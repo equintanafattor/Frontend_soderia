@@ -114,4 +114,3 @@ class VisitCard extends StatelessWidget {
     );
   }
 }
-
