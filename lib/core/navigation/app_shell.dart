@@ -2,37 +2,50 @@ import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/colors.dart';
 import 'package:frontend_soderia/core/navigation/destinations.dart';
 
-
 /// AppShell adaptativo:
-/// - Móvil  (<600): AppBar + Drawer modal (icono hamburguesa)
-/// - Tablet (600-1024): AppBar + NavigationRail colapsado (siempre visible)
-/// - Desktop(>=1024): Drawer persistente (siempre visible)
+/// - Móvil  (<600): AppBar + Drawer modal
+/// - Tablet (600–1024): AppBar + NavigationRail
+/// - Desktop(>=1024): Drawer persistente
 ///
 /// Mantiene estado por sección con IndexedStack.
-/// Exposición de FAB adaptativo: aparece si el destino actual lo requiere.
+/// Exposición de FAB y título dinámico por sección.
 
 class AppShell extends StatefulWidget {
   const AppShell({
     super.key,
-    required this.pages, // Widgets por índice (mismo orden que kDestinations)
-    this.initialIndex = 0, 
-    this.onRouteChange, // opcional: para analytics o deep-link
-    this.fabBuilder, // opcional: FAB distinto por sección
-    this.titleBuilder, // opcional: Título dinámico en AppBar
-    });
+    this.pages, // Opción A: lista fija de páginas
+    this.pagesBuilder, // Opción B: fábrica que recibe el _select
+    this.initialIndex = 0,
+    this.onRouteChange,
+    this.fabBuilder,
+    this.titleBuilder,
+  }) : assert(pages != null || pagesBuilder != null,
+            'Debes proveer pages o pagesBuilder');
 
-    final List<Widget> pages;
-    final int initialIndex; 
-    final void Function(int index, AppDestination dest)? onRouteChange; 
-    final Widget? Function(BuildContext context, int index)? fabBuilder; 
-    final String Function(int index, AppDestination dest)? titleBuilder; 
+  /// Lista fija de páginas. El orden debe coincidir con kDestinations.
+  final List<Widget>? pages;
+
+  /// Fábrica de páginas que recibe el callback select (cambiar de pestaña).
+  final List<Widget> Function(void Function(int) select)? pagesBuilder;
+
+  /// Índice inicial.
+  final int initialIndex;
+
+  /// Callback opcional al cambiar de sección (útil para analytics/deep-link).
+  final void Function(int index, AppDestination dest)? onRouteChange;
+
+  /// FAB opcional por sección.
+  final Widget? Function(BuildContext context, int index)? fabBuilder;
+
+  /// Título opcional por sección. Si devuelve '', no se muestra título.
+  final String Function(int index, AppDestination dest)? titleBuilder;
 
   @override
   State<AppShell> createState() => _AppShellState();
 }
 
 class _AppShellState extends State<AppShell> {
-  late int _index; 
+  late int _index;
 
   @override
   void initState() {
@@ -41,7 +54,7 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _select(int newIndex) {
-    if (newIndex == _index) return; 
+    if (newIndex == _index) return;
     setState(() => _index = newIndex);
     widget.onRouteChange?.call(newIndex, kDestinations[newIndex]);
   }
@@ -49,27 +62,27 @@ class _AppShellState extends State<AppShell> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final w = MediaQuery.of(context).size.width; 
-    final isMobile = w < 600; 
-    final isRail = w >= 600 && w < 1024; 
-    final isDesk = w >= 1024; 
+    final w = MediaQuery.of(context).size.width;
+    final isMobile = w < 600;
+    final isRail   = w >= 600 && w < 1024;
 
-    final titleText = widget.titleBuilder?.call(_index, kDestinations[_index]) ??
-      kDestinations[_index].label;
-    
+    // Construye las páginas (inyectando _select si se usa pagesBuilder)
+    final pages = widget.pagesBuilder?.call(_select) ?? widget.pages!;
+
+    // Título dinámico (si titleBuilder devuelve '', no se muestra)
+    final titleText = widget.titleBuilder?.call(_index, kDestinations[_index])
+        ?? kDestinations[_index].label;
+
     final fab = widget.fabBuilder?.call(context, _index);
 
-    // Contenido principal (mantiene estado por tab)
-    final body = IndexedStack(
-      index: _index,
-      children: widget.pages,
-    );
+    // Contenido principal preservando estado por pestaña
+    final body = IndexedStack(index: _index, children: pages);
 
     // ------- MÓVIL: AppBar + Drawer modal -------
     if (isMobile) {
       return Scaffold(
         appBar: AppBar(
-          title: Text(titleText),
+          title: titleText.isEmpty ? null : Text(titleText),
           backgroundColor: cs.primary,
           foregroundColor: cs.onPrimary,
           elevation: 0,
@@ -94,7 +107,7 @@ class _AppShellState extends State<AppShell> {
     if (isRail) {
       return Scaffold(
         appBar: AppBar(
-          title: Text(titleText),
+          title: titleText.isEmpty ? null : Text(titleText),
           backgroundColor: cs.primary,
           foregroundColor: cs.onPrimary,
           elevation: 0,
@@ -106,25 +119,12 @@ class _AppShellState extends State<AppShell> {
               selectedIndex: _index,
               onDestinationSelected: _select,
               labelType: NavigationRailLabelType.selected,
-              leading: Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: IconButton(
-                  icon: const Icon(Icons.menu_open),
-                  tooltip: 'Abrir menú',
-                  onPressed: () {
-                    // Opcional: podrías abrir un Drawer temporal con textos completos
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Aquí podrías abrir un Drawer temporal con títulos')),
-                    );
-                  },
-                ),
-              ),
               destinations: [
                 for (final d in kDestinations)
                   NavigationRailDestination(
                     icon: Icon(d.icon),
                     label: Text(d.label),
-                  )
+                  ),
               ],
             ),
             const VerticalDivider(width: 1),
@@ -153,7 +153,7 @@ class _AppShellState extends State<AppShell> {
           Expanded(
             child: Scaffold(
               appBar: AppBar(
-                title: Text(titleText),
+                title: titleText.isEmpty ? null : Text(titleText),
                 backgroundColor: cs.primary,
                 foregroundColor: cs.onPrimary,
                 elevation: 0,
@@ -169,6 +169,7 @@ class _AppShellState extends State<AppShell> {
 }
 
 // ====== Drawers ======
+
 class _ModalDrawer extends StatelessWidget {
   const _ModalDrawer({
     required this.selectedIndex,
@@ -176,7 +177,7 @@ class _ModalDrawer extends StatelessWidget {
   });
 
   final int selectedIndex;
-  final ValueChanged<int> onSelect; 
+  final ValueChanged<int> onSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -185,31 +186,46 @@ class _ModalDrawer extends StatelessWidget {
         padding: EdgeInsets.zero,
         children: [
           const DrawerHeader(
-            child: Text('Dashboard', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold))
+            child: Text(
+              'Dashboard',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
           ),
           for (var i = 0; i < kDestinations.length; i++)
             ListTile(
               leading: Icon(kDestinations[i].icon, color: AppColors.azul),
-              title: Text(kDestinations[i].label, style: const TextStyle(color: AppColors.azul)),
+              title: Text(
+                kDestinations[i].label,
+                style: const TextStyle(color: AppColors.azul),
+              ),
               selected: i == selectedIndex,
               onTap: () {
                 Navigator.pop(context);
                 onSelect(i);
               },
             ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.logout, color: AppColors.azul),
+            title: const Text(
+              'Cerrar sesión',
+              style: TextStyle(color: AppColors.azul),
+            ),
+            onTap: () {
+              Navigator.pop(context);
+              // TODO: lógica de logout (limpiar sesión y navegar a Login)
+            },
+          ),
         ],
       ),
     );
   }
 }
 
-
-
-
 class _PersistentDrawer extends StatelessWidget {
   const _PersistentDrawer({
     required this.selectedIndex,
-    required this.onSelect
+    required this.onSelect,
   });
 
   final int selectedIndex;
@@ -222,21 +238,42 @@ class _PersistentDrawer extends StatelessWidget {
       children: [
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          child: Text('Dashboard', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          child: Text(
+            'Dashboard',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
         ),
         for (var i = 0; i < kDestinations.length; i++)
           ListTile(
             leading: Icon(kDestinations[i].icon, color: AppColors.azul),
-            title: Text(kDestinations[i].label, style: const TextStyle(color: AppColors.azul)),
+            title: Text(
+              kDestinations[i].label,
+              style: const TextStyle(color: AppColors.azul),
+            ),
             selected: i == selectedIndex,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
             onTap: () => onSelect(i),
             // ignore: deprecated_member_use
             hoverColor: AppColors.celeste.withOpacity(0.08),
             // ignore: deprecated_member_use
             selectedTileColor: AppColors.celeste.withOpacity(0.12),
           ),
+        const Divider(),
+        ListTile(
+          leading: const Icon(Icons.logout, color: AppColors.azul),
+          title: const Text(
+            'Cerrar sesión',
+            style: TextStyle(color: AppColors.azul),
+          ),
+          onTap: () {
+            // TODO: lógica de logout (limpiar sesión y navegar a Login)
+          },
+        ),
       ],
     );
   }
 }
+
+

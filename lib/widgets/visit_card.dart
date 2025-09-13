@@ -43,6 +43,7 @@ class VisitCard extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
+                // ignore: deprecated_member_use
                 color: chipColor.withOpacity(0.15),
                 shape: BoxShape.circle,
               ),

@@ -74,17 +74,20 @@ class FrontendSoderiaApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: soderiaTheme,
       home: AppShell(
-        pages: const [
-          HomeScreen(nombreUsuario: 'Gastón'),
-          TodosScreen(nombreUsuario: 'Gastón'),
-          Placeholder(), // Reportes
-          Placeholder(), // Usuarios
-          Placeholder(), // Clientes
-        ],
         initialIndex: 0,
+        pagesBuilder: (select) => [
+          HomeScreen(nombreUsuario: 'Gastón', onRequestTab: select),
+          const TodosScreen(nombreUsuario: 'Gastón'),
+          const Placeholder(), // Reportes
+          const Placeholder(), // Usuarios
+          const Placeholder(), // Clientes
+        ],
+        // 👇 Aquí controlamos qué título muestra el AppBar
+        titleBuilder: (index, dest) {
+          if (index == 0) return ''; // Home → sin título
+          return dest.label; // resto → usa el label de kDestinations
+        },
       ),
     );
   }
 }
-
-
