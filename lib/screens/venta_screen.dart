@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/colors.dart';
+import 'package:frontend_soderia/screens/pago_screen.dart';
 
 class VentaScreen extends StatefulWidget {
   final String nombreCliente;
@@ -83,24 +84,38 @@ class _VentaScreenState extends State<VentaScreen> {
   }
 
   Future<void> _confirmarVenta() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Confirmar venta'),
-        content: Text('¿Confirmar venta por \$${_total.toStringAsFixed(0)}?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirmar')),
-        ],
+    final ok = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => PagoScreen(
+          nombreCliente: 'Tamara Silva',
+          legajo: '001',
+          fecha: DateTime.now(),
+          deudaActual: 25000,
+          items: const [
+            LineaVenta(
+              nroPedido: '015',
+              producto: 'Agua de 20 Lts',
+              cantidad: 2,
+              precioUnitario: 3500,
+            ),
+            LineaVenta(
+              nroPedido: '015',
+              producto: 'Dispenser Frio Calor',
+              cantidad: 1,
+              precioUnitario: 20000,
+            ),
+          ],
+          total: 27000,
+        ),
       ),
     );
 
     if (ok == true) {
       // TODO: Llamar a API para registrar venta, mostrar éxito y volver
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Venta confirmada')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Venta confirmada')));
         Navigator.pop(context); // volver a la lista de Hoy (si aplica)
       }
     }
@@ -111,9 +126,14 @@ class _VentaScreenState extends State<VentaScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Marcar como "No compra"'),
-        content: const Text('¿Estás seguro de marcar esta visita como "No compra"?'),
+        content: const Text(
+          '¿Estás seguro de marcar esta visita como "No compra"?',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(context, true),
@@ -135,9 +155,9 @@ class _VentaScreenState extends State<VentaScreen> {
 
   void _postergar() async {
     // TODO: Abrir date picker / motivo
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Visita postergada (demo)')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Visita postergada (demo)')));
     Navigator.pop(context);
   }
 
@@ -197,7 +217,9 @@ class _VentaScreenState extends State<VentaScreen> {
         bottomNavigationBar: isMobile ? confirm : null,
 
         body: Padding(
-          padding: EdgeInsets.only(bottom: isMobile ? 84 : 0), // espacio para que no tape el botón
+          padding: EdgeInsets.only(
+            bottom: isMobile ? 84 : 0,
+          ), // espacio para que no tape el botón
           child: TabBarView(
             children: [
               _tabVentaActual(context, cs),
@@ -216,10 +238,7 @@ class _VentaScreenState extends State<VentaScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _HeaderInfo(
-          legajo: widget.legajo,
-          deuda: widget.deuda,
-        ),
+        _HeaderInfo(legajo: widget.legajo, deuda: widget.deuda),
         const SizedBox(height: 12),
 
         // Acciones rápidas
@@ -257,7 +276,9 @@ class _VentaScreenState extends State<VentaScreen> {
               children: [
                 Icon(Icons.info_outline, color: cs.primary),
                 const SizedBox(width: 8),
-                const Expanded(child: Text('No hay productos en la venta actual.')),
+                const Expanded(
+                  child: Text('No hay productos en la venta actual.'),
+                ),
               ],
             ),
           ),
@@ -268,7 +289,9 @@ class _VentaScreenState extends State<VentaScreen> {
             child: ListTile(
               leading: const Icon(Icons.local_drink),
               title: Text(entry.key),
-              subtitle: Text('Cantidad: ${entry.value} · \$${(_catalogo[entry.key] ?? 0).toStringAsFixed(0)} c/u'),
+              subtitle: Text(
+                'Cantidad: ${entry.value} · \$${(_catalogo[entry.key] ?? 0).toStringAsFixed(0)} c/u',
+              ),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -294,9 +317,9 @@ class _VentaScreenState extends State<VentaScreen> {
           child: Text(
             'Total: \$${_total.toStringAsFixed(0)}',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Colors.green.shade700,
-                  fontWeight: FontWeight.bold,
-                ),
+              color: Colors.green.shade700,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ],
@@ -347,8 +370,7 @@ class _VentaScreenState extends State<VentaScreen> {
         ),
       ),
     );
-    }
-
+  }
 }
 
 // ---------- Widgets auxiliares ----------
@@ -363,7 +385,10 @@ class _TitleCliente extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(nombre, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        Text(
+          nombre,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
         Text(direccion, style: const TextStyle(fontSize: 13)),
       ],
     );
@@ -424,7 +449,10 @@ class _InfoItem extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text('$label: ', style: TextStyle(color: cs.onSurfaceVariant)),
-        Text(value, style: valueStyle ?? const TextStyle(fontWeight: FontWeight.w600)),
+        Text(
+          value,
+          style: valueStyle ?? const TextStyle(fontWeight: FontWeight.w600),
+        ),
       ],
     );
   }
@@ -459,7 +487,10 @@ class _CantidadDialogState extends State<_CantidadDialog> {
             onPressed: () => setState(() => _cant = (_cant - 1).clamp(0, 999)),
             icon: const Icon(Icons.remove),
           ),
-          Text('$_cant', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+          Text(
+            '$_cant',
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          ),
           IconButton(
             tooltip: 'Más',
             onPressed: () => setState(() => _cant = (_cant + 1).clamp(0, 999)),
@@ -468,8 +499,14 @@ class _CantidadDialogState extends State<_CantidadDialog> {
         ],
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-        FilledButton(onPressed: () => Navigator.pop<int>(context, _cant), child: const Text('Guardar')),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop<int>(context, _cant),
+          child: const Text('Guardar'),
+        ),
       ],
     );
   }
@@ -511,13 +548,17 @@ class ConfirmAction extends StatelessWidget {
               onPressed: enabled ? onConfirm : null,
               icon: const Icon(Icons.check),
               label: Text(
-                total > 0 ? 'Confirmar · \$${total.toStringAsFixed(0)}' : 'Confirmar',
+                total > 0
+                    ? 'Confirmar · \$${total.toStringAsFixed(0)}'
+                    : 'Confirmar',
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: enabled ? Colors.green : null,
                 foregroundColor: enabled ? Colors.white : null,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ),
