@@ -23,9 +23,9 @@ class PagoScreen extends StatefulWidget {
   final String nombreCliente;
   final String legajo;
   final DateTime fecha;
-  final double deudaActual;          // para mostrar en rojo si > 0
-  final List<LineaVenta> items;      // ítems de la venta (para el recibo)
-  final double total;                // total de la venta
+  final double deudaActual; // para mostrar en rojo si > 0
+  final List<LineaVenta> items; // ítems de la venta (para el recibo)
+  final double total; // total de la venta
 
   const PagoScreen({
     super.key,
@@ -72,34 +72,106 @@ class _PagoScreenState extends State<PagoScreen> {
 
   Future<void> _confirmar() async {
     // Validaciones mínimas
-    if (!_montoValido) return;
+    // 🔹 2) EN _confirmar(): mostrar sheet si hay que compartir
+    Future<void> _confirmar() async {
+      if (!_montoValido) return;
 
-    // Confirmación
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Confirmar pago'),
-        content: Text(
-          'Cliente: ${widget.nombreCliente}\n'
-          'Medio: ${_medio.name}\n'
-          'Importe: ${_money(_montoElegido!)}\n\n'
-          '¿Registrar pago?',
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Confirmar pago'),
+          content: Text(
+            'Cliente: ${widget.nombreCliente}\n'
+            'Medio: ${_medio.name}\n'
+            'Importe: ${_money(_montoElegido!)}\n\n'
+            '¿Registrar pago?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Confirmar'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirmar')),
-        ],
-      ),
-    );
-
-    if (ok == true && mounted) {
-      // TODO: llamar API para registrar pago, emitir recibo, etc.
-      // Si _compartirComprobante == true → disparar share / WhatsApp / email.
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Pago registrado por ${_money(_montoElegido!)}')),
       );
-      Navigator.pop(context, true); // volvés a la venta
+
+      if (ok == true && mounted) {
+        // TODO: llamar API para registrar pago, emitir recibo, etc.
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Pago registrado por ${_money(_montoElegido!)}'),
+          ),
+        );
+
+        // ⬇️ NUEVO: si pidieron compartir, muestro opciones
+        if (_compartirComprobante) {
+          await _showShareSheet();
+        }
+
+        if (mounted) Navigator.pop(context, true);
+      }
     }
+  }
+
+  // 🔹 1) NUEVO: helper para saber si queda saldo al día
+  bool get _saldoAlDia {
+    if (!_montoValido) return false;
+    final requerido = widget.total + widget.deudaActual;
+    return _montoElegido! + 0.0001 >= requerido; // tolerancia por parseo
+  }
+
+  // 🔹 3) NUEVO: bottom sheet de “Compartir comprobante”
+  Future<void> _showShareSheet() {
+    return showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const ListTile(
+                title: Text('Compartir comprobante'),
+                subtitle: Text('Elegí un canal'),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.chat),
+                title: const Text('WhatsApp'),
+                onTap: () {
+                  // TODO: integrar share hacia WhatsApp con el PDF/recibo
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.email_outlined),
+                title: const Text('Email'),
+                onTap: () {
+                  // TODO: integrar share por email (adjuntar PDF/recibo)
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.print_outlined),
+                title: const Text('Imprimir'),
+                onTap: () {
+                  // TODO: integrar impresión del comprobante
+                  Navigator.pop(context);
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -107,6 +179,9 @@ class _PagoScreenState extends State<PagoScreen> {
     final cs = Theme.of(context).colorScheme;
     final w = MediaQuery.of(context).size.width;
     final isMobile = w < 720;
+
+    final bool _otroActivo =
+        _montoElegido == null || !_montosRapidos.contains(_montoElegido);
 
     final confirmButton = _ConfirmarButton(
       enabled: _montoValido,
@@ -153,13 +228,15 @@ class _PagoScreenState extends State<PagoScreen> {
             const SizedBox(height: 4),
 
             // Filas
-            ...widget.items.map((it) => _TablaRow(
-                  nro: it.nroPedido,
-                  producto: it.producto,
-                  cantidad: it.cantidad,
-                  pu: it.precioUnitario,
-                  pt: it.subtotal,
-                )),
+            ...widget.items.map(
+              (it) => _TablaRow(
+                nro: it.nroPedido,
+                producto: it.producto,
+                cantidad: it.cantidad,
+                pu: it.precioUnitario,
+                pt: it.subtotal,
+              ),
+            ),
             const SizedBox(height: 8),
             const Divider(thickness: 1.4),
 
@@ -169,16 +246,19 @@ class _PagoScreenState extends State<PagoScreen> {
               child: Text(
                 'Total: ${_money(widget.total)}',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: Colors.black87,
-                    ),
+                  fontWeight: FontWeight.w800,
+                  color: Colors.black87,
+                ),
               ),
             ),
 
             const SizedBox(height: 16),
 
             // Monto a abonar
-            Text('El cliente abonará:', style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              'El cliente abonará:',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 10,
@@ -195,44 +275,64 @@ class _PagoScreenState extends State<PagoScreen> {
                       });
                     },
                   ),
+
                 _MontoChip(
                   label: 'Otro',
-                  selected: _montoElegido != null &&
-                      !_montosRapidos.contains(_montoElegido),
+                  selected: _otroActivo,
                   onTap: () {
                     setState(() {
-                      _montoElegido = null;
+                      _montoElegido = null; // activa “Otro”
+                      _otroCtrl.text = ''; // limpio el campo
                     });
                   },
-                  filled: true,
+                  filled: _otroActivo, // 👈 antes estaba true fijo
                 ),
-                SizedBox(
-                  width: 160,
-                  child: TextField(
-                    controller: _otroCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      isDense: true,
-                      labelText: 'Importe',
-                      prefixText: '\$ ',
-                      border: OutlineInputBorder(),
+
+                if (_otroActivo)
+                  SizedBox(
+                    width: 160,
+                    child: TextField(
+                      controller: _otroCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        labelText: 'Importe',
+                        prefixText: '\$ ',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (txt) {
+                        final cleaned = txt.replaceAll(RegExp(r'[^0-9.]'), '');
+                        final val = double.tryParse(cleaned);
+                        setState(() {
+                          _montoElegido =
+                              val; // queda “Otro” activo porque no pertenece a _montosRapidos
+                        });
+                      },
                     ),
-                    onChanged: (txt) {
-                      final cleaned = txt.replaceAll(RegExp(r'[^0-9.]'), '');
-                      final val = double.tryParse(cleaned);
-                      setState(() {
-                        _montoElegido = val;
-                      });
-                    },
                   ),
-                ),
               ],
             ),
+
+            const SizedBox(height: 8),
+            if (_saldoAlDia)
+              Row(
+                children: const [
+                  Icon(Icons.verified, color: Colors.green),
+                  SizedBox(width: 8),
+                  Text(
+                    'Saldo al día ✅',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ),
 
             const SizedBox(height: 16),
 
             // Medio de pago
-            Text('Medio de pago:', style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              'Medio de pago:',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 8),
             _Segmented<MedioPago>(
               value: _medio,
@@ -284,15 +384,16 @@ class _EncabezadoCliente extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(nombre,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                )),
+        Text(
+          nombre,
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+        ),
         const SizedBox(height: 4),
         Row(
           children: [
-            Text('Legajo: ',
-                style: TextStyle(color: cs.onSurfaceVariant)),
+            Text('Legajo: ', style: TextStyle(color: cs.onSurfaceVariant)),
             Text(legajo, style: const TextStyle(fontWeight: FontWeight.w600)),
           ],
         ),
@@ -320,7 +421,8 @@ class _FechaPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final f = '${fecha.day.toString().padLeft(2, '0')}/'
+    final f =
+        '${fecha.day.toString().padLeft(2, '0')}/'
         '${fecha.month.toString().padLeft(2, '0')}/'
         '${fecha.year}';
     return Container(
@@ -338,7 +440,9 @@ class _FechaPill extends StatelessWidget {
 class _TablaHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700);
+    final style = Theme.of(
+      context,
+    ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Row(
@@ -377,9 +481,7 @@ class _TablaRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
       decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(color: cs.outlineVariant),
-        ),
+        border: Border(top: BorderSide(color: cs.outlineVariant)),
       ),
       child: Row(
         children: [
@@ -431,7 +533,10 @@ class _MontoChip extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
           border: Border.all(color: border.color, width: border.width),
         ),
-        child: Text(label, style: TextStyle(color: fg, fontWeight: FontWeight.w700)),
+        child: Text(
+          label,
+          style: TextStyle(color: fg, fontWeight: FontWeight.w700),
+        ),
       ),
     );
   }
@@ -460,7 +565,10 @@ class _Segmented<T> extends StatelessWidget {
           selected: selected,
           onSelected: (_) => onChanged(e.$1),
           selectedColor: AppColors.azul,
-          labelStyle: TextStyle(color: selected ? Colors.white : Colors.black87, fontWeight: FontWeight.w700),
+          labelStyle: TextStyle(
+            color: selected ? Colors.white : Colors.black87,
+            fontWeight: FontWeight.w700,
+          ),
           backgroundColor: Colors.transparent,
           side: const BorderSide(color: Colors.black87, width: 1.2),
         );
