@@ -55,10 +55,11 @@ import 'package:intl/date_symbol_data_local.dart';
 
 import 'core/theme.dart';
 import 'core/navigation/app_shell.dart';
+import 'core/navigation/app_shell_actions.dart'; // 👈 NUEVO
 import 'screens/home_screen.dart';
 import 'screens/todos_screen.dart';
 
-// 👇 importa tus screens nuevos
+// Altas
 import 'screens/clientes/cliente_add_screen.dart';
 import 'screens/productos/producto_add_screen.dart';
 import 'screens/usuarios/usuario_add_screen.dart';
@@ -79,7 +80,6 @@ class FrontendSoderiaApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: soderiaTheme,
 
-      // 👇 rutas nombradas para abrir las pantallas de "agregar"
       routes: {
         '/cliente/new': (_) => const ClienteAddScreen(),
         '/producto/new': (_) => const ProductoAddScreen(),
@@ -95,30 +95,28 @@ class FrontendSoderiaApp extends StatelessWidget {
           const Placeholder(), // Usuarios
           const Placeholder(), // Clientes
         ],
-        // 👇 título dinámico
         titleBuilder: (index, dest) => index == 0 ? '' : dest.label,
 
-        // 👇 FAB por sección
         fabBuilder: (ctx, index) {
-          // En Inicio mostramos un FAB que abre el "launcher" de altas
           if (index == 0) {
             return FloatingActionButton.extended(
               icon: const Icon(Icons.add),
               label: const Text('Agregar'),
-              onPressed: () => _showAddSheet(ctx),
+              onPressed: () =>
+                  AppShellActions.showAddSheet(ctx), // 👈 usar helper
             );
           }
-          // En Usuarios: alta directa de usuario
           if (index == 3) {
+            // Usuarios
             return FloatingActionButton(
-              onPressed: () => _pushAndRefresh(ctx, '/usuario/new'),
+              onPressed: () => AppShellActions.push(ctx, '/usuario/new'),
               child: const Icon(Icons.person_add),
             );
           }
-          // En Clientes: alta directa de cliente
           if (index == 4) {
+            // Clientes
             return FloatingActionButton(
-              onPressed: () => _pushAndRefresh(ctx, '/cliente/new'),
+              onPressed: () => AppShellActions.push(ctx, '/cliente/new'),
               child: const Icon(Icons.person_add_alt_1),
             );
           }
@@ -171,8 +169,8 @@ Future<void> _showAddSheet(BuildContext context) async {
 }
 
 Future<void> _pushAndRefresh(BuildContext context, String route) async {
-  final ok = await Navigator.pushNamed<bool>(context, route);
-  if (ok == true && context.mounted) {
+  final res = await Navigator.pushNamed(context, route);
+  if (res == true && context.mounted) {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('Guardado correctamente')));

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/colors.dart';
+import 'package:frontend_soderia/core/navigation/app_shell_actions.dart';
 import 'package:frontend_soderia/core/navigation/destinations.dart';
 
 /// AppShell adaptativo:
@@ -19,8 +20,10 @@ class AppShell extends StatefulWidget {
     this.onRouteChange,
     this.fabBuilder,
     this.titleBuilder,
-  }) : assert(pages != null || pagesBuilder != null,
-            'Debes proveer pages o pagesBuilder');
+  }) : assert(
+         pages != null || pagesBuilder != null,
+         'Debes proveer pages o pagesBuilder',
+       );
 
   /// Lista fija de páginas. El orden debe coincidir con kDestinations.
   final List<Widget>? pages;
@@ -64,14 +67,15 @@ class _AppShellState extends State<AppShell> {
     final cs = Theme.of(context).colorScheme;
     final w = MediaQuery.of(context).size.width;
     final isMobile = w < 600;
-    final isRail   = w >= 600 && w < 1024;
+    final isRail = w >= 600 && w < 1024;
 
     // Construye las páginas (inyectando _select si se usa pagesBuilder)
     final pages = widget.pagesBuilder?.call(_select) ?? widget.pages!;
 
     // Título dinámico (si titleBuilder devuelve '', no se muestra)
-    final titleText = widget.titleBuilder?.call(_index, kDestinations[_index])
-        ?? kDestinations[_index].label;
+    final titleText =
+        widget.titleBuilder?.call(_index, kDestinations[_index]) ??
+        kDestinations[_index].label;
 
     final fab = widget.fabBuilder?.call(context, _index);
 
@@ -94,12 +98,18 @@ class _AppShellState extends State<AppShell> {
             ),
           ),
         ),
-        drawer: _ModalDrawer(
-          selectedIndex: _index,
-          onSelect: _select,
-        ),
+        drawer: _ModalDrawer(selectedIndex: _index, onSelect: _select),
         body: body,
-        floatingActionButton: fab,
+        // donde hoy ponés floatingActionButton: fab,
+        floatingActionButton:
+            fab ??
+            (_index == 0
+                ? FloatingActionButton.extended(
+                    icon: const Icon(Icons.add),
+                    label: const Text('Agregar'),
+                    onPressed: () => AppShellActions.showAddSheet(context),
+                  )
+                : null),
       );
     }
 
@@ -171,10 +181,7 @@ class _AppShellState extends State<AppShell> {
 // ====== Drawers ======
 
 class _ModalDrawer extends StatelessWidget {
-  const _ModalDrawer({
-    required this.selectedIndex,
-    required this.onSelect,
-  });
+  const _ModalDrawer({required this.selectedIndex, required this.onSelect});
 
   final int selectedIndex;
   final ValueChanged<int> onSelect;
@@ -275,5 +282,3 @@ class _PersistentDrawer extends StatelessWidget {
     );
   }
 }
-
-
