@@ -64,6 +64,10 @@ import 'screens/clientes/cliente_add_screen.dart';
 import 'screens/productos/producto_add_screen.dart';
 import 'screens/usuarios/usuario_add_screen.dart';
 
+// Listar
+import 'screens/usuarios/usuarios_list_screen.dart';
+import 'screens/clientes/clientes_list_screen.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('es_AR', null);
@@ -92,8 +96,8 @@ class FrontendSoderiaApp extends StatelessWidget {
           HomeScreen(nombreUsuario: 'Gastón', onRequestTab: select),
           const TodosScreen(nombreUsuario: 'Gastón'),
           const Placeholder(), // Reportes
-          const Placeholder(), // Usuarios
-          const Placeholder(), // Clientes
+          const UsuariosListScreen(),   // Usuarios
+          const ClientesListScreen(),   // Clientes
         ],
         titleBuilder: (index, dest) => index == 0 ? '' : dest.label,
 

@@ -1,61 +1,67 @@
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/navigation/app_shell_actions.dart';
 
-class UsuariosListScreen extends StatefulWidget {
-  const UsuariosListScreen({super.key});
+class ClientesListScreen extends StatefulWidget {
+  const ClientesListScreen({super.key});
 
   @override
-  State<UsuariosListScreen> createState() => _UsuariosListScreenState();
+  State<ClientesListScreen> createState() => _ClientesListScreenState();
 }
 
-class _UsuariosListScreenState extends State<UsuariosListScreen> {
+class _ClientesListScreenState extends State<ClientesListScreen> {
   final _search = TextEditingController();
-  String _orden = 'Nombre (A→Z)';
+  String _orden = 'Apellido (A→Z)';
   bool _cargando = false;
 
-  // Mock inicial – luego lo reemplazás con tu repo/API
+  // Mock – reemplazar por repo/API
   List<Map<String, dynamic>> _data = [
     {
-      'nombre': 'Ana Torres',
-      'email': 'ana@soderia.com',
-      'rol': 'Ventas',
-      'activo': true,
-      'created': DateTime(2025, 9, 1),
+      'nombre': 'Juan',
+      'apellido': 'Pérez',
+      'tel': '343-555111',
+      'zona': 'Centro',
+      'visitadia': 'Lun, Jue',
+      'created': DateTime(2025, 9, 10),
     },
     {
-      'nombre': 'Bruno Díaz',
-      'email': 'bruno@soderia.com',
-      'rol': 'Repartidor',
-      'activo': true,
-      'created': DateTime(2025, 9, 5),
+      'nombre': 'María',
+      'apellido': 'López',
+      'tel': '343-555222',
+      'zona': 'Norte',
+      'visitadia': 'Mar, Vie',
+      'created': DateTime(2025, 9, 3),
     },
     {
-      'nombre': 'Carla Gómez',
-      'email': 'carla@soderia.com',
-      'rol': 'Admin',
-      'activo': false,
-      'created': DateTime(2025, 8, 20),
+      'nombre': 'Carlos',
+      'apellido': 'García',
+      'tel': '343-555333',
+      'zona': 'Sur',
+      'visitadia': 'Mié',
+      'created': DateTime(2025, 8, 22),
     },
   ];
 
   List<Map<String, dynamic>> get _filtered {
     final q = _search.text.trim().toLowerCase();
-    var list = _data.where((u) {
+    var list = _data.where((c) {
       if (q.isEmpty) return true;
-      return (u['nombre'] as String).toLowerCase().contains(q) ||
-          (u['email'] as String).toLowerCase().contains(q) ||
-          (u['rol'] as String).toLowerCase().contains(q);
+      final nombreCompleto = '${c['nombre']} ${c['apellido']}'.toLowerCase();
+      return nombreCompleto.contains(q) ||
+          (c['tel'] as String).toLowerCase().contains(q) ||
+          (c['zona'] as String).toLowerCase().contains(q);
     }).toList();
 
     switch (_orden) {
-      case 'Nombre (A→Z)':
+      case 'Apellido (A→Z)':
         list.sort(
-          (a, b) => (a['nombre'] as String).compareTo(b['nombre'] as String),
+          (a, b) =>
+              (a['apellido'] as String).compareTo(b['apellido'] as String),
         );
         break;
-      case 'Nombre (Z→A)':
+      case 'Apellido (Z→A)':
         list.sort(
-          (a, b) => (b['nombre'] as String).compareTo(a['nombre'] as String),
+          (a, b) =>
+              (b['apellido'] as String).compareTo(a['apellido'] as String),
         );
         break;
       case 'Más nuevos':
@@ -76,7 +82,7 @@ class _UsuariosListScreenState extends State<UsuariosListScreen> {
 
   Future<void> _refresh() async {
     setState(() => _cargando = true);
-    // TODO: cargar desde backend
+    // TODO: fetch backend
     await Future.delayed(const Duration(milliseconds: 500));
     if (mounted) setState(() => _cargando = false);
   }
@@ -103,12 +109,13 @@ class _UsuariosListScreenState extends State<UsuariosListScreen> {
                   onChanged: (_) => setState(() {}),
                   decoration: const InputDecoration(
                     prefixIcon: Icon(Icons.search),
-                    hintText: 'Buscar por nombre, email o rol...',
+                    hintText: 'Buscar por nombre, teléfono o zona...',
                     border: OutlineInputBorder(),
                     isDense: true,
                   ),
                 ),
               ),
+
               const SizedBox(width: 12),
               PopupMenuButton<String>(
                 tooltip: 'Ordenar',
@@ -116,12 +123,12 @@ class _UsuariosListScreenState extends State<UsuariosListScreen> {
                 onSelected: (v) => setState(() => _orden = v),
                 itemBuilder: (ctx) => const [
                   PopupMenuItem(
-                    value: 'Nombre (A→Z)',
-                    child: Text('Nombre (A→Z)'),
+                    value: 'Apellido (A→Z)',
+                    child: Text('Apellido (A→Z)'),
                   ),
                   PopupMenuItem(
-                    value: 'Nombre (Z→A)',
-                    child: Text('Nombre (Z→A)'),
+                    value: 'Apellido (Z→A)',
+                    child: Text('Apellido (Z→A)'),
                   ),
                   PopupMenuItem(value: 'Más nuevos', child: Text('Más nuevos')),
                   PopupMenuItem(
@@ -137,8 +144,8 @@ class _UsuariosListScreenState extends State<UsuariosListScreen> {
               ),
               const SizedBox(width: 8),
               FilledButton.icon(
-                onPressed: () => AppShellActions.push(context, '/usuario/new'),
-                icon: const Icon(Icons.person_add),
+                onPressed: () => AppShellActions.push(context, '/cliente/new'),
+                icon: const Icon(Icons.person_add_alt_1),
                 label: const Text('Nuevo'),
               ),
             ],
@@ -155,35 +162,31 @@ class _UsuariosListScreenState extends State<UsuariosListScreen> {
                     itemCount: _filtered.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (ctx, i) {
-                      final u = _filtered[i];
+                      final c = _filtered[i];
+                      final nombre = '${c['apellido']}, ${c['nombre']}';
                       return ListTile(
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadiusGeometry.circular(12),
                         ),
                         tileColor: Theme.of(context).colorScheme.surface,
                         leading: CircleAvatar(
-                          child: Text((u['nombre'] as String).substring(0, 1)),
+                          child: Text(
+                            (c['apellido'] as String).substring(0, 1),
+                          ),
                         ),
-                        title: Text(u['nombre']),
-                        subtitle: Text('${u['email']} · ${u['rol']}'),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              u['activo'] ? Icons.check_circle : Icons.cancel,
-                              color: u['activo'] ? cs.primary : cs.error,
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.edit),
-                              tooltip: 'Editar',
-                              onPressed: () {
-                                // TODO: Navegar a editar (en el futuro)
-                              },
-                            ),
-                          ],
+                        title: Text(nombre),
+                        subtitle: Text(
+                          '${c['tel']} · Zona: ${c['zona']} · ${c['visitadia']}',
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.edit),
+                          tooltip: 'Editar',
+                          onPressed: () {
+                            // TODO: navegar a editar
+                          },
                         ),
                         onTap: () {
-                          // TODO: detalle si querés
+                          // TODO: detalle cliente
                         },
                       );
                     },
