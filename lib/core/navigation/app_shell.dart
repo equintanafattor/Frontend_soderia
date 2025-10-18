@@ -71,6 +71,10 @@ class _AppShellState extends State<AppShell> {
 
     // Construye las páginas (inyectando _select si se usa pagesBuilder)
     final pages = widget.pagesBuilder?.call(_select) ?? widget.pages!;
+    assert(
+      pages.length == kDestinations.length,
+      'pages y kDestinations deben tener el mismo largo y orden',
+    );
 
     // Título dinámico (si titleBuilder devuelve '', no se muestra)
     final titleText =
