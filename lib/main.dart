@@ -51,6 +51,7 @@ AppShell _buildAppShell({String usuario = 'Gastón'}) {
  */
 
 import 'package:flutter/material.dart';
+import 'package:frontend_soderia/core/navigation/destinations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'core/theme.dart';
@@ -58,6 +59,7 @@ import 'core/navigation/app_shell.dart';
 import 'core/navigation/app_shell_actions.dart'; 
 import 'screens/home_screen.dart';
 import 'screens/todos_screen.dart';
+import 'screens/calendario_screen.dart'; // 👈 importa tu screen
 
 // Altas
 import 'screens/clientes/cliente_add_screen.dart';
@@ -93,32 +95,29 @@ class FrontendSoderiaApp extends StatelessWidget {
       home: AppShell(
         initialIndex: 0,
         pagesBuilder: (select) => [
-          HomeScreen(nombreUsuario: 'Gastón', onRequestTab: select),
-          const TodosScreen(nombreUsuario: 'Gastón'),
-          const Placeholder(), // Reportes
-          const UsuariosListScreen(),   // Usuarios
-          const ClientesListScreen(),   // Clientes
+          HomeScreen(nombreUsuario: 'Gastón', onRequestTab: select), // 0
+          const TodosScreen(nombreUsuario: 'Gastón'), // 1
+          const Placeholder(), // 2 Reportes
+          const UsuariosListScreen(), // 3 Usuarios
+          const ClientesListScreen(), // 4 Clientes
+          const CalendarioScreen(), // 5 Calendario 👈 NUEVO
         ],
         titleBuilder: (index, dest) => index == 0 ? '' : dest.label,
-
         fabBuilder: (ctx, index) {
-          if (index == 0) {
+          if (index == kIndexInicio) {
             return FloatingActionButton.extended(
               icon: const Icon(Icons.add),
               label: const Text('Agregar'),
-              onPressed: () =>
-                  AppShellActions.showAddSheet(ctx), // 👈 usar helper
+              onPressed: () => AppShellActions.showAddSheet(ctx),
             );
           }
-          if (index == 3) {
-            // Usuarios
+          if (index == kIndexUsuarios) {
             return FloatingActionButton(
               onPressed: () => AppShellActions.push(ctx, '/usuario/new'),
               child: const Icon(Icons.person_add),
             );
           }
-          if (index == 4) {
-            // Clientes
+          if (index == kIndexClientes) {
             return FloatingActionButton(
               onPressed: () => AppShellActions.push(ctx, '/cliente/new'),
               child: const Icon(Icons.person_add_alt_1),
