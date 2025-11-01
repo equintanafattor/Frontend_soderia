@@ -6,6 +6,7 @@ import 'package:frontend_soderia/models/jornada.dart';
 import 'package:frontend_soderia/services/jornada_service.dart';
 import 'package:frontend_soderia/widgets/day_filter_buttons.dart';
 import 'package:frontend_soderia/widgets/jornada_card.dart';
+import 'package:frontend_soderia/core/state/todos_filter.dart';
 
 class TodosScreen extends StatefulWidget {
   const TodosScreen({super.key, this.nombreUsuario = 'Usuario'});
@@ -23,50 +24,149 @@ class _TodosScreenState extends State<TodosScreen> {
   late Future<List<Jornada>> _futureJornadas;
   String _filtro = 'Todos'; // Hoy | Mañana | Ayer | Todos
 
+  late final VoidCallback _monthFilterListener;
+
+  // --- Scroll to hoy ---
+  final ScrollController _scrollController = ScrollController();
+  final Map<DateTime, GlobalKey> _dayKeys = {};
+  bool _didAutoScrollForMonth = false;
+
   @override
   void initState() {
     super.initState();
+
+    // 1) Si ya hay filtro (viene desde Calendario), aplicalo
+    final mf = todosMonthFilter.value;
+    if (mf != null) {
+      mesActual = DateTime(mf.year, mf.month, 1);
+    }
+
     _futureJornadas = _service.obtenerJornadas(mesActual.year, mesActual.month);
+
+    // 2) Escuchar cambios futuros del filtro global
+    _monthFilterListener = () {
+      final mf = todosMonthFilter.value;
+      if (mf == null) return;
+      final nueva = DateTime(mf.year, mf.month, 1);
+      if (nueva.year == mesActual.year && nueva.month == mesActual.month)
+        return;
+
+      setState(() {
+        mesActual = nueva;
+        _futureJornadas = _service.obtenerJornadas(
+          mesActual.year,
+          mesActual.month,
+        );
+        _didAutoScrollForMonth = false; // reset para autoscroll
+      });
+    };
+    todosMonthFilter.addListener(_monthFilterListener);
+  }
+
+  @override
+  void dispose() {
+    todosMonthFilter.removeListener(_monthFilterListener);
+    _scrollController.dispose();
+    super.dispose();
   }
 
   void _cambiarMes(int delta) {
     setState(() {
       mesActual = DateTime(mesActual.year, mesActual.month + delta, 1);
-      _futureJornadas = _service.obtenerJornadas(mesActual.year, mesActual.month);
+      _futureJornadas = _service.obtenerJornadas(
+        mesActual.year,
+        mesActual.month,
+      );
+      _didAutoScrollForMonth = false; // reset para autoscroll
     });
+    // 3) Sincronizar el filtro global
+    todosMonthFilter.value = MonthFilter(mesActual.year, mesActual.month);
   }
 
   Future<void> _refrescar() async {
     setState(() {
-      _futureJornadas = _service.obtenerJornadas(mesActual.year, mesActual.month);
+      _futureJornadas = _service.obtenerJornadas(
+        mesActual.year,
+        mesActual.month,
+      );
     });
     await _futureJornadas;
   }
 
-  // Helpers para filtrar por día
+  // ===== Helpers =====
+
   bool _esMismaFecha(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 
-  List<Jornada> _aplicarFiltro(List<Jornada> jornadas) {
-    if (_filtro == 'Todos') return jornadas;
+  DateTime _soloFecha(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  int _diasEnMes(DateTime d) => DateTime(d.year, d.month + 1, 0).day;
+
+  List<DateTime> _todosLosDiasDelMes(DateTime mes) {
+    final total = _diasEnMes(mes);
+    return List.generate(total, (i) => DateTime(mes.year, mes.month, i + 1));
+  }
+
+  // Agrupa jornadas por día y aplana sus clientes en una sola lista por fecha.
+  Map<DateTime, List<String>> _clientesPorDia(List<Jornada> jornadas) {
+    final map = <DateTime, List<String>>{};
+    for (final j in jornadas) {
+      final f = _soloFecha(j.fecha);
+      map.putIfAbsent(f, () => <String>[]).addAll(j.clientes);
+    }
+    // (Opcional) quitar duplicados preservando orden
+    for (final entry in map.entries) {
+      final seen = <String>{};
+      entry.value.retainWhere((c) => seen.add(c));
+    }
+    return map;
+  }
+
+  // Aplica filtro (Hoy/Ayer/Mañana/Todos) a la lista de DÍAS
+  List<DateTime> _aplicarFiltroDias(List<DateTime> dias) {
+    if (_filtro == 'Todos') return dias;
+
+    final hoyDT = _soloFecha(DateTime.now());
+    final ayerDT = _soloFecha(hoyDT.subtract(const Duration(days: 1)));
+    final manianaDT = _soloFecha(hoyDT.add(const Duration(days: 1)));
+
+    switch (_filtro) {
+      case 'Hoy':
+        return dias.where((d) => _esMismaFecha(d, hoyDT)).toList();
+      case 'Ayer':
+        return dias.where((d) => _esMismaFecha(d, ayerDT)).toList();
+      case 'Mañana':
+        return dias.where((d) => _esMismaFecha(d, manianaDT)).toList();
+      default:
+        return dias;
+    }
+  }
+
+  // Intenta hacer scroll al bloque del día de hoy si el mes coincide
+  void _autoScrollToHoySiCorresponde(List<DateTime> diasVisibles) {
+    if (_didAutoScrollForMonth) return;
 
     final hoy = DateTime.now();
-    final soloFechaHoy = DateTime(hoy.year, hoy.month, hoy.day);
-    final ayer = soloFechaHoy.subtract(const Duration(days: 1));
-    final maniana = soloFechaHoy.add(const Duration(days: 1));
+    if (hoy.year != mesActual.year || hoy.month != mesActual.month) {
+      _didAutoScrollForMonth = true; // no aplica en este mes
+      return;
+    }
 
-    return jornadas.where((j) {
-      final f = DateTime(j.fecha.year, j.fecha.month, j.fecha.day);
-      switch (_filtro) {
-        case 'Hoy':
-          return _esMismaFecha(f, soloFechaHoy);
-        case 'Ayer':
-          return _esMismaFecha(f, ayer);
-        case 'Mañana':
-          return _esMismaFecha(f, maniana);
+    final hoyKey = _dayKeys[_soloFecha(hoy)];
+    if (hoyKey?.currentContext == null) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        await Scrollable.ensureVisible(
+          hoyKey!.currentContext!,
+          duration: const Duration(milliseconds: 350),
+          alignment: 0.08,
+          curve: Curves.easeOutCubic,
+        );
+      } finally {
+        _didAutoScrollForMonth = true;
       }
-      return true;
-    }).toList();
+    });
   }
 
   @override
@@ -79,17 +179,17 @@ class _TodosScreenState extends State<TodosScreen> {
       appBar: AppBar(
         backgroundColor: cs.background,
         elevation: 0,
-        toolbarHeight: 0, // oculto; usamos header custom en el body
+        toolbarHeight: 0,
       ),
+      floatingActionButton: _buildIrAHoyFab(),
       body: Column(
         children: [
-          // ======= Header estilo mock: saludo + filtros + botón "+" =======
+          // ======= Header =======
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Saludo
                 Text(
                   'Hola, ${widget.nombreUsuario}!',
                   style: TextStyle(
@@ -99,35 +199,36 @@ class _TodosScreenState extends State<TodosScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-
-                // Filtros + botón "+"
                 Row(
                   children: [
-                    // Botones (se expanden)
                     Expanded(
                       child: DayFilterButtons(
                         onFilterChanged: (nuevo) {
-                          setState(() => _filtro = nuevo);
+                          setState(() {
+                            _filtro = nuevo;
+                            if (_filtro == 'Todos')
+                              _didAutoScrollForMonth = false;
+                          });
                         },
                       ),
                     ),
                     const SizedBox(width: 12),
-                    // Botón "+"
-                    _PlusButton(onPressed: () {
-                      // TODO: acción del "+" en Todos (crear jornada / agregar cliente)
-                      debugPrint('Nuevo desde +');
-                    }),
+                    _PlusButton(
+                      onPressed: () {
+                        debugPrint('Nuevo desde +');
+                      },
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
-
-                // Selector de mes:  APR < MAY > JUN
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     _MesLabel(
                       label: DateFormat.MMM('es_AR')
-                          .format(DateTime(mesActual.year, mesActual.month - 1, 1))
+                          .format(
+                            DateTime(mesActual.year, mesActual.month - 1, 1),
+                          )
                           .toUpperCase(),
                       color: Colors.grey,
                     ),
@@ -151,7 +252,9 @@ class _TodosScreenState extends State<TodosScreen> {
                     ),
                     _MesLabel(
                       label: DateFormat.MMM('es_AR')
-                          .format(DateTime(mesActual.year, mesActual.month + 1, 1))
+                          .format(
+                            DateTime(mesActual.year, mesActual.month + 1, 1),
+                          )
                           .toUpperCase(),
                       color: Colors.grey,
                     ),
@@ -163,7 +266,7 @@ class _TodosScreenState extends State<TodosScreen> {
             ),
           ),
 
-          // ======= Lista de jornadas =======
+          // ======= Lista: una JornadaCard por DÍA =======
           Expanded(
             child: RefreshIndicator(
               color: cs.primary,
@@ -179,6 +282,7 @@ class _TodosScreenState extends State<TodosScreen> {
                       child: Text(
                         'Error: ${snapshot.error}',
                         style: TextStyle(color: cs.onBackground),
+                        textAlign: TextAlign.center,
                       ),
                     );
                   }
@@ -186,24 +290,49 @@ class _TodosScreenState extends State<TodosScreen> {
                   final jornadas = (snapshot.data ?? const <Jornada>[])
                     ..sort((a, b) => a.fecha.compareTo(b.fecha));
 
-                  final visibles = _aplicarFiltro(jornadas);
+                  final mapaClientes = _clientesPorDia(jornadas);
+                  final todosLosDias = _todosLosDiasDelMes(mesActual);
+                  final diasVisibles = _aplicarFiltroDias(todosLosDias);
 
-                  if (visibles.isEmpty) {
-                    return const Center(child: Text('No hay jornadas para mostrar'));
+                  // Asegurar key por día visible
+                  for (final d in diasVisibles) {
+                    final k = _soloFecha(d);
+                    _dayKeys.putIfAbsent(
+                      k,
+                      () => GlobalKey(debugLabel: 'day_${k.toIso8601String()}'),
+                    );
+                  }
+
+                  // Auto scroll a HOY si corresponde
+                  _autoScrollToHoySiCorresponde(diasVisibles);
+
+                  if (diasVisibles.isEmpty) {
+                    return const Center(
+                      child: Text('No hay días para mostrar'),
+                    );
                   }
 
                   return ListView.builder(
+                    controller: _scrollController,
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.only(bottom: 16),
-                    itemCount: visibles.length,
+                    itemCount: diasVisibles.length,
                     itemBuilder: (context, i) {
-                      final j = visibles[i];
-                      return JornadaCard(
-                        fecha: j.fecha,
-                        nombres: j.clientes,
-                        onAddPressed: () {
-                          debugPrint('Agregar cliente al ${j.fecha}');
-                        },
+                      final fecha = diasVisibles[i];
+                      final key = _dayKeys[_soloFecha(fecha)];
+                      final clientes = List<String>.from(
+                        mapaClientes[_soloFecha(fecha)] ?? const <String>[],
+                      );
+
+                      return KeyedSubtree(
+                        key: key, // clave para ensureVisible
+                        child: JornadaCard(
+                          fecha: fecha,
+                          nombres: clientes,
+                          onAddPressed: () {
+                            debugPrint('Agregar cliente al $fecha');
+                          },
+                        ),
                       );
                     },
                   );
@@ -213,6 +342,29 @@ class _TodosScreenState extends State<TodosScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  // Botón opcional para ir a hoy manualmente
+  Widget? _buildIrAHoyFab() {
+    final hoy = DateTime.now();
+    if (hoy.year != mesActual.year || hoy.month != mesActual.month) return null;
+
+    return FloatingActionButton.extended(
+      onPressed: () {
+        final key = _dayKeys[_soloFecha(hoy)];
+        final ctx = key?.currentContext;
+        if (ctx != null) {
+          Scrollable.ensureVisible(
+            ctx,
+            duration: const Duration(milliseconds: 350),
+            alignment: 0.08,
+            curve: Curves.easeOutCubic,
+          );
+        }
+      },
+      icon: const Icon(Icons.today),
+      label: const Text('Ir a hoy'),
     );
   }
 }
@@ -259,6 +411,3 @@ class _MesLabel extends StatelessWidget {
     );
   }
 }
-
-
-

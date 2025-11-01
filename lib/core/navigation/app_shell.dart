@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/colors.dart';
 import 'package:frontend_soderia/core/navigation/app_shell_actions.dart';
 import 'package:frontend_soderia/core/navigation/destinations.dart';
+import 'package:frontend_soderia/core/navigation/shell_state.dart'; // 👈 NUEVO
 
 /// AppShell adaptativo:
 /// - Móvil  (<600): AppBar + Drawer modal
@@ -49,16 +50,42 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   late int _index;
+  late final VoidCallback _shellListener; // 👈 Nuevo listener
 
   @override
   void initState() {
     super.initState();
     _index = widget.initialIndex.clamp(0, kDestinations.length - 1);
+
+    // Sincroniza el estado global al iniciar
+    shellState.value = _index;
+
+    // Listener que escucha cambios globales y actualiza la UI
+    _shellListener = () {
+      if (shellState.value != _index && mounted) {
+        setState(() => _index = shellState.value);
+        widget.onRouteChange?.call(_index, kDestinations[_index]);
+      }
+    };
+
+    shellState.addListener(_shellListener);
+  }
+
+  @override
+  void dispose() {
+    shellState.removeListener(_shellListener); // evita fugas de memoria
+    super.dispose();
   }
 
   void _select(int newIndex) {
     if (newIndex == _index) return;
+
+    // Actualiza UI local
     setState(() => _index = newIndex);
+
+    // Propaga el cambio globalmente
+    shellState.selectTab(newIndex);
+
     widget.onRouteChange?.call(newIndex, kDestinations[newIndex]);
   }
 
