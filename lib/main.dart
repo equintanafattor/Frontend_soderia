@@ -53,6 +53,7 @@ AppShell _buildAppShell({String usuario = 'Gastón'}) {
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/navigation/destinations.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'core/theme.dart';
 import 'core/navigation/app_shell.dart';
@@ -70,9 +71,10 @@ import 'screens/usuarios/usuario_add_screen.dart';
 import 'screens/usuarios/usuarios_list_screen.dart';
 import 'screens/clientes/clientes_list_screen.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('es_AR', null);
+  await dotenv.load(fileName: ".env");
   runApp(const FrontendSoderiaApp());
 }
 

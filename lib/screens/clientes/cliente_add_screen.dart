@@ -1,6 +1,9 @@
 // screens/clientes/cliente_add_screen.dart
 import 'package:flutter/material.dart';
+import 'package:frontend_soderia/widgets/common/frecuencia_modal.dart';
 import 'package:frontend_soderia/widgets/common/weekdays_selector.dart';
+import 'package:frontend_soderia/core/constants/dias_semana.dart';
+import 'package:frontend_soderia/services/cliente_service.dart';
 
 class ClienteAddScreen extends StatefulWidget {
   const ClienteAddScreen({super.key});
@@ -23,6 +26,7 @@ class _ClienteAddScreenState extends State<ClienteAddScreen> {
   final _mail = TextEditingController();
   final _obs = TextEditingController();
   Set<int> _frecuencia = {};
+  final Map<int, Map<String, dynamic>> _frecuenciasConfig = {};
 
   @override
   void dispose() {
@@ -36,7 +40,7 @@ class _ClienteAddScreenState extends State<ClienteAddScreen> {
     _tel2.dispose();
     _mail.dispose();
     _obs.dispose();
-    _zona.dispose();          // 👈 importante
+    _zona.dispose(); // 👈 importante
     super.dispose();
   }
 
@@ -78,7 +82,7 @@ class _ClienteAddScreenState extends State<ClienteAddScreen> {
               _tf('y', _entre2),
             ),
             const SizedBox(height: 12),
-            _tf('Zona / Barrio', _zona), 
+            _tf('Zona / Barrio', _zona),
             const Divider(),
             _row3(
               _tf(
@@ -103,7 +107,28 @@ class _ClienteAddScreenState extends State<ClienteAddScreen> {
             const SizedBox(height: 8),
             WeekdaysSelector(
               initial: const {},
-              onChanged: (s) => setState(() => _frecuencia = s),
+              onChanged: (s) async {
+                for (final idDia in s.difference(_frecuencia)) {
+                  // se agregó un nuevo día → abrir modal
+                  await showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (_) => FrecuenciaModal(
+                      idDia: idDia,
+                      onConfirm: (modo, turno, refCliente) {
+                        // acá podés guardar esta info para usar en _submit()
+                        // ejemplo:
+                        _frecuenciasConfig[idDia] = {
+                          'modo': modo,
+                          'turno': turno,
+                          'ref': refCliente,
+                        };
+                      },
+                    ),
+                  );
+                }
+                setState(() => _frecuencia = s);
+              },
             ),
             const Divider(height: 32),
             _ta('Observaciones', _obs),
@@ -184,13 +209,71 @@ class _ClienteAddScreenState extends State<ClienteAddScreen> {
 
   Future<void> _submit() async {
     if (!_isValid) return;
-    // TODO: llamar a tu repositorio/servicio
-    // await ClientesRepo.create(ClienteCreate(...));
-    if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Cliente guardado')));
-      Navigator.pop(context, true);
+
+    final service = ClienteService();
+
+    try {
+      // 1) crear cliente base
+      final res = await service.crearCliente(
+        nombre: _nombre.text.trim(),
+        apellido: _apellido.text.trim(),
+        dni: _dni.text.trim(),
+        observacion: _obs.text.trim().isEmpty ? null : _obs.text.trim(),
+      );
+
+      // el back te devuelve el legajo
+      final int legajo = res['legajo'];
+
+      // 2) dirección si hay
+      if (_direccion.text.trim().isNotEmpty) {
+        await service.agregarDireccion(legajo, {
+          "direccion": _direccion.text.trim(),
+          "entre_calle": _entre1.text.trim().isEmpty
+              ? null
+              : _entre1.text.trim(),
+          "y_calle": _entre2.text.trim().isEmpty ? null : _entre2.text.trim(),
+          "zona_barrio": _zona.text.trim().isEmpty ? null : _zona.text.trim(),
+        });
+      }
+
+      // 3) teléfonos
+      if (_tel1.text.trim().isNotEmpty) {
+        await service.agregarTelefono(legajo, _tel1.text.trim());
+      }
+      if (_tel2.text.trim().isNotEmpty) {
+        await service.agregarTelefono(legajo, _tel2.text.trim());
+      }
+
+      // 4) mail
+      if (_mail.text.trim().isNotEmpty) {
+        await service.agregarMail(legajo, _mail.text.trim());
+      }
+
+      // 5) frecuencia (acá hoy solo tenés los días marcados,
+      // después le agregamos el modal para "inicio/final/después de")
+      for (final idDia in _frecuencia) {
+        final f = _frecuenciasConfig[idDia];
+        await service.agregarFrecuencia(
+          legajo,
+          idDia: idDia,
+          modo: f?['modo'] ?? 'final',
+          turnoVisita: f?['turno'] ?? 'mañana',
+          idClienteReferencia: f?['ref'],
+        );
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Cliente guardado')));
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     }
   }
 }
