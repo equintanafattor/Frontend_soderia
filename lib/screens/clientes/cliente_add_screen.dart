@@ -1,9 +1,9 @@
 // screens/clientes/cliente_add_screen.dart
 import 'package:flutter/material.dart';
-import 'package:frontend_soderia/widgets/common/frecuencia_modal.dart';
 import 'package:frontend_soderia/widgets/common/weekdays_selector.dart';
 import 'package:frontend_soderia/core/constants/dias_semana.dart';
 import 'package:frontend_soderia/services/cliente_service.dart';
+import 'package:frontend_soderia/widgets/common/frecuencia_modal.dart';
 
 class ClienteAddScreen extends StatefulWidget {
   const ClienteAddScreen({super.key});
@@ -25,7 +25,10 @@ class _ClienteAddScreenState extends State<ClienteAddScreen> {
   final _tel2 = TextEditingController();
   final _mail = TextEditingController();
   final _obs = TextEditingController();
+
+  // días seleccionados (id_dia)
   Set<int> _frecuencia = {};
+  // config por día: { 1: {modo: 'final', turno: 'mañana', ref: 123}, ... }
   final Map<int, Map<String, dynamic>> _frecuenciasConfig = {};
 
   @override
@@ -40,7 +43,7 @@ class _ClienteAddScreenState extends State<ClienteAddScreen> {
     _tel2.dispose();
     _mail.dispose();
     _obs.dispose();
-    _zona.dispose(); // 👈 importante
+    _zona.dispose();
     super.dispose();
   }
 
@@ -107,29 +110,42 @@ class _ClienteAddScreenState extends State<ClienteAddScreen> {
             const SizedBox(height: 8),
             WeekdaysSelector(
               initial: const {},
-              onChanged: (s) async {
-                for (final idDia in s.difference(_frecuencia)) {
-                  // se agregó un nuevo día → abrir modal
-                  await showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    builder: (_) => FrecuenciaModal(
-                      idDia: idDia,
-                      onConfirm: (modo, turno, refCliente) {
-                        // acá podés guardar esta info para usar en _submit()
-                        // ejemplo:
-                        _frecuenciasConfig[idDia] = {
-                          'modo': modo,
-                          'turno': turno,
-                          'ref': refCliente,
-                        };
-                      },
-                    ),
-                  );
+              onChanged: (newSet) async {
+                // días destildados → limpiar
+                final quitados = _frecuencia.difference(newSet);
+                for (final dia in quitados) {
+                  _frecuenciasConfig.remove(dia);
                 }
-                setState(() => _frecuencia = s);
+
+                // días tildados → si no tienen config, abrir modal
+                for (final dia in newSet) {
+                  if (!_frecuenciasConfig.containsKey(dia)) {
+                    final confirmed = await showModalBottomSheet<bool>(
+                      context: context,
+                      isScrollControlled: true,
+                      builder: (_) => FrecuenciaModal(
+                        idDia: dia,
+                        onConfirm: (modo, turno, refCliente) {
+                          _frecuenciasConfig[dia] = {
+                            'modo': modo,
+                            'turno': turno,
+                            'ref': refCliente,
+                          };
+                        },
+                      ),
+                    );
+
+                    if (confirmed != true) {
+                      // no confirmó → no guardamos y queda sin config
+                      _frecuenciasConfig.remove(dia);
+                    }
+                  }
+                }
+
+                setState(() => _frecuencia = newSet);
               },
             ),
+
             const Divider(height: 32),
             _ta('Observaciones', _obs),
             const SizedBox(height: 80),
@@ -196,6 +212,7 @@ class _ClienteAddScreenState extends State<ClienteAddScreen> {
   // Validators
   String? _req(String? v) =>
       (v == null || v.trim().isEmpty) ? 'Obligatorio' : null;
+
   String? _mailOk(String? v) {
     if (v == null || v.isEmpty) return null;
     final ok = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(v);
@@ -213,54 +230,92 @@ class _ClienteAddScreenState extends State<ClienteAddScreen> {
     final service = ClienteService();
 
     try {
-      // 1) crear cliente base
-      final res = await service.crearCliente(
-        nombre: _nombre.text.trim(),
-        apellido: _apellido.text.trim(),
-        dni: _dni.text.trim(),
-        observacion: _obs.text.trim().isEmpty ? null : _obs.text.trim(),
-      );
+      // 1) persona
+      final persona = {
+        "nombre": _nombre.text.trim(),
+        "apellido": _apellido.text.trim(),
+        "dni": int.parse(_dni.text.trim()),
+      };
 
-      // el back te devuelve el legajo
-      final int legajo = res['legajo'];
-
-      // 2) dirección si hay
+      // 2) direcciones (array aunque haya una sola)
+      final direcciones = <Map<String, dynamic>>[];
       if (_direccion.text.trim().isNotEmpty) {
-        await service.agregarDireccion(legajo, {
+        direcciones.add({
           "direccion": _direccion.text.trim(),
-          "entre_calle": _entre1.text.trim().isEmpty
+          "entre_calle1": _entre1.text.trim().isEmpty
               ? null
               : _entre1.text.trim(),
-          "y_calle": _entre2.text.trim().isEmpty ? null : _entre2.text.trim(),
-          "zona_barrio": _zona.text.trim().isEmpty ? null : _zona.text.trim(),
+          "entre_calle2": _entre2.text.trim().isEmpty
+              ? null
+              : _entre2.text.trim(),
+          "zona": _zona.text.trim().isEmpty ? null : _zona.text.trim(),
         });
       }
 
       // 3) teléfonos
+      final telefonos = <Map<String, dynamic>>[];
       if (_tel1.text.trim().isNotEmpty) {
-        await service.agregarTelefono(legajo, _tel1.text.trim());
+        telefonos.add({"nro_telefono": _tel1.text.trim()});
       }
       if (_tel2.text.trim().isNotEmpty) {
-        await service.agregarTelefono(legajo, _tel2.text.trim());
+        telefonos.add({"nro_telefono": _tel2.text.trim()});
       }
 
-      // 4) mail
+      // 4) emails
+      final emails = <Map<String, dynamic>>[];
       if (_mail.text.trim().isNotEmpty) {
-        await service.agregarMail(legajo, _mail.text.trim());
+        emails.add({"mail": _mail.text.trim()});
       }
 
-      // 5) frecuencia (acá hoy solo tenés los días marcados,
-      // después le agregamos el modal para "inicio/final/después de")
-      for (final idDia in _frecuencia) {
-        final f = _frecuenciasConfig[idDia];
-        await service.agregarFrecuencia(
-          legajo,
-          idDia: idDia,
-          modo: f?['modo'] ?? 'final',
-          turnoVisita: f?['turno'] ?? 'mañana',
-          idClienteReferencia: f?['ref'],
-        );
+      // 5) dias_visita (el back quiere códigos: "lun", "mar", ...)
+      final diasVisita = _frecuencia.map((idDia) {
+        final dia = diasSemana.firstWhere((d) => d['id'] == idDia);
+        return dia['codigo'] as String;
+      }).toList();
+
+      // 6) frecuencias (usa la info del modal)
+      final frecuencias = _frecuencia.map((idDia) {
+        final dia = diasSemana.firstWhere((d) => d['id'] == idDia);
+        final cfg = _frecuenciasConfig[idDia];
+        // turno: el back espera "manana" NO "mañana"
+        String turnoBack = 'manana';
+        if (cfg?['turno'] == 'tarde') turnoBack = 'tarde';
+
+        // posicion: el back espera "final" / "inicio" / "despues_de"
+        final String posBack = (cfg?['modo'] ?? 'final') as String;
+
+        return {
+          "dia": dia['codigo'],
+          "turno": turnoBack,
+          "posicion": posBack,
+          "despues_de_legajo": cfg?['ref'] ?? 0,
+        };
+      }).toList();
+
+      // 7) turno_visita general (el back lo tiene a nivel raíz)
+      // podemos tomar el primero o dejar "manana" por defecto
+      String turnoVisitaRoot = 'manana';
+      if (_frecuencia.isNotEmpty) {
+        final firstCfg = _frecuenciasConfig[_frecuencia.first];
+        if (firstCfg != null && firstCfg['turno'] == 'tarde') {
+          turnoVisitaRoot = 'tarde';
+        }
       }
+
+      // 8) armar body final EXACTO al back
+      final body = {
+        "observacion": _obs.text.trim().isEmpty ? null : _obs.text.trim(),
+        "dni": int.parse(_dni.text.trim()),
+        "persona": persona,
+        "direcciones": direcciones,
+        "telefonos": telefonos,
+        "emails": emails,
+        "dias_visita": diasVisita,
+        "turno_visita": turnoVisitaRoot,
+        "frecuencias": frecuencias,
+      };
+
+      final res = await service.crearClienteCompleto(body);
 
       if (mounted) {
         ScaffoldMessenger.of(

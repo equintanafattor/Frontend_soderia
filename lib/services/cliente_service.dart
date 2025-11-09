@@ -1,8 +1,10 @@
+// lib/services/cliente_service.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ClienteService {
-  final String baseUrl = 'http://localhost:8500/clientes'; // poné tu URL
+  // poné tu puerto real
+  final String baseUrl = 'http://localhost:8500/clientes';
 
   Future<Map<String, dynamic>> crearCliente({
     required String nombre,
@@ -10,7 +12,6 @@ class ClienteService {
     required String dni,
     String? observacion,
   }) async {
-    // el back espera persona o dni
     final body = {
       "persona": {
         "dni": int.parse(dni),
@@ -26,6 +27,21 @@ class ClienteService {
       body: jsonEncode(body),
     );
 
+    if (res.statusCode == 201) {
+      return jsonDecode(res.body);
+    } else {
+      throw Exception('Error creando cliente: ${res.body}');
+    }
+  }
+
+  Future<Map<String, dynamic>> crearClienteCompleto(
+    Map<String, dynamic> body,
+  ) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(body),
+    );
     if (res.statusCode == 201) {
       return jsonDecode(res.body);
     } else {
@@ -88,12 +104,34 @@ class ClienteService {
     }
   }
 
-  Future<List<dynamic>> listarClientesPorDia(int idDia) async {
-    final res = await http.get(Uri.parse('$baseUrl/frecuencia/$idDia'));
+  Future<List<dynamic>> listarClientesPorIdDia(int idDia) async {
+    final res = await http.get(Uri.parse('$baseUrl/agenda/visitas/dia/$idDia'));
+    if (res.statusCode == 200) {
+      final json = jsonDecode(res.body) as Map<String, dynamic>;
+      // el endpoint devuelve { id_dia, nombre_dia, clientes: [...] }
+      return (json['clientes'] as List<dynamic>);
+    } else {
+      throw Exception('Error listando clientes del día: ${res.body}');
+    }
+  }
+
+  // traer todos los clientes
+  Future<List<dynamic>> listarClientes() async {
+    final res = await http.get(Uri.parse('$baseUrl/'));
     if (res.statusCode == 200) {
       return jsonDecode(res.body) as List;
     } else {
-      throw Exception('Error listando clientes del día: ${res.body}');
+      throw Exception('Error listando clientes: ${res.body}');
+    }
+  }
+
+  // traer un cliente puntual por legajo
+  Future<Map<String, dynamic>> obtenerCliente(int legajo) async {
+    final res = await http.get(Uri.parse('$baseUrl/$legajo'));
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    } else {
+      throw Exception('Error obteniendo cliente $legajo: ${res.body}');
     }
   }
 }

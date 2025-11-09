@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/navigation/app_shell_actions.dart';
+import 'package:frontend_soderia/services/cliente_service.dart';
 
 class ClientesListScreen extends StatefulWidget {
   const ClientesListScreen({super.key});
@@ -10,81 +11,76 @@ class ClientesListScreen extends StatefulWidget {
 
 class _ClientesListScreenState extends State<ClientesListScreen> {
   final _search = TextEditingController();
+  final _service = ClienteService();
+
   String _orden = 'Apellido (A→Z)';
   bool _cargando = false;
 
-  // Mock – reemplazar por repo/API
-  List<Map<String, dynamic>> _data = [
-    {
-      'nombre': 'Juan',
-      'apellido': 'Pérez',
-      'tel': '343-555111',
-      'zona': 'Centro',
-      'visitadia': 'Lun, Jue',
-      'created': DateTime(2025, 9, 10),
-    },
-    {
-      'nombre': 'María',
-      'apellido': 'López',
-      'tel': '343-555222',
-      'zona': 'Norte',
-      'visitadia': 'Mar, Vie',
-      'created': DateTime(2025, 9, 3),
-    },
-    {
-      'nombre': 'Carlos',
-      'apellido': 'García',
-      'tel': '343-555333',
-      'zona': 'Sur',
-      'visitadia': 'Mié',
-      'created': DateTime(2025, 8, 22),
-    },
-  ];
+  // ahora viene del backend
+  List<dynamic> _data = [];
 
-  List<Map<String, dynamic>> get _filtered {
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _cargando = true);
+    try {
+      final list = await _service.listarClientes();
+      setState(() => _data = list);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _cargando = false);
+    }
+  }
+
+  List<dynamic> get _filtered {
     final q = _search.text.trim().toLowerCase();
+    // cada item del back tiene: legajo, dni, observacion, persona:{nombre,apellido,...}
     var list = _data.where((c) {
       if (q.isEmpty) return true;
-      final nombreCompleto = '${c['nombre']} ${c['apellido']}'.toLowerCase();
-      return nombreCompleto.contains(q) ||
-          (c['tel'] as String).toLowerCase().contains(q) ||
-          (c['zona'] as String).toLowerCase().contains(q);
+      final persona = c['persona'] ?? {};
+      final nombreCompleto =
+          '${persona['nombre'] ?? ''} ${persona['apellido'] ?? ''}'
+              .toLowerCase();
+      final dni = '${c['dni'] ?? ''}'.toLowerCase();
+      return nombreCompleto.contains(q) || dni.contains(q);
     }).toList();
 
     switch (_orden) {
       case 'Apellido (A→Z)':
-        list.sort(
-          (a, b) =>
-              (a['apellido'] as String).compareTo(b['apellido'] as String),
-        );
+        list.sort((a, b) {
+          final apA = (a['persona']?['apellido'] ?? '') as String;
+          final apB = (b['persona']?['apellido'] ?? '') as String;
+          return apA.compareTo(apB);
+        });
         break;
       case 'Apellido (Z→A)':
-        list.sort(
-          (a, b) =>
-              (b['apellido'] as String).compareTo(a['apellido'] as String),
-        );
+        list.sort((a, b) {
+          final apA = (a['persona']?['apellido'] ?? '') as String;
+          final apB = (b['persona']?['apellido'] ?? '') as String;
+          return apB.compareTo(apA);
+        });
         break;
       case 'Más nuevos':
-        list.sort(
-          (a, b) =>
-              (b['created'] as DateTime).compareTo(a['created'] as DateTime),
-        );
+        // tu back ahora no está mandando fecha de creación,
+        // así que este caso lo dejamos igual pero no hará mucho
         break;
       case 'Más antiguos':
-        list.sort(
-          (a, b) =>
-              (a['created'] as DateTime).compareTo(b['created'] as DateTime),
-        );
         break;
     }
     return list;
   }
 
   Future<void> _refresh() async {
-    setState(() => _cargando = true);
-    // TODO: fetch backend
-    await Future.delayed(const Duration(milliseconds: 500));
-    if (mounted) setState(() => _cargando = false);
+    await _load();
   }
 
   @override
@@ -109,13 +105,12 @@ class _ClientesListScreenState extends State<ClientesListScreen> {
                   onChanged: (_) => setState(() {}),
                   decoration: const InputDecoration(
                     prefixIcon: Icon(Icons.search),
-                    hintText: 'Buscar por nombre, teléfono o zona...',
+                    hintText: 'Buscar por nombre o DNI...',
                     border: OutlineInputBorder(),
                     isDense: true,
                   ),
                 ),
               ),
-
               const SizedBox(width: 12),
               PopupMenuButton<String>(
                 tooltip: 'Ordenar',
@@ -144,7 +139,15 @@ class _ClientesListScreenState extends State<ClientesListScreen> {
               ),
               const SizedBox(width: 8),
               FilledButton.icon(
-                onPressed: () => AppShellActions.push(context, '/cliente/new'),
+                onPressed: () async {
+                  final result = await AppShellActions.push(
+                    context,
+                    '/cliente/new',
+                  );
+                  if (result == true && mounted) {
+                    _load(); // o _refresh();
+                  }
+                },
                 icon: const Icon(Icons.person_add_alt_1),
                 label: const Text('Nuevo'),
               ),
@@ -163,30 +166,39 @@ class _ClientesListScreenState extends State<ClientesListScreen> {
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (ctx, i) {
                       final c = _filtered[i];
-                      final nombre = '${c['apellido']}, ${c['nombre']}';
+                      final persona = c['persona'] ?? {};
+                      final apellido = persona['apellido'] ?? '';
+                      final nombre = persona['nombre'] ?? '';
+                      final legajo = c['legajo'];
+
                       return ListTile(
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadiusGeometry.circular(12),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        tileColor: Theme.of(context).colorScheme.surface,
+                        tileColor: cs.surface,
                         leading: CircleAvatar(
                           child: Text(
-                            (c['apellido'] as String).substring(0, 1),
+                            (apellido.isNotEmpty
+                                    ? apellido[0]
+                                    : (nombre.isNotEmpty ? nombre[0] : '?'))
+                                .toUpperCase(),
                           ),
                         ),
-                        title: Text(nombre),
-                        subtitle: Text(
-                          '${c['tel']} · Zona: ${c['zona']} · ${c['visitadia']}',
-                        ),
+                        title: Text('$apellido, $nombre'),
+                        subtitle: Text('DNI: ${c['dni']}'),
                         trailing: IconButton(
                           icon: const Icon(Icons.edit),
                           tooltip: 'Editar',
                           onPressed: () {
-                            // TODO: navegar a editar
+                            // TODO: navegar a editar con legajo
                           },
                         ),
                         onTap: () {
-                          // TODO: detalle cliente
+                          Navigator.pushNamed(
+                            context,
+                            '/cliente/detail',
+                            arguments: c['legajo'],
+                          );
                         },
                       );
                     },

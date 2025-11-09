@@ -3,7 +3,7 @@ import 'package:frontend_soderia/services/cliente_service.dart';
 
 class FrecuenciaModal extends StatefulWidget {
   final int idDia;
-  final Function(String modo, String turno, int? refCliente) onConfirm;
+  final void Function(String modo, String turno, int? refCliente) onConfirm;
 
   const FrecuenciaModal({
     super.key,
@@ -20,6 +20,7 @@ class _FrecuenciaModalState extends State<FrecuenciaModal> {
   String _turno = 'mañana';
   int? _refCliente;
   List<dynamic> _clientesExistentes = [];
+  bool _loading = true;
 
   @override
   void initState() {
@@ -30,10 +31,13 @@ class _FrecuenciaModalState extends State<FrecuenciaModal> {
   Future<void> _loadClientes() async {
     final service = ClienteService();
     try {
-      final list = await service.listarClientesPorDia(widget.idDia);
-      setState(() => _clientesExistentes = list);
+      final list = await service.listarClientesPorIdDia(widget.idDia);
+      setState(() {
+        _clientesExistentes = list;
+        _loading = false;
+      });
     } catch (_) {
-      // si falla, lo dejamos vacío
+      setState(() => _loading = false);
     }
   }
 
@@ -65,7 +69,7 @@ class _FrecuenciaModalState extends State<FrecuenciaModal> {
                 DropdownMenuItem(value: 'inicio', child: Text('Al inicio')),
                 DropdownMenuItem(value: 'final', child: Text('Al final')),
                 DropdownMenuItem(
-                  value: 'despues_de',
+                  value: 'despues',
                   child: Text('Después de...'),
                 ),
               ],
@@ -74,31 +78,38 @@ class _FrecuenciaModalState extends State<FrecuenciaModal> {
 
             const SizedBox(height: 12),
 
-            if (_modo == 'despues_de')
-              DropdownButtonFormField<int>(
-                value: _refCliente,
-                decoration: const InputDecoration(
-                  labelText: 'Cliente de referencia',
-                ),
-                items: _clientesExistentes.map<DropdownMenuItem<int>>((c) {
-                  // intentamos distintos nombres según lo que devuelva el back
-                  final int idCliente =
-                      c['id_cliente'] ?? c['legajo'] ?? c['id'] as int;
-                  // nombre “bonito” si viene con join
-                  final String label;
-                  if (c['cliente'] != null && c['cliente']['persona'] != null) {
-                    label =
-                        '${c['cliente']['persona']['nombre']} ${c['cliente']['persona']['apellido']}';
-                  } else {
-                    label = 'Cliente $idCliente';
-                  }
-                  return DropdownMenuItem<int>(
-                    value: idCliente,
-                    child: Text(label),
-                  );
-                }).toList(),
-                onChanged: (v) => setState(() => _refCliente = v),
-              ),
+            if (_modo == 'despues')
+              _loading
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: LinearProgressIndicator(minHeight: 2),
+                    )
+                  : _clientesExistentes.isEmpty
+                  ? const Text(
+                      'No hay clientes en ese día para poner “después de”.',
+                      style: TextStyle(fontSize: 13, color: Colors.grey),
+                    )
+                  : DropdownButtonFormField<int>(
+                      value: _refCliente,
+                      decoration: const InputDecoration(
+                        labelText: 'Cliente de referencia',
+                      ),
+                      items: _clientesExistentes.map<DropdownMenuItem<int>>((
+                        c,
+                      ) {
+                        final int legajo = c['legajo'] as int;
+                        final String nombre = (c['nombre'] ?? '') as String;
+                        final String apellido = (c['apellido'] ?? '') as String;
+                        final label = (nombre.isNotEmpty || apellido.isNotEmpty)
+                            ? '$nombre $apellido'
+                            : 'Cliente $legajo';
+                        return DropdownMenuItem<int>(
+                          value: legajo,
+                          child: Text(label),
+                        );
+                      }).toList(),
+                      onChanged: (v) => setState(() => _refCliente = v),
+                    ),
 
             const SizedBox(height: 12),
 
@@ -118,7 +129,7 @@ class _FrecuenciaModalState extends State<FrecuenciaModal> {
               child: FilledButton(
                 onPressed: () {
                   widget.onConfirm(_modo, _turno, _refCliente);
-                  Navigator.pop(context);
+                  Navigator.pop(context, true);
                 },
                 child: const Text('Confirmar'),
               ),
