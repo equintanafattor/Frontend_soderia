@@ -90,17 +90,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       direccion: v['direccion'] as String,
                       visitado: v['visitado'] as bool,
                       onTap: () {
-                        // 🔔 Abrir pantalla de venta con los datos del cliente
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => VentaScreen(
-                              nombreCliente: v['nombre'] as String,
-                              direccion: v['direccion'] as String,
-                              // Estos dos son mock por ahora: reemplazalos por tus datos reales
-                              legajo: '00$index',
-                              deuda: (v['visitado'] as bool) ? 0 : 25000,
-                            ),
-                          ),
+                        final legajoMock = 1000 + index;
+                        Navigator.of(context, rootNavigator: true).pushNamed(
+                          '/venta',
+                          arguments: {'legajo': legajoMock},
                         );
                       },
                     );

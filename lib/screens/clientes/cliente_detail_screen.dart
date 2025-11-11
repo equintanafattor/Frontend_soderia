@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:frontend_soderia/core/navigation/app_shell_actions.dart';
 import 'package:frontend_soderia/services/cliente_service.dart';
 
 class ClienteDetailScreen extends StatefulWidget {
@@ -28,12 +29,10 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
           IconButton(
             icon: const Icon(Icons.edit),
             onPressed: () {
-              // acá navegás a tu pantalla de edición
-              // le pasás el legajo
-              Navigator.pushNamed(context, '/cliente/edit',
-                  arguments: widget.legajo);
+              // cuando tengas la pantalla de editar
+              // Navigator.pushNamed(context, '/cliente/edit', arguments: widget.legajo);
             },
-          )
+          ),
         ],
       ),
       body: FutureBuilder<Map<String, dynamic>>(
@@ -45,12 +44,15 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
           if (snap.hasError) {
             return Center(child: Text('Error: ${snap.error}'));
           }
+
           final data = snap.data!;
           final persona = data['persona'] ?? {};
           final nombre =
               '${persona['nombre'] ?? ''} ${persona['apellido'] ?? ''}'.trim();
-          final dni = data['dni']?.toString() ?? '-';
-          final observacion = data['observacion'] ?? '-';
+          final dni =
+              persona['dni']?.toString() ?? data['dni']?.toString() ?? '-';
+          final observacion =
+              persona['observacion']?.toString() ?? data['observacion']?.toString() ?? '-';
 
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -70,8 +72,6 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
               ),
               const SizedBox(height: 4),
               Text(observacion),
-              const SizedBox(height: 16),
-              // cuando tengas direcciones/telefonos, los metemos acá
             ],
           );
         },
@@ -80,17 +80,11 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: FilledButton.icon(
-            onPressed: () {
-              // ir a venta_screen.dart
-              // le podés pasar el cliente completo en arguments
-              Navigator.pushNamed(
-                context,
-                '/venta',
-                arguments: {
-                  'legajo': widget.legajo,
-                },
-              );
-            },
+            onPressed: () => AppShellActions.push(
+              context,
+              '/venta',
+              arguments: {'legajo': widget.legajo},
+            ),
             icon: const Icon(Icons.point_of_sale),
             label: const Text('Iniciar venta fuera de recorrido'),
           ),

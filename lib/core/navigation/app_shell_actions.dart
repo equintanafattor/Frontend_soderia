@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/navigation/destinations.dart';
-import 'package:frontend_soderia/core/navigation/shell_state.dart'; // 👈 NUEVO
-import 'package:frontend_soderia/core/navigation/destinations.dart'; // 👈 para kIndexCalendario
+import 'package:frontend_soderia/core/navigation/shell_state.dart';
 
 class AppShellActions {
   static Future<void> showAddSheet(BuildContext context) async {
@@ -13,21 +12,15 @@ class AppShellActions {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 👇 NUEVO ITEM
             ListTile(
               leading: const Icon(Icons.calendar_month),
               title: const Text('Abrir calendario'),
               onTap: () {
-                Navigator.of(
-                  sheetCtx,
-                  rootNavigator: true,
-                ).pop(); // cerrar el modal
-                jumpToTab(context, kIndexCalendario); // ir a pestaña Calendario
+                Navigator.of(sheetCtx, rootNavigator: true).pop();
+                jumpToTab(context, kIndexCalendario);
               },
             ),
             const Divider(),
-
-            // Resto de opciones existentes
             ListTile(
               leading: const Icon(Icons.person_add),
               title: const Text('Nuevo cliente'),
@@ -50,43 +43,38 @@ class AppShellActions {
     );
   }
 
-  /// Permite cambiar de tab desde cualquier lugar.
-  /// Requiere que AppShell esté arriba en el árbol.
-  //static void _jumpToTab(BuildContext context, int index) {
-  // Como tu AppShell expone _select internamente, la forma simple
-  // es pasar el callback “select” a HomeScreen (ya lo hacés).
-  // Si querés hacerlo global, podés usar un InheritedWidget/Provider.
-  // En tu caso actual, lo más directo es:
-  //Navigator.of(context).popUntil((route) => route.isFirst);
-  // y luego, si HomeScreen tiene onRequestTab, llamarla desde ahí.
-  //}
-
-  /// Cambia a una pestaña del AppShell desde cualquier parte de la app.
   static void jumpToTab(BuildContext context, int index) {
-    // Primero cerramos cualquier modal o ruta que esté arriba
     Navigator.of(
       context,
       rootNavigator: true,
     ).popUntil((route) => route.isFirst);
-
-    // Luego actualizamos el índice global
     shellState.selectTab(index);
   }
 
-  static Future<Object?> push(BuildContext context, String route) {
+  // 👇 ahora con arguments
+  static Future<Object?> push(
+    BuildContext context,
+    String route, {
+    Object? arguments,
+  }) {
     return Navigator.of(
       context,
       rootNavigator: true,
-    ).pushNamed(route); // 👈 sin <bool>
+    ).pushNamed(route, arguments: arguments);
   }
 
-  static void _closeAndPush(BuildContext sheetCtx, String route) {
+  // 👇 también acepta arguments
+  static void _closeAndPush(
+    BuildContext sheetCtx,
+    String route, {
+    Object? arguments,
+  }) {
     Navigator.of(sheetCtx, rootNavigator: true).pop();
     Future.microtask(() async {
       final res = await Navigator.of(
         sheetCtx,
         rootNavigator: true,
-      ).pushNamed(route); // 👈 sin <bool>
+      ).pushNamed(route, arguments: arguments);
       if (res == true) {
         ScaffoldMessenger.of(
           sheetCtx,

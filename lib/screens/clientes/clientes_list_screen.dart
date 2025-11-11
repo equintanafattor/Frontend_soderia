@@ -193,13 +193,16 @@ class _ClientesListScreenState extends State<ClientesListScreen> {
                             // TODO: navegar a editar con legajo
                           },
                         ),
-                        onTap: () {
-                          Navigator.pushNamed(
-                            context,
-                            '/cliente/detail',
-                            arguments: c['legajo'],
-                          );
-                        },
+                        onTap: () =>
+                            AppShellActions.push(
+                              context,
+                              '/cliente/detail',
+                              arguments: legajo,
+                            ).then((res) {
+                              if (res == true) {
+                                _refresh(); // si editás el cliente y volvés
+                              }
+                            }),
                       );
                     },
                   ),

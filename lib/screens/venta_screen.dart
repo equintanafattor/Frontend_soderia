@@ -1,19 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/colors.dart';
 import 'package:frontend_soderia/screens/pago_screen.dart';
+import 'package:frontend_soderia/services/cliente_service.dart';
 
 class VentaScreen extends StatefulWidget {
-  final String nombreCliente;
-  final String direccion;
-  final String legajo;
-  final double deuda;
+  final int legajoCliente;
 
   const VentaScreen({
     super.key,
-    required this.nombreCliente,
-    required this.direccion,
-    required this.legajo,
-    required this.deuda,
+    required this.legajoCliente,
   });
 
   @override
@@ -42,6 +37,15 @@ class _VentaScreenState extends State<VentaScreen> {
     '04/07 · 1 × Soda 2L',
     '21/06 · 1 × Agua Bidón 20L',
   ];
+
+  late Future<Map<String, dynamic>> _futureCliente;
+  final _service = ClienteService();
+
+  @override
+  void initState() {
+    super.initState();
+    _futureCliente = _service.obtenerCliente(widget.legajoCliente);
+  }
 
   // -------- Helpers --------
   double get _total {
@@ -83,14 +87,19 @@ class _VentaScreenState extends State<VentaScreen> {
     });
   }
 
-  Future<void> _confirmarVenta() async {
+  Future<void> _confirmarVenta(
+    String nombreCliente,
+    String legajo,
+    double deuda,
+  ) async {
+    // acá después pegás al endpoint real
     final ok = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => PagoScreen(
-          nombreCliente: 'Tamara Silva',
-          legajo: '001',
+          nombreCliente: nombreCliente,
+          legajo: legajo,
           fecha: DateTime.now(),
-          deudaActual: 25000,
+          deudaActual: deuda,
           items: const [
             LineaVenta(
               nroPedido: '015',
@@ -111,23 +120,22 @@ class _VentaScreenState extends State<VentaScreen> {
     );
 
     if (ok == true) {
-      // TODO: Llamar a API para registrar venta, mostrar éxito y volver
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Venta confirmada')));
-        Navigator.pop(context); // volver a la lista de Hoy (si aplica)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Venta confirmada')),
+        );
+        Navigator.pop(context);
       }
     }
   }
 
-  void _noCompra() async {
+  void _noCompra(String nombreCliente) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Marcar como "No compra"'),
-        content: const Text(
-          '¿Estás seguro de marcar esta visita como "No compra"?',
+        content: Text(
+          '¿Estás seguro de marcar a $nombreCliente como "No compra"?',
         ),
         actions: [
           TextButton(
@@ -143,7 +151,7 @@ class _VentaScreenState extends State<VentaScreen> {
       ),
     );
     if (ok == true) {
-      // TODO: Registrar "no compra"
+      // TODO: pegar al endpoint de no compra
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Visita marcada como "No compra"')),
@@ -153,8 +161,8 @@ class _VentaScreenState extends State<VentaScreen> {
     }
   }
 
-  void _postergar() async {
-    // TODO: Abrir date picker / motivo
+  void _postergar() {
+    // TODO: endpoint de postergar
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('Visita postergada (demo)')));
@@ -163,6 +171,40 @@ class _VentaScreenState extends State<VentaScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _futureCliente,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (snap.hasError) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Venta')),
+            body: Center(child: Text('Error: ${snap.error}')),
+          );
+        }
+
+        final cli = snap.data!;
+        final persona = cli['persona'] ?? {};
+        final nombre =
+            '${persona['nombre'] ?? ''} ${persona['apellido'] ?? ''}'.trim();
+        final legajoStr = cli['legajo'].toString();
+        final direccion = ''; // cuando tu GET de cliente lo traiga, lo usás acá
+        final deuda = 0.0; // lo mismo, cuando tengas cuenta corriente
+
+        return _buildScaffold(nombre, direccion, legajoStr, deuda);
+      },
+    );
+  }
+
+  Widget _buildScaffold(
+    String nombreCliente,
+    String direccion,
+    String legajo,
+    double deuda,
+  ) {
     final cs = Theme.of(context).colorScheme;
     final w = MediaQuery.of(context).size.width;
     final isMobile = w < 600;
@@ -170,7 +212,7 @@ class _VentaScreenState extends State<VentaScreen> {
     final confirm = ConfirmAction(
       enabled: _ventaValida,
       total: _total,
-      onConfirm: _confirmarVenta,
+      onConfirm: () => _confirmarVenta(nombreCliente, legajo, deuda),
     );
 
     return DefaultTabController(
@@ -180,49 +222,44 @@ class _VentaScreenState extends State<VentaScreen> {
           backgroundColor: AppColors.azul,
           foregroundColor: Colors.white,
           title: _TitleCliente(
-            nombre: widget.nombreCliente,
-            direccion: widget.direccion,
+            nombre: nombreCliente,
+            direccion: direccion,
           ),
           actions: [
             IconButton(
               tooltip: 'Editar cliente',
               icon: const Icon(Icons.edit),
               onPressed: () {
-                // TODO: editar datos del cliente
+                // TODO: editar cliente
               },
             ),
             IconButton(
               tooltip: 'Ver ubicación',
               icon: const Icon(Icons.location_on),
               onPressed: () {
-                // TODO: abrir mapa/geo
+                // TODO: mapa
               },
             ),
           ],
-          bottom: TabBar(
+          bottom: const TabBar(
             labelColor: Colors.white,
             unselectedLabelColor: Colors.white70,
             indicatorColor: Colors.white,
-            tabs: const [
+            tabs: [
               Tab(text: 'Venta actual'),
               Tab(text: 'Productos'),
               Tab(text: 'Historial'),
             ],
           ),
         ),
-
-        // Botón Confirmar (responsive)
         floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
         floatingActionButton: isMobile ? null : confirm,
         bottomNavigationBar: isMobile ? confirm : null,
-
         body: Padding(
-          padding: EdgeInsets.only(
-            bottom: isMobile ? 84 : 0,
-          ), // espacio para que no tape el botón
+          padding: EdgeInsets.only(bottom: isMobile ? 84 : 0),
           child: TabBarView(
             children: [
-              _tabVentaActual(context, cs),
+              _tabVentaActual(context, cs, legajo, deuda, nombreCliente),
               _tabProductos(context, cs),
               _tabHistorial(context, cs),
             ],
@@ -234,21 +271,26 @@ class _VentaScreenState extends State<VentaScreen> {
 
   // ---------- Tabs ----------
 
-  Widget _tabVentaActual(BuildContext context, ColorScheme cs) {
+  Widget _tabVentaActual(
+    BuildContext context,
+    ColorScheme cs,
+    String legajo,
+    double deuda,
+    String nombreCliente,
+  ) {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _HeaderInfo(legajo: widget.legajo, deuda: widget.deuda),
+        _HeaderInfo(legajo: legajo, deuda: deuda),
         const SizedBox(height: 12),
 
-        // Acciones rápidas
         Wrap(
           spacing: 12,
           runSpacing: 8,
           children: [
             FilledButton.icon(
               style: FilledButton.styleFrom(backgroundColor: Colors.red),
-              onPressed: _noCompra,
+              onPressed: () => _noCompra(nombreCliente),
               icon: const Icon(Icons.close),
               label: const Text('No compra'),
             ),
@@ -317,9 +359,9 @@ class _VentaScreenState extends State<VentaScreen> {
           child: Text(
             'Total: \$${_total.toStringAsFixed(0)}',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: Colors.green.shade700,
-              fontWeight: FontWeight.bold,
-            ),
+                  color: Colors.green.shade700,
+                  fontWeight: FontWeight.bold,
+                ),
           ),
         ),
       ],
@@ -389,7 +431,8 @@ class _TitleCliente extends StatelessWidget {
           nombre,
           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
-        Text(direccion, style: const TextStyle(fontSize: 13)),
+        if (direccion.isNotEmpty)
+          Text(direccion, style: const TextStyle(fontSize: 13)),
       ],
     );
   }
@@ -516,7 +559,7 @@ class _CantidadDialogState extends State<_CantidadDialog> {
 
 class ConfirmAction extends StatelessWidget {
   final bool enabled;
-  final double total; // total de la venta
+  final double total;
   final VoidCallback onConfirm;
 
   const ConfirmAction({
@@ -532,7 +575,6 @@ class ConfirmAction extends StatelessWidget {
     final isMobile = w < 600;
 
     if (isMobile) {
-      // Botón ancho al pie (sticky)
       return SafeArea(
         top: false,
         child: Container(
@@ -566,7 +608,6 @@ class ConfirmAction extends StatelessWidget {
       );
     }
 
-    // FAB extendido centrado (tablet/desktop)
     return SafeArea(
       child: FloatingActionButton.extended(
         onPressed: enabled ? onConfirm : null,
@@ -581,3 +622,8 @@ class ConfirmAction extends StatelessWidget {
     );
   }
 }
+
+
+
+
+

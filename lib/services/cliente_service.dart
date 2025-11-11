@@ -127,9 +127,13 @@ class ClienteService {
 
   // traer un cliente puntual por legajo
   Future<Map<String, dynamic>> obtenerCliente(int legajo) async {
-    final res = await http.get(Uri.parse('$baseUrl/$legajo'));
+    final res = await http.get(
+      Uri.parse('$baseUrl/$legajo/detalle'),
+      // headers: {'Content-Type': 'application/json'},
+    );
+
     if (res.statusCode == 200) {
-      return jsonDecode(res.body);
+      return jsonDecode(res.body) as Map<String, dynamic>;
     } else {
       throw Exception('Error obteniendo cliente $legajo: ${res.body}');
     }
