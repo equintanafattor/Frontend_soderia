@@ -52,6 +52,7 @@ AppShell _buildAppShell({String usuario = 'Gastón'}) {
 
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/navigation/destinations.dart';
+import 'package:frontend_soderia/screens/clientes/cliente_edit_screen.dart';
 import 'package:frontend_soderia/screens/venta_screen.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -119,6 +120,8 @@ class FrontendSoderiaApp extends StatelessWidget {
             ),
           );
         },
+
+        '/cliente/edit': (context) => const ClienteEditScreen(),
       },
 
       home: AppShell(

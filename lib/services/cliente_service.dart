@@ -49,7 +49,7 @@ class ClienteService {
     }
   }
 
-  Future<void> agregarDireccion(int legajo, Map<String, dynamic> data) async {
+  /* Future<void> agregarDireccion(int legajo, Map<String, dynamic> data) async {
     final res = await http.post(
       Uri.parse('$baseUrl/$legajo/direcciones'),
       headers: {'Content-Type': 'application/json'},
@@ -102,7 +102,7 @@ class ClienteService {
     if (res.statusCode != 201) {
       throw Exception('Error agregando frecuencia: ${res.body}');
     }
-  }
+  } */
 
   Future<List<dynamic>> listarClientesPorIdDia(int idDia) async {
     final res = await http.get(Uri.parse('$baseUrl/agenda/visitas/dia/$idDia'));
@@ -137,5 +137,59 @@ class ClienteService {
     } else {
       throw Exception('Error obteniendo cliente $legajo: ${res.body}');
     }
+  }
+
+  Future<Map<String, dynamic>> actualizarCliente(
+    int legajo,
+    Map<String, dynamic> body,
+  ) async {
+    final resp = await http.put(
+      Uri.parse('$baseUrl/$legajo'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(body),
+    );
+
+    if (resp.statusCode != 200) {
+      throw Exception('Error actualizando cliente: ${resp.body}');
+    }
+
+    return jsonDecode(resp.body);
+  }
+
+  Future<void> borrarCliente(int legajo) async {
+    final resp = await http.delete(Uri.parse('$baseUrl/$legajo'));
+    // tu back devuelve 204 si OK
+    if (resp.statusCode != 204) {
+      // puede ser 404 o 409, lo mostramos
+      throw Exception('No se pudo borrar: ${resp.body}');
+    }
+  }
+
+    Future<Map<String, dynamic>> obtenerDetalleCliente(int legajo) async {
+    final resp = await http.get(Uri.parse('$baseUrl/$legajo/detalle'));
+    if (resp.statusCode != 200) {
+      throw Exception('Error obteniendo detalle de cliente');
+    }
+    return jsonDecode(resp.body) as Map<String, dynamic>;
+  }
+
+  Future<List<dynamic>> listarPedidosCliente(int legajo, {int limit = 10}) async {
+    final resp = await http.get(
+      Uri.parse('$baseUrl/$legajo/pedidos?limit=$limit'),
+    );
+    if (resp.statusCode != 200) {
+      throw Exception('Error listando pedidos del cliente');
+    }
+    return jsonDecode(resp.body) as List<dynamic>;
+  }
+
+  Future<List<dynamic>> listarHistoricoCliente(int legajo, {int limit = 10}) async {
+    final resp = await http.get(
+      Uri.parse('$baseUrl/$legajo/historicos?limit=$limit'),
+    );
+    if (resp.statusCode != 200) {
+      throw Exception('Error listando histórico del cliente');
+    }
+    return jsonDecode(resp.body) as List<dynamic>;
   }
 }

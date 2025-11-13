@@ -70,8 +70,6 @@ class _ClientesListScreenState extends State<ClientesListScreen> {
         });
         break;
       case 'Más nuevos':
-        // tu back ahora no está mandando fecha de creación,
-        // así que este caso lo dejamos igual pero no hará mucho
         break;
       case 'Más antiguos':
         break;
@@ -145,7 +143,7 @@ class _ClientesListScreenState extends State<ClientesListScreen> {
                     '/cliente/new',
                   );
                   if (result == true && mounted) {
-                    _load(); // o _refresh();
+                    _load();
                   }
                 },
                 icon: const Icon(Icons.person_add_alt_1),
@@ -186,12 +184,72 @@ class _ClientesListScreenState extends State<ClientesListScreen> {
                         ),
                         title: Text('$apellido, $nombre'),
                         subtitle: Text('DNI: ${c['dni']}'),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.edit),
-                          tooltip: 'Editar',
-                          onPressed: () {
-                            // TODO: navegar a editar con legajo
-                          },
+                        // 👇 solo este trailing
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit),
+                              tooltip: 'Editar',
+                              onPressed: () async {
+                                final result = await AppShellActions.push(
+                                  context,
+                                  '/cliente/edit',
+                                  arguments: {'legajo': legajo, 'data': c},
+                                );
+                                if (result != null && mounted) {
+                                  _refresh();
+                                }
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete),
+                              tooltip: 'Eliminar',
+                              onPressed: () async {
+                                final ok = await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('Eliminar cliente'),
+                                    content: Text(
+                                      '¿Seguro que querés eliminar al cliente $legajo?',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.of(ctx).pop(false),
+                                        child: const Text('Cancelar'),
+                                      ),
+                                      FilledButton(
+                                        onPressed: () =>
+                                            Navigator.of(ctx).pop(true),
+                                        child: const Text('Eliminar'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+
+                                if (ok != true) return;
+
+                                try {
+                                  await _service.borrarCliente(legajo);
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Cliente eliminado'),
+                                      ),
+                                    );
+                                    _refresh();
+                                  }
+                                } catch (e) {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Error: $e')),
+                                    );
+                                  }
+                                }
+                              },
+                            ),
+                          ],
                         ),
                         onTap: () =>
                             AppShellActions.push(
@@ -200,7 +258,7 @@ class _ClientesListScreenState extends State<ClientesListScreen> {
                               arguments: legajo,
                             ).then((res) {
                               if (res == true) {
-                                _refresh(); // si editás el cliente y volvés
+                                _refresh();
                               }
                             }),
                       );
