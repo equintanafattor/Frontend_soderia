@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/colors.dart';
 import 'package:frontend_soderia/core/navigation/app_shell_actions.dart';
 import 'package:frontend_soderia/core/navigation/destinations.dart';
-import 'package:frontend_soderia/core/navigation/shell_state.dart'; // 👈 NUEVO
+import 'package:frontend_soderia/core/navigation/shell_state.dart';
+import 'package:frontend_soderia/services/auth_service.dart';
 
 /// AppShell adaptativo:
 /// - Móvil  (<600): AppBar + Drawer modal
@@ -249,9 +250,19 @@ class _ModalDrawer extends StatelessWidget {
               'Cerrar sesión',
               style: TextStyle(color: AppColors.azul),
             ),
-            onTap: () {
-              Navigator.pop(context);
-              // TODO: lógica de logout (limpiar sesión y navegar a Login)
+            onTap: () async {
+              Navigator.pop(context); // cerrar el drawer
+
+              // Limpiar sesión
+              await AuthService().logout();
+
+              // Navegar al login limpiando el stack
+              // (rootNavigator:true por si estás profundo en la jerarquía)
+              // ignore: use_build_context_synchronously
+              Navigator.of(
+                context,
+                rootNavigator: true,
+              ).pushNamedAndRemoveUntil('/login', (route) => false);
             },
           ),
         ],
@@ -305,8 +316,16 @@ class _PersistentDrawer extends StatelessWidget {
             'Cerrar sesión',
             style: TextStyle(color: AppColors.azul),
           ),
-          onTap: () {
-            // TODO: lógica de logout (limpiar sesión y navegar a Login)
+          onTap: () async {
+            // Limpiar sesión
+            await AuthService().logout();
+
+            // Navegar al login limpiando el stack
+            // ignore: use_build_context_synchronously
+            Navigator.of(
+              context,
+              rootNavigator: true,
+            ).pushNamedAndRemoveUntil('/login', (route) => false);
           },
         ),
       ],

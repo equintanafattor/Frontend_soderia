@@ -5,6 +5,7 @@ class VisitCard extends StatelessWidget {
   final String nombre;
   final String direccion;
   final bool visitado;
+  final String? turnoVisita; // 👈 nuevo
   final VoidCallback? onTap;
 
   const VisitCard({
@@ -12,6 +13,7 @@ class VisitCard extends StatelessWidget {
     required this.nombre,
     required this.direccion,
     required this.visitado,
+    this.turnoVisita, // 👈 nuevo
     this.onTap,
   });
 
@@ -19,10 +21,12 @@ class VisitCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    final Color chipColor   = visitado ? AppColors.verde : AppColors.celeste;
-    final Color chipText    = AppColors.blanco;
-    final String chipLabel  = visitado ? 'Visitado' : 'Pendiente';
+    final Color chipColor = visitado ? AppColors.verde : AppColors.celeste;
+    final Color chipText = AppColors.blanco;
+    final String chipLabel = visitado ? 'Visitado' : 'Pendiente';
     final IconData leadIcon = visitado ? Icons.check_circle : Icons.schedule;
+
+    final String turnoLabel = (turnoVisita ?? '').trim();
 
     return InkWell(
       onTap: onTap,
@@ -51,7 +55,7 @@ class VisitCard extends StatelessWidget {
             ),
             const SizedBox(width: 12),
 
-            // Nombre + dirección
+            // Nombre + turno + dirección
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -67,25 +71,54 @@ class VisitCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
-                  // Dirección (subtítulo)
-                  Row(
-                    children: [
-                      Icon(Icons.place, size: 16, color: AppColors.grisTexto),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          direccion,
+
+                  // Turno de visita (si viene)
+                  if (turnoLabel.isNotEmpty) ...[
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.access_time,
+                          size: 16,
+                          color: AppColors.grisTexto,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Turno $turnoLabel',
                           style: const TextStyle(
                             color: AppColors.grisTexto,
                             fontSize: 13,
                           ),
                           overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                          softWrap: false,
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                  ],
+
+                  // Dirección (subtítulo) si no está vacía
+                  if (direccion.isNotEmpty)
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.place,
+                          size: 16,
+                          color: AppColors.grisTexto,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            direccion,
+                            style: const TextStyle(
+                              color: AppColors.grisTexto,
+                              fontSize: 13,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                            softWrap: false,
+                          ),
+                        ),
+                      ],
+                    ),
                 ],
               ),
             ),

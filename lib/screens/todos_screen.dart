@@ -1,17 +1,26 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'package:frontend_soderia/core/colors.dart';
-import 'package:frontend_soderia/models/jornada.dart';
-import 'package:frontend_soderia/services/jornada_service.dart';
 import 'package:frontend_soderia/widgets/day_filter_buttons.dart';
 import 'package:frontend_soderia/widgets/jornada_card.dart';
 import 'package:frontend_soderia/core/state/todos_filter.dart';
 
+// 👇 nuevos imports (ajustá paths si hace falta)
+import 'package:frontend_soderia/services/agenda_visitas_service.dart';
+import 'package:frontend_soderia/models/clientes_por_dia.dart';
+
 class TodosScreen extends StatefulWidget {
-  const TodosScreen({super.key, this.nombreUsuario = 'Usuario'});
+  const TodosScreen({
+    super.key,
+    this.nombreUsuario = 'Usuario',
+    this.onRequestTab,
+  });
 
   final String nombreUsuario;
+  final void Function(int index)? onRequestTab;
 
   @override
   State<TodosScreen> createState() => _TodosScreenState();
@@ -19,9 +28,12 @@ class TodosScreen extends StatefulWidget {
 
 class _TodosScreenState extends State<TodosScreen> {
   DateTime mesActual = DateTime.now();
-  final JornadaService _service = JornadaService();
 
-  late Future<List<Jornada>> _futureJornadas;
+  final AgendaVisitasService _agendaService = AgendaVisitasService();
+
+  /// mapa de fecha -> lista de clientes de ese día
+  late Future<Map<DateTime, List<ClientePorDiaItem>>> _futureAgendaMes;
+
   String _filtro = 'Todos'; // Hoy | Mañana | Ayer | Todos
 
   late final VoidCallback _monthFilterListener;
@@ -41,22 +53,20 @@ class _TodosScreenState extends State<TodosScreen> {
       mesActual = DateTime(mf.year, mf.month, 1);
     }
 
-    _futureJornadas = _service.obtenerJornadas(mesActual.year, mesActual.month);
+    _futureAgendaMes = _cargarAgendaMes(mesActual);
 
-    // 2) Escuchar cambios futuros del filtro global
+    // 2) Escuchar cambios futuros del filtro global (desde Calendario, por ej.)
     _monthFilterListener = () {
       final mf = todosMonthFilter.value;
       if (mf == null) return;
       final nueva = DateTime(mf.year, mf.month, 1);
-      if (nueva.year == mesActual.year && nueva.month == mesActual.month)
+      if (nueva.year == mesActual.year && nueva.month == mesActual.month) {
         return;
+      }
 
       setState(() {
         mesActual = nueva;
-        _futureJornadas = _service.obtenerJornadas(
-          mesActual.year,
-          mesActual.month,
-        );
+        _futureAgendaMes = _cargarAgendaMes(mesActual);
         _didAutoScrollForMonth = false; // reset para autoscroll
       });
     };
@@ -70,30 +80,51 @@ class _TodosScreenState extends State<TodosScreen> {
     super.dispose();
   }
 
+  // ===== Carga de datos reales =====
+
+  Future<Map<DateTime, List<ClientePorDiaItem>>> _cargarAgendaMes(
+      DateTime mes) async {
+    final dias = _todosLosDiasDelMes(mes);
+
+    // Hacemos un request por día del mes al endpoint /clientes/agenda/visitas
+    final results = await Future.wait(
+      dias.map((fecha) async {
+        try {
+          final agenda = await _agendaService.obtenerClientesPorFecha(fecha);
+          return MapEntry(_soloFecha(fecha), agenda.clientes);
+        } catch (_) {
+          // Si algún día falla, devolvemos lista vacía para esa fecha
+          return MapEntry(_soloFecha(fecha), <ClientePorDiaItem>[]);
+        }
+      }),
+    );
+
+    final map = <DateTime, List<ClientePorDiaItem>>{};
+    for (final entry in results) {
+      map[entry.key] = entry.value;
+    }
+    return map;
+  }
+
   void _cambiarMes(int delta) {
     setState(() {
       mesActual = DateTime(mesActual.year, mesActual.month + delta, 1);
-      _futureJornadas = _service.obtenerJornadas(
-        mesActual.year,
-        mesActual.month,
-      );
+      _futureAgendaMes = _cargarAgendaMes(mesActual);
       _didAutoScrollForMonth = false; // reset para autoscroll
     });
+
     // 3) Sincronizar el filtro global
     todosMonthFilter.value = MonthFilter(mesActual.year, mesActual.month);
   }
 
   Future<void> _refrescar() async {
     setState(() {
-      _futureJornadas = _service.obtenerJornadas(
-        mesActual.year,
-        mesActual.month,
-      );
+      _futureAgendaMes = _cargarAgendaMes(mesActual);
     });
-    await _futureJornadas;
+    await _futureAgendaMes;
   }
 
-  // ===== Helpers =====
+  // ===== Helpers de fechas =====
 
   bool _esMismaFecha(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
@@ -105,21 +136,6 @@ class _TodosScreenState extends State<TodosScreen> {
   List<DateTime> _todosLosDiasDelMes(DateTime mes) {
     final total = _diasEnMes(mes);
     return List.generate(total, (i) => DateTime(mes.year, mes.month, i + 1));
-  }
-
-  // Agrupa jornadas por día y aplana sus clientes en una sola lista por fecha.
-  Map<DateTime, List<String>> _clientesPorDia(List<Jornada> jornadas) {
-    final map = <DateTime, List<String>>{};
-    for (final j in jornadas) {
-      final f = _soloFecha(j.fecha);
-      map.putIfAbsent(f, () => <String>[]).addAll(j.clientes);
-    }
-    // (Opcional) quitar duplicados preservando orden
-    for (final entry in map.entries) {
-      final seen = <String>{};
-      entry.value.retainWhere((c) => seen.add(c));
-    }
-    return map;
   }
 
   // Aplica filtro (Hoy/Ayer/Mañana/Todos) a la lista de DÍAS
@@ -203,12 +219,23 @@ class _TodosScreenState extends State<TodosScreen> {
                   children: [
                     Expanded(
                       child: DayFilterButtons(
+                        selected: _filtro,
                         onFilterChanged: (nuevo) {
-                          setState(() {
-                            _filtro = nuevo;
-                            if (_filtro == 'Todos')
+                          if (nuevo == 'Todos') {
+                            setState(() {
+                              _filtro = 'Todos';
                               _didAutoScrollForMonth = false;
-                          });
+                            });
+                          } else {
+                            // Hoy / Mañana / Ayer -> mandar a Home
+                            homeDayFilter.value = nuevo;
+                            widget.onRequestTab?.call(0);
+
+                            // Al volver a Todos, queremos que el chip sea "Todos"
+                            setState(() {
+                              _filtro = 'Todos';
+                            });
+                          }
                         },
                       ),
                     ),
@@ -271,8 +298,8 @@ class _TodosScreenState extends State<TodosScreen> {
             child: RefreshIndicator(
               color: cs.primary,
               onRefresh: _refrescar,
-              child: FutureBuilder<List<Jornada>>(
-                future: _futureJornadas,
+              child: FutureBuilder<Map<DateTime, List<ClientePorDiaItem>>>(
+                future: _futureAgendaMes,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
@@ -287,10 +314,9 @@ class _TodosScreenState extends State<TodosScreen> {
                     );
                   }
 
-                  final jornadas = (snapshot.data ?? const <Jornada>[])
-                    ..sort((a, b) => a.fecha.compareTo(b.fecha));
+                  final mapaClientes =
+                      snapshot.data ?? <DateTime, List<ClientePorDiaItem>>{};
 
-                  final mapaClientes = _clientesPorDia(jornadas);
                   final todosLosDias = _todosLosDiasDelMes(mesActual);
                   final diasVisibles = _aplicarFiltroDias(todosLosDias);
 
@@ -320,15 +346,22 @@ class _TodosScreenState extends State<TodosScreen> {
                     itemBuilder: (context, i) {
                       final fecha = diasVisibles[i];
                       final key = _dayKeys[_soloFecha(fecha)];
-                      final clientes = List<String>.from(
-                        mapaClientes[_soloFecha(fecha)] ?? const <String>[],
+
+                      final clientes = List<ClientePorDiaItem>.from(
+                        mapaClientes[_soloFecha(fecha)] ??
+                            const <ClientePorDiaItem>[],
                       );
 
+                      // Convertimos a nombres para JornadaCard
+                      final nombres = clientes
+                          .map((c) => c.nombreCompleto)
+                          .toList(growable: false);
+
                       return KeyedSubtree(
-                        key: key, // clave para ensureVisible
+                        key: key,
                         child: JornadaCard(
                           fecha: fecha,
-                          nombres: clientes,
+                          nombres: nombres,
                           onAddPressed: () {
                             debugPrint('Agregar cliente al $fecha');
                           },
@@ -411,3 +444,4 @@ class _MesLabel extends StatelessWidget {
     );
   }
 }
+

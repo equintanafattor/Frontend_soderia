@@ -31,7 +31,9 @@ const _weekdaysMonFirst = [
 ]; // Lunes a Domingo
 
 class CalendarioScreen extends StatelessWidget {
-  const CalendarioScreen({super.key});
+  const CalendarioScreen({super.key, this.nombreUsuario = 'Usuario'});
+
+  final String nombreUsuario;
 
   @override
   Widget build(BuildContext context) {
@@ -46,10 +48,10 @@ class CalendarioScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                "Hola, Gastón!",
-                style: TextStyle(
-                  color: AppColors.azul,
+              Text(
+                "Hola, $nombreUsuario!",
+                style: const TextStyle(
+                  // color: AppColors.azul,
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                 ),
@@ -64,7 +66,10 @@ class CalendarioScreen extends StatelessWidget {
               Row(
                 children: [
                   IconButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () {
+                      // Cambiar a la pestaña de Inicio dentro del AppShell
+                      AppShellActions.jumpToTab(context, kIndexInicio);
+                    },
                     icon: const Icon(
                       Icons.arrow_back,
                       color: AppColors.azul,
@@ -75,6 +80,7 @@ class CalendarioScreen extends StatelessWidget {
                       shape: const CircleBorder(),
                     ),
                   ),
+
                   Expanded(
                     child: Container(
                       margin: const EdgeInsets.symmetric(horizontal: 8),

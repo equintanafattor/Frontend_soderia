@@ -139,21 +139,65 @@ class ClienteService {
     }
   }
 
+  // PUT /clientes/{legajo}
   Future<Map<String, dynamic>> actualizarCliente(
     int legajo,
-    Map<String, dynamic> body,
+    Map<String, dynamic> payload,
   ) async {
     final resp = await http.put(
       Uri.parse('$baseUrl/$legajo'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(body),
+      body: jsonEncode(payload),
     );
-
     if (resp.statusCode != 200) {
       throw Exception('Error actualizando cliente: ${resp.body}');
     }
+    return jsonDecode(resp.body) as Map<String, dynamic>;
+  }
 
-    return jsonDecode(resp.body);
+  // PUT /clientes/{legajo}/contacto
+  // payload:
+  // {
+  //   "direcciones": [ { ... } ],
+  //   "telefonos":   [ { ... } ],
+  //   "emails":      [ { ... } ]
+  // }
+  Future<Map<String, dynamic>> actualizarContacto(
+    int legajo,
+    Map<String, dynamic> payload,
+  ) async {
+    final resp = await http.put(
+      Uri.parse('$baseUrl/$legajo/contacto'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    );
+    if (resp.statusCode != 200) {
+      throw Exception('Error actualizando contacto: ${resp.body}');
+    }
+    return jsonDecode(resp.body) as Map<String, dynamic>;
+  }
+
+  // PUT /clientes/{legajo}/dias-visita
+  // payload que proponemos al back:
+  // {
+  //   "dias": [
+  //     { "dia": "lun", "turno_visita": "manana" },
+  //     { "dia": "mie", "turno_visita": "manana" }
+  //   ]
+  // }
+  Future<List<dynamic>> actualizarFrecuencia(
+    int legajo,
+    Map<String, dynamic> payload,
+  ) async {
+    final resp = await http.put(
+      Uri.parse('$baseUrl/$legajo/dias-visita'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    );
+    if (resp.statusCode != 200) {
+      throw Exception('Error actualizando frecuencia: ${resp.body}');
+    }
+    return jsonDecode(resp.body) as List<dynamic>;
   }
 
   Future<void> borrarCliente(int legajo) async {
@@ -165,7 +209,7 @@ class ClienteService {
     }
   }
 
-    Future<Map<String, dynamic>> obtenerDetalleCliente(int legajo) async {
+  Future<Map<String, dynamic>> obtenerDetalleCliente(int legajo) async {
     final resp = await http.get(Uri.parse('$baseUrl/$legajo/detalle'));
     if (resp.statusCode != 200) {
       throw Exception('Error obteniendo detalle de cliente');
@@ -173,7 +217,10 @@ class ClienteService {
     return jsonDecode(resp.body) as Map<String, dynamic>;
   }
 
-  Future<List<dynamic>> listarPedidosCliente(int legajo, {int limit = 10}) async {
+  Future<List<dynamic>> listarPedidosCliente(
+    int legajo, {
+    int limit = 10,
+  }) async {
     final resp = await http.get(
       Uri.parse('$baseUrl/$legajo/pedidos?limit=$limit'),
     );
@@ -183,7 +230,10 @@ class ClienteService {
     return jsonDecode(resp.body) as List<dynamic>;
   }
 
-  Future<List<dynamic>> listarHistoricoCliente(int legajo, {int limit = 10}) async {
+  Future<List<dynamic>> listarHistoricoCliente(
+    int legajo, {
+    int limit = 10,
+  }) async {
     final resp = await http.get(
       Uri.parse('$baseUrl/$legajo/historicos?limit=$limit'),
     );
