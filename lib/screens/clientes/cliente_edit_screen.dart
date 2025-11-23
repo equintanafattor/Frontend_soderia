@@ -32,6 +32,25 @@ class _ClienteEditScreenState extends State<ClienteEditScreen> {
   // Frecuencia (días y turno)
   final Set<String> _diasSeleccionados = {}; // 'lun','mar',...
   String? _turnoVisita; // 'manana','tarde','noche', null
+  static const Map<int, String> _codigoDiaPorId = {
+    1: 'lun',
+    2: 'mar',
+    3: 'mie',
+    4: 'jue',
+    5: 'vie',
+    6: 'sab',
+    7: 'dom',
+  };
+
+  static const Map<String, int> _idDiaPorCodigo = {
+    'lun': 1,
+    'mar': 2,
+    'mie': 3,
+    'jue': 4,
+    'vie': 5,
+    'sab': 6,
+    'dom': 7,
+  };
 
   bool _saving = false;
 
@@ -83,17 +102,53 @@ class _ClienteEditScreenState extends State<ClienteEditScreen> {
       }
     }
 
-    // Frecuencia (días + turno) si viene en el detalle
-    final diasVisita = (widget.data['dias_visita'] as List?) ?? const [];
-    for (final d in diasVisita) {
-      if (d is String) {
-        _diasSeleccionados.add(d);
+    // ===== Frecuencia (días + turno) =====
+
+    // 1) Intentar usar dias_visita si viene (hoy viene vacío, pero lo soportamos igual)
+    final diasVisita = widget.data['dias_visita'];
+    if (diasVisita is List) {
+      for (final d in diasVisita) {
+        if (d is String) {
+          _diasSeleccionados.add(d); // ej: "lun"
+        } else if (d is Map && d['value'] is String) {
+          _diasSeleccionados.add((d['value'] as String).toLowerCase());
+        }
       }
     }
-    final turno = widget.data['turno_visita'];
-    if (turno is String && turno.isNotEmpty) {
-      _turnoVisita = turno;
+
+    // 2) Si no vino nada en dias_visita, usamos dias_semanas con id_dia
+    if (_diasSeleccionados.isEmpty) {
+      final diasSemanas = widget.data['dias_semanas'];
+      if (diasSemanas is List) {
+        for (final row in diasSemanas) {
+          if (row is! Map) continue;
+
+          // id_dia -> 'lun','mar',...
+          final idDia = row['id_dia'];
+          if (idDia is int) {
+            final code = _codigoDiaPorId[idDia];
+            if (code != null) {
+              _diasSeleccionados.add(code);
+            }
+          }
+
+          // turno_visita (lo tomamos del primero que tenga valor)
+          final turno = row['turno_visita'];
+          if (_turnoVisita == null && turno is String && turno.isNotEmpty) {
+            _turnoVisita = turno; // "manana", "tarde", "noche"
+          }
+        }
+      }
     }
+
+    // 3) Si además el detalle trae turno_visita a nivel raíz, lo dejamos pisar
+    final turnoRoot = widget.data['turno_visita'];
+    if (turnoRoot is String && turnoRoot.isNotEmpty) {
+      _turnoVisita = turnoRoot;
+    }
+
+    // Si querés, podrías agregar logs:
+    // debugPrint('map diasId: $_diasId');
   }
 
   @override
@@ -133,77 +188,83 @@ class _ClienteEditScreenState extends State<ClienteEditScreen> {
     try {
       final dniParsed = int.tryParse(_dniCtrl.text.trim());
 
-      // 1) payload cliente/persona
-      final payloadCliente = <String, dynamic>{
-        'observacion': _observacionCtrl.text.trim().isEmpty
-            ? null
-            : _observacionCtrl.text.trim(),
-        'persona': {
-          'nombre': _nombreCtrl.text.trim(),
-          'apellido': _apellidoCtrl.text.trim(),
-          'dni': dniParsed,
-        },
+      // 1) persona
+      final personaPayload = <String, dynamic>{
+        'nombre': _nombreCtrl.text.trim(),
+        'apellido': _apellidoCtrl.text.trim(),
+        'dni': dniParsed,
       };
 
-      // 2) payload contacto
+      // 2) direcciones
       final direccionesPayload = _direcciones
           .map((d) => d.toPayload())
-          .where((m) =>
-              (m['direccion']?.toString().trim().isNotEmpty ?? false) ||
-              (m['localidad']?.toString().trim().isNotEmpty ?? false))
+          .where(
+            (m) =>
+                (m['direccion']?.toString().trim().isNotEmpty ?? false) ||
+                (m['localidad']?.toString().trim().isNotEmpty ?? false),
+          )
           .toList();
 
+      // 3) teléfonos
       final telefonosPayload = _telefonos
           .map((t) => t.toPayload())
-          .where((m) => (m['nro_telefono']?.toString().trim().isNotEmpty ?? false))
+          .where(
+            (m) => (m['nro_telefono']?.toString().trim().isNotEmpty ?? false),
+          )
           .toList();
 
+      // 4) emails
       final emailsPayload = _emails
           .map((e) => e.toPayload())
           .where((m) => (m['mail']?.toString().trim().isNotEmpty ?? false))
           .toList();
 
-      final payloadContacto = <String, dynamic>{
-        'direcciones': direccionesPayload,
-        'telefonos': telefonosPayload,
-        'emails': emailsPayload,
-      };
-
-      // 3) payload frecuencia
+      // 5) días de visita -> dias_semanas
       // Orden fijo de días para que siempre salgan ordenados
       const ordenDias = ['lun', 'mar', 'mie', 'jue', 'vie', 'sab', 'dom'];
-      final diasOrdenados = ordenDias
+      final seleccionadosOrdenados = ordenDias
           .where((d) => _diasSeleccionados.contains(d))
           .toList();
 
-      final diasPayload = diasOrdenados
-          .map((d) => {
-                'dia': d,
-                'turno_visita': _turnoVisita,
-              })
-          .toList();
+      final List<Map<String, dynamic>> diasSemanasPayload = [];
+      int orden = 1;
+      for (final code in seleccionadosOrdenados) {
+        final idDia = _idDiaPorCodigo[code];
+        if (idDia == null) continue;
 
-      final payloadFrecuencia = <String, dynamic>{
-        'dias': diasPayload,
+        diasSemanasPayload.add({
+          'id_dia': idDia,
+          'turno_visita': _turnoVisita, // puede ser null
+          'orden': orden,
+        });
+        orden++;
+      }
+
+      // 6) payload UNIFICADO para ClienteDetalleUpdate
+      final payloadDetalle = <String, dynamic>{
+        'persona': personaPayload,
+        'direcciones': direccionesPayload,
+        'telefonos': telefonosPayload,
+        'emails': emailsPayload,
+        'dias_semanas': diasSemanasPayload,
+        'observacion': _observacionCtrl.text.trim().isEmpty
+            ? null
+            : _observacionCtrl.text.trim(),
       };
 
-      // Llamadas al back (secuenciales)
-      await _service.actualizarCliente(widget.legajo, payloadCliente);
-      await _service.actualizarContacto(widget.legajo, payloadContacto);
-      await _service.actualizarFrecuencia(widget.legajo, payloadFrecuencia);
+      // 7) Una sola llamada al back
+      await _service.actualizarClienteDetalle(widget.legajo, payloadDetalle);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Cliente actualizado correctamente')),
       );
-
-      // devolvemos algo (podés devolver solo true y que el detail recargue desde el back)
-      Navigator.of(context).pop(true);
+      Navigator.of(context).pop(true); // que el detail recargue desde el back
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al guardar: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error al guardar: $e')));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -274,9 +335,7 @@ class _ClienteEditScreenState extends State<ClienteEditScreen> {
                               Text(
                                 '${_nombreCtrl.text.trim()} ${_apellidoCtrl.text.trim()}'
                                     .trim(),
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleMedium
+                                style: Theme.of(context).textTheme.titleMedium
                                     ?.copyWith(fontWeight: FontWeight.w600),
                               ),
                               const SizedBox(height: 8),
@@ -288,10 +347,7 @@ class _ClienteEditScreenState extends State<ClienteEditScreen> {
                                     label: 'Legajo',
                                     value: widget.legajo.toString(),
                                   ),
-                                  _InfoChip(
-                                    label: 'DNI',
-                                    value: _dniCtrl.text,
-                                  ),
+                                  _InfoChip(label: 'DNI', value: _dniCtrl.text),
                                 ],
                               ),
                             ],
@@ -428,8 +484,7 @@ class _ClienteEditScreenState extends State<ClienteEditScreen> {
                                     Expanded(
                                       child: TextFormField(
                                         controller: d.entre1,
-                                        decoration:
-                                            const InputDecoration(
+                                        decoration: const InputDecoration(
                                           labelText: 'Entre calle 1',
                                           border: OutlineInputBorder(),
                                           isDense: true,
@@ -440,8 +495,7 @@ class _ClienteEditScreenState extends State<ClienteEditScreen> {
                                     Expanded(
                                       child: TextFormField(
                                         controller: d.entre2,
-                                        decoration:
-                                            const InputDecoration(
+                                        decoration: const InputDecoration(
                                           labelText: 'Entre calle 2',
                                           border: OutlineInputBorder(),
                                           isDense: true,
@@ -469,9 +523,8 @@ class _ClienteEditScreenState extends State<ClienteEditScreen> {
                                         ? null
                                         : () {
                                             setState(() {
-                                              final removed =
-                                                  _direcciones.removeAt(
-                                                      index);
+                                              final removed = _direcciones
+                                                  .removeAt(index);
                                               removed.dispose();
                                             });
                                           },
@@ -538,8 +591,9 @@ class _ClienteEditScreenState extends State<ClienteEditScreen> {
                                   ? null
                                   : () {
                                       setState(() {
-                                        final removed =
-                                            _telefonos.removeAt(index);
+                                        final removed = _telefonos.removeAt(
+                                          index,
+                                        );
                                         removed.dispose();
                                       });
                                     },
@@ -582,8 +636,7 @@ class _ClienteEditScreenState extends State<ClienteEditScreen> {
                                   border: OutlineInputBorder(),
                                   isDense: true,
                                 ),
-                                keyboardType:
-                                    TextInputType.emailAddress,
+                                keyboardType: TextInputType.emailAddress,
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -593,8 +646,7 @@ class _ClienteEditScreenState extends State<ClienteEditScreen> {
                                   ? null
                                   : () {
                                       setState(() {
-                                        final removed =
-                                            _emails.removeAt(index);
+                                        final removed = _emails.removeAt(index);
                                         removed.dispose();
                                       });
                                     },
@@ -740,10 +792,9 @@ class _SectionCard extends StatelessWidget {
           children: [
             Text(
               title,
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w600),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
             child,
@@ -797,6 +848,7 @@ class _InfoChip extends StatelessWidget {
 // Modelos de formulario
 
 class _DireccionFormData {
+  final int? idDireccion;
   final TextEditingController localidad;
   final TextEditingController direccion;
   final TextEditingController zona;
@@ -805,6 +857,7 @@ class _DireccionFormData {
   final TextEditingController observacion;
 
   _DireccionFormData({
+    required this.idDireccion,
     required this.localidad,
     required this.direccion,
     required this.zona,
@@ -814,37 +867,43 @@ class _DireccionFormData {
   });
 
   factory _DireccionFormData.empty() => _DireccionFormData(
-        localidad: TextEditingController(),
-        direccion: TextEditingController(),
-        zona: TextEditingController(),
-        entre1: TextEditingController(),
-        entre2: TextEditingController(),
-        observacion: TextEditingController(),
-      );
+    idDireccion: null,
+    localidad: TextEditingController(),
+    direccion: TextEditingController(),
+    zona: TextEditingController(),
+    entre1: TextEditingController(),
+    entre2: TextEditingController(),
+    observacion: TextEditingController(),
+  );
 
   factory _DireccionFormData.fromMap(Map d) => _DireccionFormData(
-        localidad: TextEditingController(text: d['localidad']?.toString() ?? ''),
-        direccion: TextEditingController(text: d['direccion']?.toString() ?? ''),
-        zona: TextEditingController(text: d['zona']?.toString() ?? ''),
-        entre1:
-            TextEditingController(text: d['entre_calle1']?.toString() ?? ''),
-        entre2:
-            TextEditingController(text: d['entre_calle2']?.toString() ?? ''),
-        observacion:
-            TextEditingController(text: d['observacion']?.toString() ?? ''),
-      );
+    idDireccion: d['id_direccion'] as int?,
+    localidad: TextEditingController(text: d['localidad']?.toString() ?? ''),
+    direccion: TextEditingController(text: d['direccion']?.toString() ?? ''),
+    zona: TextEditingController(text: d['zona']?.toString() ?? ''),
+    entre1: TextEditingController(text: d['entre_calle1']?.toString() ?? ''),
+    entre2: TextEditingController(text: d['entre_calle2']?.toString() ?? ''),
+    observacion: TextEditingController(
+      text: d['observacion']?.toString() ?? '',
+    ),
+  );
 
-  Map<String, dynamic> toPayload() => {
-        'localidad': localidad.text.trim().isEmpty ? null : localidad.text.trim(),
-        'direccion': direccion.text.trim().isEmpty ? null : direccion.text.trim(),
-        'zona': zona.text.trim().isEmpty ? null : zona.text.trim(),
-        'entre_calle1':
-            entre1.text.trim().isEmpty ? null : entre1.text.trim(),
-        'entre_calle2':
-            entre2.text.trim().isEmpty ? null : entre2.text.trim(),
-        'observacion':
-            observacion.text.trim().isEmpty ? null : observacion.text.trim(),
-      };
+  Map<String, dynamic> toPayload() {
+    final map = <String, dynamic>{
+      'localidad': localidad.text.trim().isEmpty ? null : localidad.text.trim(),
+      'direccion': direccion.text.trim().isEmpty ? null : direccion.text.trim(),
+      'zona': zona.text.trim().isEmpty ? null : zona.text.trim(),
+      'entre_calle1': entre1.text.trim().isEmpty ? null : entre1.text.trim(),
+      'entre_calle2': entre2.text.trim().isEmpty ? null : entre2.text.trim(),
+      'observacion': observacion.text.trim().isEmpty
+          ? null
+          : observacion.text.trim(),
+    };
+    if (idDireccion != null) {
+      map['id_direccion'] = idDireccion;
+    }
+    return map;
+  }
 
   void dispose() {
     localidad.dispose();
@@ -857,29 +916,38 @@ class _DireccionFormData {
 }
 
 class _TelefonoFormData {
+  final int? idTelefono;
   final TextEditingController numero;
   final TextEditingController estado;
 
   _TelefonoFormData({
+    required this.idTelefono,
     required this.numero,
     required this.estado,
   });
 
   factory _TelefonoFormData.empty() => _TelefonoFormData(
-        numero: TextEditingController(),
-        estado: TextEditingController(),
-      );
+    idTelefono: null,
+    numero: TextEditingController(),
+    estado: TextEditingController(),
+  );
 
   factory _TelefonoFormData.fromMap(Map t) => _TelefonoFormData(
-        numero: TextEditingController(text: t['nro_telefono']?.toString() ?? ''),
-        estado: TextEditingController(text: t['estado']?.toString() ?? ''),
-      );
+    idTelefono: t['id_telefono'] as int?,
+    numero: TextEditingController(text: t['nro_telefono']?.toString() ?? ''),
+    estado: TextEditingController(text: t['estado']?.toString() ?? ''),
+  );
 
-  Map<String, dynamic> toPayload() => {
-        'nro_telefono':
-            numero.text.trim().isEmpty ? null : numero.text.trim(),
-        'estado': estado.text.trim().isEmpty ? null : estado.text.trim(),
-      };
+  Map<String, dynamic> toPayload() {
+    final map = <String, dynamic>{
+      'nro_telefono': numero.text.trim().isEmpty ? null : numero.text.trim(),
+      'estado': estado.text.trim().isEmpty ? null : estado.text.trim(),
+    };
+    if (idTelefono != null) {
+      map['id_telefono'] = idTelefono;
+    }
+    return map;
+  }
 
   void dispose() {
     numero.dispose();
@@ -888,20 +956,28 @@ class _TelefonoFormData {
 }
 
 class _EmailFormData {
+  final int? idMail;
   final TextEditingController mail;
 
-  _EmailFormData({required this.mail});
+  _EmailFormData({required this.idMail, required this.mail});
 
   factory _EmailFormData.empty() =>
-      _EmailFormData(mail: TextEditingController());
+      _EmailFormData(idMail: null, mail: TextEditingController());
 
   factory _EmailFormData.fromMap(Map e) => _EmailFormData(
-        mail: TextEditingController(text: e['mail']?.toString() ?? ''),
-      );
+    idMail: e['id_mail'] as int?,
+    mail: TextEditingController(text: e['mail']?.toString() ?? ''),
+  );
 
-  Map<String, dynamic> toPayload() => {
-        'mail': mail.text.trim().isEmpty ? null : mail.text.trim(),
-      };
+  Map<String, dynamic> toPayload() {
+    final map = <String, dynamic>{
+      'mail': mail.text.trim().isEmpty ? null : mail.text.trim(),
+    };
+    if (idMail != null) {
+      map['id_mail'] = idMail;
+    }
+    return map;
+  }
 
   void dispose() {
     mail.dispose();
@@ -931,4 +1007,3 @@ class _DiaChip extends StatelessWidget {
     );
   }
 }
-

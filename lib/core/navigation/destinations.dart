@@ -13,7 +13,8 @@ const kDestinations = <AppDestination>[
   AppDestination(icon: Icons.bar_chart,       label: 'Reportes'),
   AppDestination(icon: Icons.people,          label: 'Usuarios'),
   AppDestination(icon: Icons.person_search,   label: 'Clientes'),
-  AppDestination(icon: Icons.calendar_month,  label: 'Calendario'), // 👈 NUEVO
+  AppDestination(icon: Icons.inventory_2,     label: 'Productos'), 
+  AppDestination(icon: Icons.calendar_month,  label: 'Calendario'),
 ];
 
 // Para no “adivinar” índices en otras pantallas:
@@ -22,4 +23,5 @@ const int kIndexTareas      = 1;
 const int kIndexReportes    = 2;
 const int kIndexUsuarios    = 3;
 const int kIndexClientes    = 4;
-const int kIndexCalendario  = 5; // 👈 NUEVO
+const int kIndexProductos   = 5; 
+const int kIndexCalendario  = 6;

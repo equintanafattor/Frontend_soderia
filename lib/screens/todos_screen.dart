@@ -12,6 +12,9 @@ import 'package:frontend_soderia/core/state/todos_filter.dart';
 import 'package:frontend_soderia/services/agenda_visitas_service.dart';
 import 'package:frontend_soderia/models/clientes_por_dia.dart';
 
+import 'package:frontend_soderia/core/navigation/shell_state.dart';
+import 'package:frontend_soderia/core/navigation/destinations.dart'; // para kIndexTodos
+
 class TodosScreen extends StatefulWidget {
   const TodosScreen({
     super.key,
@@ -30,6 +33,7 @@ class _TodosScreenState extends State<TodosScreen> {
   DateTime mesActual = DateTime.now();
 
   final AgendaVisitasService _agendaService = AgendaVisitasService();
+  late final VoidCallback _shellListener;
 
   /// mapa de fecha -> lista de clientes de ese día
   late Future<Map<DateTime, List<ClientePorDiaItem>>> _futureAgendaMes;
@@ -71,19 +75,30 @@ class _TodosScreenState extends State<TodosScreen> {
       });
     };
     todosMonthFilter.addListener(_monthFilterListener);
+
+    // Escuchar cambios de pestaña del AppShell
+    _shellListener = () {
+      // Cuando el índice actual del shell sea el de Todos, recargamos
+      if (shellState.value == kIndexTareas) {
+        _refrescar(); // vuelve a pedir jornadas/agenda del mes actual
+      }
+    };
+    shellState.addListener(_shellListener);
   }
 
   @override
   void dispose() {
     todosMonthFilter.removeListener(_monthFilterListener);
     _scrollController.dispose();
+    shellState.removeListener(_shellListener); // 👈 nuevo
     super.dispose();
   }
 
   // ===== Carga de datos reales =====
 
   Future<Map<DateTime, List<ClientePorDiaItem>>> _cargarAgendaMes(
-      DateTime mes) async {
+    DateTime mes,
+  ) async {
     final dias = _todosLosDiasDelMes(mes);
 
     // Hacemos un request por día del mes al endpoint /clientes/agenda/visitas
@@ -444,4 +459,3 @@ class _MesLabel extends StatelessWidget {
     );
   }
 }
-

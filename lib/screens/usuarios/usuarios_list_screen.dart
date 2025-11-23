@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/navigation/app_shell_actions.dart';
+import 'package:frontend_soderia/models/usuario.dart';
+import 'package:frontend_soderia/services/usuario_service.dart';
+import 'package:frontend_soderia/screens/usuarios/usuario_detail_screen.dart';
+import 'package:intl/intl.dart';
 
 class UsuariosListScreen extends StatefulWidget {
   const UsuariosListScreen({super.key});
@@ -10,75 +14,63 @@ class UsuariosListScreen extends StatefulWidget {
 
 class _UsuariosListScreenState extends State<UsuariosListScreen> {
   final _search = TextEditingController();
+  final _service = UsuarioService();
   String _orden = 'Nombre (A→Z)';
   bool _cargando = false;
+  List<Usuario> _data = [];
 
-  // Mock inicial – luego lo reemplazás con tu repo/API
-  List<Map<String, dynamic>> _data = [
-    {
-      'nombre': 'Ana Torres',
-      'email': 'ana@soderia.com',
-      'rol': 'Ventas',
-      'activo': true,
-      'created': DateTime(2025, 9, 1),
-    },
-    {
-      'nombre': 'Bruno Díaz',
-      'email': 'bruno@soderia.com',
-      'rol': 'Repartidor',
-      'activo': true,
-      'created': DateTime(2025, 9, 5),
-    },
-    {
-      'nombre': 'Carla Gómez',
-      'email': 'carla@soderia.com',
-      'rol': 'Admin',
-      'activo': false,
-      'created': DateTime(2025, 8, 20),
-    },
-  ];
-
-  List<Map<String, dynamic>> get _filtered {
+  List<Usuario> get _filtered {
     final q = _search.text.trim().toLowerCase();
     var list = _data.where((u) {
       if (q.isEmpty) return true;
-      return (u['nombre'] as String).toLowerCase().contains(q) ||
-          (u['email'] as String).toLowerCase().contains(q) ||
-          (u['rol'] as String).toLowerCase().contains(q);
+      return u.nombre.toLowerCase().contains(q) ||
+          u.email.toLowerCase().contains(q) ||
+          u.rol.toLowerCase().contains(q);
     }).toList();
 
     switch (_orden) {
       case 'Nombre (A→Z)':
-        list.sort(
-          (a, b) => (a['nombre'] as String).compareTo(b['nombre'] as String),
-        );
+        list.sort((a, b) => a.nombre.compareTo(b.nombre));
         break;
       case 'Nombre (Z→A)':
-        list.sort(
-          (a, b) => (b['nombre'] as String).compareTo(a['nombre'] as String),
-        );
+        list.sort((a, b) => b.nombre.compareTo(a.nombre));
         break;
       case 'Más nuevos':
-        list.sort(
-          (a, b) =>
-              (b['created'] as DateTime).compareTo(a['created'] as DateTime),
-        );
+        list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
         break;
       case 'Más antiguos':
-        list.sort(
-          (a, b) =>
-              (a['created'] as DateTime).compareTo(b['created'] as DateTime),
-        );
+        list.sort((a, b) => a.createdAt.compareTo(b.createdAt));
         break;
     }
     return list;
   }
 
-  Future<void> _refresh() async {
+  @override
+  void initState() {
+    super.initState();
+    _cargar();
+  }
+
+  Future<void> _cargar() async {
     setState(() => _cargando = true);
-    // TODO: cargar desde backend
-    await Future.delayed(const Duration(milliseconds: 500));
-    if (mounted) setState(() => _cargando = false);
+    try {
+      final items = await _service.obtenerUsuarios();
+      if (!mounted) return;
+      setState(() {
+        _data = items;
+        _cargando = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _cargando = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al cargar usuarios: $e')),
+      );
+    }
+  }
+
+  Future<void> _refresh() async {
+    await _cargar();
   }
 
   @override
@@ -90,6 +82,7 @@ class _UsuariosListScreenState extends State<UsuariosListScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final dateFmt = DateFormat('dd/MM/yyyy');
 
     return Column(
       children: [
@@ -137,7 +130,16 @@ class _UsuariosListScreenState extends State<UsuariosListScreen> {
               ),
               const SizedBox(width: 8),
               FilledButton.icon(
-                onPressed: () => AppShellActions.push(context, '/usuario/new'),
+                onPressed: () async {
+                  final created = await AppShellActions.push(
+                    context,
+                    '/usuario/new',
+                  );
+                  // Si el alta devolvió true, recargamos
+                  if (created == true && mounted) {
+                    _cargar();
+                  }
+                },
                 icon: const Icon(Icons.person_add),
                 label: const Text('Nuevo'),
               ),
@@ -162,28 +164,45 @@ class _UsuariosListScreenState extends State<UsuariosListScreen> {
                         ),
                         tileColor: Theme.of(context).colorScheme.surface,
                         leading: CircleAvatar(
-                          child: Text((u['nombre'] as String).substring(0, 1)),
+                          child: Text(
+                            u.nombre.isNotEmpty
+                                ? u.nombre.substring(0, 1).toUpperCase()
+                                : '?',
+                          ),
                         ),
-                        title: Text(u['nombre']),
-                        subtitle: Text('${u['email']} · ${u['rol']}'),
+                        title: Text(u.nombre),
+                        subtitle: Text(
+                          '${u.email.isEmpty ? 'Sin email' : u.email} · ${u.rol.isEmpty ? 'Sin rol' : u.rol}',
+                        ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
-                              u['activo'] ? Icons.check_circle : Icons.cancel,
-                              color: u['activo'] ? cs.primary : cs.error,
+                            Tooltip(
+                              message: u.activo ? 'Activo' : 'Inactivo',
+                              child: Icon(
+                                u.activo
+                                    ? Icons.check_circle
+                                    : Icons.cancel_outlined,
+                                color: u.activo ? cs.primary : cs.error,
+                              ),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.edit),
-                              tooltip: 'Editar',
-                              onPressed: () {
-                                // TODO: Navegar a editar (en el futuro)
-                              },
+                            const SizedBox(width: 8),
+                            Text(
+                              dateFmt.format(u.createdAt),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(color: cs.outline),
                             ),
                           ],
                         ),
                         onTap: () {
-                          // TODO: detalle si querés
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  UsuarioDetailScreen(usuario: u),
+                            ),
+                          );
                         },
                       );
                     },

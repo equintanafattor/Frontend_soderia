@@ -49,61 +49,6 @@ class ClienteService {
     }
   }
 
-  /* Future<void> agregarDireccion(int legajo, Map<String, dynamic> data) async {
-    final res = await http.post(
-      Uri.parse('$baseUrl/$legajo/direcciones'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(data),
-    );
-    if (res.statusCode != 201) {
-      throw Exception('Error agregando dirección: ${res.body}');
-    }
-  }
-
-  Future<void> agregarTelefono(int legajo, String numero) async {
-    final res = await http.post(
-      Uri.parse('$baseUrl/$legajo/telefonos'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({"numero": numero}),
-    );
-    if (res.statusCode != 201) {
-      throw Exception('Error agregando teléfono: ${res.body}');
-    }
-  }
-
-  Future<void> agregarMail(int legajo, String mail) async {
-    final res = await http.post(
-      Uri.parse('$baseUrl/$legajo/emails'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({"mail": mail}),
-    );
-    if (res.statusCode != 201) {
-      throw Exception('Error agregando mail: ${res.body}');
-    }
-  }
-
-  Future<void> agregarFrecuencia(
-    int legajo, {
-    required int idDia,
-    required String modo,
-    required String turnoVisita,
-    int? idClienteReferencia,
-  }) async {
-    final res = await http.post(
-      Uri.parse('$baseUrl/$legajo/frecuencia'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        "id_dia": idDia,
-        "modo": modo,
-        "turno_visita": turnoVisita,
-        "id_cliente_referencia": idClienteReferencia,
-      }),
-    );
-    if (res.statusCode != 201) {
-      throw Exception('Error agregando frecuencia: ${res.body}');
-    }
-  } */
-
   Future<List<dynamic>> listarClientesPorIdDia(int idDia) async {
     final res = await http.get(Uri.parse('$baseUrl/agenda/visitas/dia/$idDia'));
     if (res.statusCode == 200) {
@@ -241,5 +186,23 @@ class ClienteService {
       throw Exception('Error listando histórico del cliente');
     }
     return jsonDecode(resp.body) as List<dynamic>;
+  }
+
+  Future<Map<String, dynamic>> actualizarClienteDetalle(
+    int legajo,
+    Map<String, dynamic> payload,
+  ) async {
+    final url = Uri.parse('$baseUrl/$legajo/detalle');
+    final res = await http.put(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    );
+
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Error ${res.statusCode}: ${res.body}');
+    }
   }
 }

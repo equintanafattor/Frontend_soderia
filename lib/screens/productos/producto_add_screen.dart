@@ -1,11 +1,15 @@
 // screens/productos/producto_add_screen.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:frontend_soderia/models/producto.dart';
+import 'package:frontend_soderia/services/producto_service.dart';
 import 'package:frontend_soderia/widgets/common/choice_chips.dart';
 import 'package:image_picker/image_picker.dart';
 
 class ProductoAddScreen extends StatefulWidget {
-  const ProductoAddScreen({super.key});
+  const ProductoAddScreen({super.key, this.initial});
+
+  final Producto? initial;
 
   @override
   State<ProductoAddScreen> createState() => _ProductoAddScreenState();
@@ -21,6 +25,24 @@ class _ProductoAddScreenState extends State<ProductoAddScreen> {
   bool _activo = true;
   XFile? _image;
 
+  final _service = ProductoService();
+  bool _saving = false;
+
+  bool get _isValid =>
+      _formKey.currentState?.validate() == true && _litros != null && !_saving;
+
+  @override
+  void initState() {
+    super.initState();
+    final p = widget.initial;
+    if (p != null) {
+      _tipo.text = p.nombre;
+      _litros = p.litros;
+      _activo = p.estado ?? true;
+      // precio / stock / sku / imagen por ahora no se mapean al back
+    }
+  }
+
   @override
   void dispose() {
     _tipo.dispose();
@@ -30,17 +52,22 @@ class _ProductoAddScreenState extends State<ProductoAddScreen> {
     super.dispose();
   }
 
-  bool get _isValid =>
-      _formKey.currentState?.validate() == true && _litros != null;
-
   @override
   Widget build(BuildContext context) {
+    final isEdit = widget.initial != null;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Agregar producto'),
+        title: Text(isEdit ? 'Editar producto' : 'Agregar producto'),
         actions: [
           IconButton(
-            icon: Icon(Icons.check),
+            icon: _saving
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.check),
             onPressed: _isValid ? _submit : null,
           ),
         ],
@@ -51,7 +78,7 @@ class _ProductoAddScreenState extends State<ProductoAddScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            _tf('Tipo', _tipo, validator: _req),
+            _tf('Tipo / Nombre', _tipo, validator: _req),
             const SizedBox(height: 12),
             Text(
               'Cantidad de litros',
@@ -75,18 +102,18 @@ class _ProductoAddScreenState extends State<ProductoAddScreen> {
             ),
             const Divider(height: 32),
             _tf(
-              'Precio',
+              'Precio (solo visual, aún no se guarda)',
               _precio,
               keyboard: TextInputType.number,
               validator: _money,
             ),
             _tf(
-              'Stock inicial',
+              'Stock inicial (solo visual, aún no se guarda)',
               _stock,
               keyboard: TextInputType.number,
               validator: _intPos,
             ),
-            _tf('Código/SKU (opcional)', _sku),
+            _tf('Código/SKU (solo visual, aún no se guarda)', _sku),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -129,7 +156,7 @@ class _ProductoAddScreenState extends State<ProductoAddScreen> {
           child: FilledButton.icon(
             onPressed: _isValid ? _submit : null,
             icon: const Icon(Icons.save),
-            label: const Text('Guardar'),
+            label: Text(isEdit ? 'Guardar cambios' : 'Guardar'),
           ),
         ),
       ),
@@ -142,15 +169,17 @@ class _ProductoAddScreenState extends State<ProductoAddScreen> {
     TextEditingController c, {
     String? Function(String?)? validator,
     TextInputType? keyboard,
-  }) => TextFormField(
-    controller: c,
-    decoration: InputDecoration(labelText: label),
-    validator: validator,
-    keyboardType: keyboard,
-  );
+  }) =>
+      TextFormField(
+        controller: c,
+        decoration: InputDecoration(labelText: label),
+        validator: validator,
+        keyboardType: keyboard,
+      );
 
   String? _req(String? v) =>
       (v == null || v.trim().isEmpty) ? 'Obligatorio' : null;
+
   String? _money(String? v) {
     if (_req(v) != null) return 'Obligatorio';
     return RegExp(r'^\d+([.,]\d{1,2})?$').hasMatch(v!.replaceAll(',', '.'))
@@ -199,12 +228,52 @@ class _ProductoAddScreenState extends State<ProductoAddScreen> {
   }
 
   Future<void> _submit() async {
-    // TODO: enviar a backend
-    if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Producto guardado')));
-      Navigator.pop(context, true);
+    if (!_isValid) return;
+    setState(() => _saving = true);
+
+    try {
+      final nombre = _tipo.text.trim();
+      final litros = _litros;
+      final activo = _activo;
+
+      if (widget.initial == null) {
+        // Alta
+        await _service.crear(
+          nombre: nombre,
+          litros: litros,
+          estado: activo,
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Producto creado')),
+          );
+        }
+      } else {
+        // Edición
+        await _service.actualizar(
+          widget.initial!.idProducto,
+          nombre: nombre,
+          litros: litros,
+          estado: activo,
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Producto actualizado')),
+          );
+        }
+      }
+
+      if (mounted) {
+        Navigator.pop(context, true); // true => se modificó algo
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al guardar: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 }
