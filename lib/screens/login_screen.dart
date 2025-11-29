@@ -227,7 +227,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     return Scaffold(
-      backgroundColor: cs.background,
+      backgroundColor: cs.surface,
       body: isWide
           // Dos columnas (tablet/desktop)
           ? Row(

@@ -277,18 +277,27 @@ class _ClienteAddScreenState extends State<ClienteAddScreen> {
       final frecuencias = _frecuencia.map((idDia) {
         final dia = diasSemana.firstWhere((d) => d['id'] == idDia);
         final cfg = _frecuenciasConfig[idDia];
-        // turno: el back espera "manana" NO "mañana"
+
+        // turno
         String turnoBack = 'manana';
         if (cfg?['turno'] == 'tarde') turnoBack = 'tarde';
 
-        // posicion: el back espera "final" / "inicio" / "despues_de"
-        final String posBack = (cfg?['modo'] ?? 'final') as String;
+        // posicion lógica
+        final modo = cfg?['modo'];
+
+        final String posicionBack = (modo == 'despues')
+            ? 'despues'
+            : (modo ?? 'final');
+
+        final int? ref = (modo == 'despues' && cfg?['ref'] != null)
+            ? cfg!['ref']
+            : null;
 
         return {
           "dia": dia['codigo'],
           "turno": turnoBack,
-          "posicion": posBack,
-          "despues_de_legajo": cfg?['ref'] ?? 0,
+          "posicion": posicionBack,
+          if (ref != null) "despues_de_legajo": ref,
         };
       }).toList();
 

@@ -16,7 +16,9 @@ class ProductoService {
     }
 
     final List<dynamic> data = jsonDecode(resp.body);
-    return data.map((e) => Producto.fromJson(e as Map<String, dynamic>)).toList();
+    return data
+        .map((e) => Producto.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<Producto> crear({
@@ -85,5 +87,15 @@ class ProductoService {
     if (resp.statusCode != 204) {
       throw Exception('Error al borrar producto: ${resp.statusCode}');
     }
+  }
+
+  Future<List<dynamic>> listarProductosDeLista(int idLista) async {
+    final res = await http.get(
+      Uri.parse('$baseUrl/listas-precios/$idLista/productos'),
+    );
+    if (res.statusCode != 200) {
+      throw Exception('Error ${res.statusCode}: ${res.body}');
+    }
+    return jsonDecode(res.body) as List<dynamic>;
   }
 }

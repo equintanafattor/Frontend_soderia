@@ -1,318 +1,4 @@
-/* import 'package:flutter/material.dart';
-import 'package:frontend_soderia/core/navigation/app_shell_actions.dart';
-import 'package:frontend_soderia/services/cliente_service.dart';
-
-class ClienteDetailScreen extends StatefulWidget {
-  final int legajo;
-  const ClienteDetailScreen({super.key, required this.legajo});
-
-  @override
-  State<ClienteDetailScreen> createState() => _ClienteDetailScreenState();
-}
-
-class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
-  final _service = ClienteService();
-  late Future<Map<String, dynamic>> _future;
-
-  @override
-  void initState() {
-    super.initState();
-    // 🔹 Traer el detalle completo
-    _future = _service.obtenerDetalleCliente(
-      widget.legajo,
-    ); // /clientes/{legajo}/detalle
-  }
-
-  Future<void> _reload() async {
-    setState(() {
-      _future = _service.obtenerDetalleCliente(widget.legajo);
-    });
-  }
-
-  Future<void> _eliminar() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar cliente'),
-        content: Text(
-          '¿Seguro que querés eliminar al cliente ${widget.legajo}?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
-    );
-    if (ok != true) return;
-
-    try {
-      await _service.borrarCliente(widget.legajo);
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Cliente eliminado')));
-        // Volvemos para que la lista se refresque (puede leer el 'true')
-        Navigator.of(context).pop(true);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Cliente'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () async {
-              final data = await _future;
-              final result = await AppShellActions.push(
-                context,
-                '/cliente/edit',
-                arguments: {'legajo': widget.legajo, 'data': data},
-              );
-              if (result != null && mounted) {
-                // 🔹 Releer el detalle desde el back para tener listas actualizadas
-                _reload();
-              }
-            },
-          ),
-          IconButton(icon: const Icon(Icons.delete), onPressed: _eliminar),
-        ],
-      ),
-      body: FutureBuilder<Map<String, dynamic>>(
-        future: _future,
-        builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snap.hasError) {
-            return Center(child: Text('Error: ${snap.error}'));
-          }
-
-          final data = snap.data!;
-          final persona = (data['persona'] as Map?) ?? {};
-          final nombre =
-              '${persona['nombre'] ?? ''} ${persona['apellido'] ?? ''}'.trim();
-          final dni = (persona['dni'] ?? data['dni'] ?? '-').toString();
-          final observacion = (data['observacion'] ?? '').toString();
-
-          final cuentas = (data['cuentas'] as List?) ?? const [];
-          final direcciones = (data['direcciones'] as List?) ?? const [];
-          final telefonos = (data['telefonos'] as List?) ?? const [];
-          final pedidos = (data['pedidos'] as List?) ?? const [];
-          final historicos = (data['historicos'] as List?) ?? const [];
-
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              // Header
-              Text(
-                nombre.isEmpty ? 'Sin nombre' : nombre,
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: 4),
-              Text('Legajo: ${widget.legajo}'),
-              const SizedBox(height: 4),
-              Text('DNI: $dni'),
-              const SizedBox(height: 16),
-              if (observacion.isNotEmpty) ...[
-                Text(
-                  'Observaciones',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 4),
-                Text(observacion),
-                const SizedBox(height: 16),
-              ],
-
-              // Datos personales
-              _Section(
-                title: 'Datos personales',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (telefonos.isEmpty)
-                      const Text('Sin teléfonos')
-                    else
-                      ...telefonos.map(
-                        (t) => ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          leading: const Icon(Icons.phone),
-                          title: Text('${(t as Map)['nro_telefono'] ?? ''}'),
-                          subtitle: Text('${t['observacion'] ?? ''}'),
-                          trailing: Text('${t['estado'] ?? ''}'),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-
-              // Direcciones
-              _Section(
-                title: 'Direcciones',
-                child: direcciones.isEmpty
-                    ? const Text('Sin direcciones')
-                    : Column(
-                        children: direcciones.map((d0) {
-                          final d = d0 as Map;
-                          final entre = d['entre_calle1'] != null
-                              ? 'Entre ${d['entre_calle1']} y ${d['entre_calle2'] ?? ''}'
-                              : null;
-                          final sub = [d['localidad'], d['zona'], entre]
-                              .whereType<String>()
-                              .where((s) => s.isNotEmpty)
-                              .join(' · ');
-                          return ListTile(
-                            dense: true,
-                            contentPadding: EdgeInsets.zero,
-                            leading: const Icon(Icons.location_on_outlined),
-                            title: Text('${d['direccion'] ?? '-'}'),
-                            subtitle: sub.isEmpty ? null : Text(sub),
-                          );
-                        }).toList(),
-                      ),
-              ),
-
-              // Cuenta
-              _Section(
-                title: 'Cuenta',
-                child: cuentas.isEmpty
-                    ? const Text('Sin cuenta')
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: cuentas.map((c0) {
-                          final c = c0 as Map;
-                          return Card(
-                            color: cs.surface,
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('${c['tipo_de_cuenta'] ?? 'Cuenta'}'),
-                                  const SizedBox(height: 4),
-                                  Text('Saldo: ${c['saldo']}'),
-                                  Text('Deuda: ${c['deuda']}'),
-                                  Text('Bidones: ${c['numero_bidones']}'),
-                                  if (c['estado'] != null)
-                                    Text('Estado: ${c['estado']}'),
-                                ],
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-              ),
-
-              // Últimos pedidos / movimientos
-              _Section(
-                title: 'Últimos pedidos',
-                child: pedidos.isEmpty
-                    ? const Text('Sin pedidos')
-                    : Column(
-                        children: pedidos.map((p0) {
-                          final p = p0 as Map;
-                          return ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: const Icon(Icons.shopping_bag_outlined),
-                            title: Text('Pedido #${p['id_pedido'] ?? ''}'),
-                            subtitle: Text('${p['fecha'] ?? ''}'),
-                            trailing: Text(
-                              '${p['total'] ?? ''}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-              ),
-
-              // Histórico
-              _Section(
-                title: 'Histórico',
-                child: historicos.isEmpty
-                    ? const Text('Sin eventos')
-                    : Column(
-                        children: historicos.map((h0) {
-                          final h = h0 as Map;
-                          final ev = h['evento'];
-                          final evNombre = ev is Map
-                              ? (ev['nombre'] ?? 'Evento')
-                              : (ev?.toString() ?? 'Evento');
-                          return ListTile(
-                            dense: true,
-                            contentPadding: EdgeInsets.zero,
-                            leading: const Icon(Icons.history),
-                            title: Text(evNombre),
-                            subtitle: Text('${h['observacion'] ?? ''}'),
-                            trailing: Text('${h['fecha'] ?? ''}'),
-                          );
-                        }).toList(),
-                      ),
-              ),
-            ],
-          );
-        },
-      ),
-
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: FilledButton.icon(
-            onPressed: () {
-              AppShellActions.push(
-                context,
-                '/venta',
-                arguments: {'legajo': widget.legajo},
-              );
-            },
-            icon: const Icon(Icons.point_of_sale),
-            label: const Text('Iniciar venta fuera de recorrido'),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _Section extends StatelessWidget {
-  final String title;
-  final Widget child;
-  const _Section({required this.title, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          child,
-        ],
-      ),
-    );
-  }
-} */
+// ignore_for_file: deprecated_member_use
 
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/navigation/app_shell_actions.dart';
@@ -396,6 +82,148 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
+  }
+
+  String _buildHistoricoSubtitle(Map h) {
+    final obs = (h['observacion'] ?? '')?.toString() ?? '';
+    final datos = h['datos'];
+
+    if (datos is! Map) return obs;
+    final cambios = datos['cambios'];
+    if (cambios is! Map) return obs.isEmpty ? '' : obs;
+
+    final List<String> lines = [];
+    if (obs.isNotEmpty) {
+      lines.add(obs);
+    }
+
+    // ========== PERSONA ==========
+    final persona = cambios['persona'];
+    if (persona is Map && persona['actualizados'] is Map) {
+      final actualizados = persona['actualizados'] as Map;
+      actualizados.forEach((campo, change) {
+        if (change is Map) {
+          final antes = change['antes'];
+          final despues = change['despues'];
+          lines.add('Persona.$campo: "$antes" → "$despues"');
+        }
+      });
+    }
+
+    // helper para obtener un "título" de cada item
+    String _labelPrincipal(Map item, String tipo) {
+      switch (tipo) {
+        case 'direcciones':
+          return (item['direccion'] ?? '')?.toString() ?? '';
+        case 'telefonos':
+          return (item['nro_telefono'] ?? '')?.toString() ?? '';
+        case 'emails':
+          return (item['mail'] ?? '')?.toString() ?? '';
+        case 'cuentas':
+          return (item['tipo_de_cuenta'] ?? '')?.toString() ?? '';
+        default:
+          return '';
+      }
+    }
+
+    // helper genérico para colecciones 1–N con detalle
+    void _appendColeccionDetalles(String key, String labelColeccion) {
+      final col = cambios[key];
+      if (col is! Map) return;
+
+      final creados = (col['creados'] as List? ?? const []);
+      final actualizados = (col['actualizados'] as List? ?? const []);
+      final eliminados = (col['eliminados'] as List? ?? const []);
+
+      // CREADOS
+      for (final item in creados) {
+        if (item is! Map) continue;
+        final titulo = _labelPrincipal(item, key);
+        if (titulo.isNotEmpty) {
+          lines.add('$labelColeccion creado: $titulo');
+        } else {
+          lines.add('$labelColeccion creado');
+        }
+      }
+
+      // ACTUALIZADOS
+      for (final item in actualizados) {
+        if (item is! Map) continue;
+        final campos = item['campos'];
+        if (campos is! Map) continue;
+        final titulo = _labelPrincipal(item, key);
+        final prefix = titulo.isNotEmpty
+            ? '$labelColeccion ($titulo)'
+            : labelColeccion;
+        campos.forEach((campo, change) {
+          if (change is Map) {
+            final antes = change['antes'];
+            final despues = change['despues'];
+            lines.add('$prefix.$campo: "$antes" → "$despues"');
+          }
+        });
+      }
+
+      // ELIMINADOS
+      for (final item in eliminados) {
+        if (item is! Map) continue;
+        final titulo = _labelPrincipal(item, key);
+        final id = item.values.firstWhere((v) => v != null, orElse: () => null);
+        if (titulo.isNotEmpty) {
+          lines.add('$labelColeccion eliminado: $titulo');
+        } else if (id != null) {
+          lines.add('$labelColeccion eliminado (id=$id)');
+        } else {
+          lines.add('$labelColeccion eliminado');
+        }
+      }
+    }
+
+    // ========== COLECCIONES ==========
+    _appendColeccionDetalles('direcciones', 'Dirección');
+    _appendColeccionDetalles('telefonos', 'Teléfono');
+    _appendColeccionDetalles('emails', 'Email');
+    _appendColeccionDetalles('cuentas', 'Cuenta');
+
+    // ========== DÍAS DE VISITA ==========
+    final dias = cambios['dias_semanas'];
+    if (dias is Map) {
+      final antes = dias['antes'] as List? ?? const [];
+      final despues = dias['despues'] as List? ?? const [];
+
+      String _fmtDia(Map d) {
+        final idDia = d['id_dia'];
+        final turno = d['turno_visita'] ?? '';
+        final orden = d['orden'];
+        final base = 'día $idDia';
+        final turnoTxt = turno.toString().isEmpty ? '' : ' ($turno)';
+        final ordTxt = orden == null ? '' : ' [orden $orden]';
+        return base + turnoTxt + ordTxt;
+      }
+
+      if (antes.isEmpty && despues.isNotEmpty) {
+        lines.add(
+          'Días de visita asignados: ' +
+              despues.whereType<Map>().map(_fmtDia).join(', '),
+        );
+      } else if (antes.isNotEmpty && despues.isEmpty) {
+        lines.add('Días de visita eliminados');
+      } else if (antes.isNotEmpty || despues.isNotEmpty) {
+        lines.add('Días de visita:');
+        if (antes.isNotEmpty) {
+          lines.add(
+            '  Antes: ' + antes.whereType<Map>().map(_fmtDia).join(', '),
+          );
+        }
+        if (despues.isNotEmpty) {
+          lines.add(
+            '  Después: ' + despues.whereType<Map>().map(_fmtDia).join(', '),
+          );
+        }
+      }
+    }
+
+    return lines.join('\n');
   }
 
   @override
@@ -663,12 +491,21 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                             final evNombre = ev is Map
                                 ? (ev['nombre'] ?? 'Evento')
                                 : (ev?.toString() ?? 'Evento');
+
+                            final subtitleText = _buildHistoricoSubtitle(h);
+
                             return ListTile(
                               dense: true,
                               contentPadding: EdgeInsets.zero,
                               leading: const Icon(Icons.history),
                               title: Text(evNombre),
-                              subtitle: Text('${h['observacion'] ?? ''}'),
+                              subtitle: subtitleText.isEmpty
+                                  ? null
+                                  : Text(
+                                      subtitleText,
+                                      maxLines: 6,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                               trailing: Text('${h['fecha'] ?? ''}'),
                             );
                           }).toList(),

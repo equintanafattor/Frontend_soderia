@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/colors.dart';
+import 'package:printing/printing.dart';
+import '../utils/pdf_generator.dart';
+import 'package:frontend_soderia/services/pedido_service.dart';
 
 class LineaVenta {
   final String nroPedido;
@@ -42,6 +45,8 @@ class PagoScreen extends StatefulWidget {
 }
 
 class _PagoScreenState extends State<PagoScreen> {
+  final _pedidoService = PedidoService();
+
   // Chips de montos rápidos (pueden variar según tu lógica)
   late final List<num> _montosRapidos = [
     widget.total * 2, // ejemplo: total + deuda posible
@@ -64,6 +69,51 @@ class _PagoScreenState extends State<PagoScreen> {
     return m != null && m > 0;
   }
 
+  // Mapea tu enum de UI al id_medio_pago de tu tabla medio_pago
+  int _mapMedioPagoToId(MedioPago medio) {
+    // TODO: reemplazá estos valores con los reales de tu tabla medio_pago
+    switch (medio) {
+      case MedioPago.efectivo:
+        return 1;
+      case MedioPago.transferencia:
+        return 2;
+      case MedioPago.otro:
+        return 3;
+    }
+  }
+
+  /// Decide el `estado` del pedido según total, deuda y lo que paga el cliente.
+  ///
+  /// Debe matchear con tu Enum del back:
+  /// "pendiente", "abonado", "abonado parcialmente",
+  /// "cliente no compra", "pedido postergado", "cliente pago de más".
+  String _resolverEstadoPedido({
+    required double totalVenta,
+    required double deudaActual,
+    required double montoAbonado,
+  }) {
+    final requerido = totalVenta + deudaActual;
+    const double epsilon = 0.01;
+
+    if (montoAbonado <= 0) {
+      // Creás el pedido pero queda pendiente de pago
+      return 'pendiente';
+    }
+
+    if ((montoAbonado - requerido).abs() < epsilon) {
+      // Pagó todo: venta + deuda -> queda al día
+      return 'abonado';
+    }
+
+    if (montoAbonado < requerido - epsilon) {
+      // Pagó algo, pero no todo
+      return 'abonado parcialmente';
+    }
+
+    // Pagó de más
+    return 'cliente pago de más';
+  }
+
   @override
   void dispose() {
     _otroCtrl.dispose();
@@ -71,60 +121,115 @@ class _PagoScreenState extends State<PagoScreen> {
   }
 
   Future<void> _confirmar() async {
-    // Validaciones mínimas
-    // 🔹 2) EN _confirmar(): mostrar sheet si hay que compartir
-    Future<void> _confirmar() async {
-      if (!_montoValido) return;
+    if (!_montoValido) return;
 
-      final ok = await showDialog<bool>(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('Confirmar pago'),
-          content: Text(
-            'Cliente: ${widget.nombreCliente}\n'
-            'Medio: ${_medio.name}\n'
-            'Importe: ${_money(_montoElegido!)}\n\n'
-            '¿Registrar pago?',
+    // 1) Preguntar confirmación
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Confirmar pago'),
+        content: Text(
+          'Cliente: ${widget.nombreCliente}\n'
+          'Medio: ${_medio.name}\n'
+          'Importe: ${_money(_montoElegido!)}\n\n'
+          '¿Registrar pago y crear pedido?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Confirmar'),
-            ),
-          ],
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Confirmar'),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true || !mounted) return;
+
+    try {
+      final legajoInt = int.tryParse(widget.legajo);
+      if (legajoInt == null) {
+        throw Exception('Legajo inválido: ${widget.legajo}');
+      }
+
+      final idMedio = _mapMedioPagoToId(_medio);
+
+      // 2) Calcular estado según lo que paga el cliente
+      final estado = _resolverEstadoPedido(
+        totalVenta: widget.total,
+        deudaActual: widget.deudaActual,
+        montoAbonado: _montoElegido!,
+      );
+
+      // 3) (Opcional) obtener id_repartodia real
+      // Si todavía no tenés endpoint, dejá esto como:
+      //   final idRepartoDia = 1;
+      int idRepartoDia = 1;
+
+      // Si querés usar el servicio real:
+      /*
+    final repService = RepartoDiaService();
+    final rep = await repService.obtenerRepartoDiaActual(idEmpresa: 1);
+    idRepartoDia = rep['id_repartodia'] as int;
+    */
+
+      // 4) Crear pedido
+      final pedido = await _pedidoService.crearPedido(
+        legajo: legajoInt,
+        idMedioPago: idMedio,
+        fecha: widget.fecha,
+        montoTotal: widget.total,
+        montoAbonado: _montoElegido!,
+        idEmpresa: 1,
+        estado: estado, // 👈 el que resolvimos con _resolverEstadoPedido
+        idRepartoDia: idRepartoDia,
+      );
+
+      final idPedido = pedido['id_pedido'] as int;
+
+      // 5) Confirmar pedido
+      await _pedidoService.confirmarPedido(
+        idPedido: idPedido,
+        idRepartoDia: idRepartoDia,
+      );
+
+      // 6) Aviso al usuario
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Pedido #$idPedido creado y confirmado.\n'
+            'Estado: $estado · Pago ${_money(_montoElegido!)}',
+          ),
         ),
       );
 
-      if (ok == true && mounted) {
-        // TODO: llamar API para registrar pago, emitir recibo, etc.
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Pago registrado por ${_money(_montoElegido!)}'),
-          ),
-        );
-
-        // ⬇️ NUEVO: si pidieron compartir, muestro opciones
-        if (_compartirComprobante) {
-          await _showShareSheet();
-        }
-
-        if (mounted) Navigator.pop(context, true);
+      // 7) Compartir comprobante (si está activado)
+      if (_compartirComprobante) {
+        await _shareComprobante();
       }
+
+      if (mounted) {
+        Navigator.pop(context, true); // devolvés true a VentaScreen
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error al registrar pedido: $e')));
     }
   }
 
-  // 🔹 1) NUEVO: helper para saber si queda saldo al día
+  // 🔹 helper para saber si queda saldo al día (solo UI)
   bool get _saldoAlDia {
     if (!_montoValido) return false;
     final requerido = widget.total + widget.deudaActual;
     return _montoElegido! + 0.0001 >= requerido; // tolerancia por parseo
   }
 
-  // 🔹 3) NUEVO: bottom sheet de “Compartir comprobante”
+  // 🔹 bottom sheet de “Compartir comprobante”
   Future<void> _showShareSheet() {
     return showModalBottomSheet(
       context: context,
@@ -171,6 +276,30 @@ class _PagoScreenState extends State<PagoScreen> {
           ),
         );
       },
+    );
+  }
+
+  Future<void> _shareComprobante() async {
+    final data = await generarComprobantePDF(
+      nombreCliente: widget.nombreCliente,
+      legajo: widget.legajo,
+      fecha: widget.fecha,
+      deudaAnterior: widget.deudaActual,
+      totalVenta: widget.total,
+      montoPagado: _montoElegido!,
+      medioPago: _medio.name,
+      items: widget.items.map((it) {
+        return {
+          'producto': it.producto,
+          'cantidad': it.cantidad,
+          'precioUnitario': it.precioUnitario,
+        };
+      }).toList(),
+    );
+
+    await Printing.sharePdf(
+      bytes: data,
+      filename: 'comprobante_${widget.legajo}.pdf',
     );
   }
 
@@ -285,7 +414,7 @@ class _PagoScreenState extends State<PagoScreen> {
                       _otroCtrl.text = ''; // limpio el campo
                     });
                   },
-                  filled: _otroActivo, // 👈 antes estaba true fijo
+                  filled: _otroActivo,
                 ),
 
                 if (_otroActivo)
@@ -304,8 +433,7 @@ class _PagoScreenState extends State<PagoScreen> {
                         final cleaned = txt.replaceAll(RegExp(r'[^0-9.]'), '');
                         final val = double.tryParse(cleaned);
                         setState(() {
-                          _montoElegido =
-                              val; // queda “Otro” activo porque no pertenece a _montosRapidos
+                          _montoElegido = val;
                         });
                       },
                     ),

@@ -1,88 +1,133 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/colors.dart';
+import 'package:frontend_soderia/core/navigation/app_shell_actions.dart';
 import 'package:frontend_soderia/screens/pago_screen.dart';
 import 'package:frontend_soderia/services/cliente_service.dart';
+import 'package:frontend_soderia/services/producto_service.dart';
+import 'package:frontend_soderia/screens/clientes/cliente_edit_screen.dart';
+import 'package:frontend_soderia/services/visita_service.dart';
 
 class VentaScreen extends StatefulWidget {
   final int legajoCliente;
+  final int idListaPrecios;
 
   const VentaScreen({
     super.key,
     required this.legajoCliente,
+    this.idListaPrecios = 1,
   });
 
   @override
   State<VentaScreen> createState() => _VentaScreenState();
 }
 
+// ------------------- Modelo interno de carrito -------------------
+
+class _CarritoItem {
+  final int idProducto;
+  final String nombre;
+  final double precioUnitario;
+  int cantidad;
+
+  _CarritoItem({
+    required this.idProducto,
+    required this.nombre,
+    required this.precioUnitario,
+    required this.cantidad,
+  });
+}
+
 class _VentaScreenState extends State<VentaScreen> {
-  // Catálogo de ejemplo (nombre → precio)
-  final Map<String, double> _catalogo = const {
-    'Agua Bidón 12L': 2500,
-    'Agua Bidón 20L': 3200,
-    'Soda 2L': 1200,
-    'Dispenser frío/calor': 150000,
-    'Alquiler dispenser (mensual)': 8000,
-  };
+  // Carrito actual (clave: nombre producto → item)
+  final Map<int, _CarritoItem> _carrito = {};
 
-  // Carrito actual (nombre → cantidad)
-  final Map<String, int> _carrito = {
-    'Agua Bidón 12L': 2,
-    'Dispenser frío/calor': 1,
-  };
+  // Futuros para cliente (detalle) y productos
+  late Future<Map<String, dynamic>> _futureClienteDetalle;
+  late Future<List<dynamic>> _futureProductos;
 
-  // Historial MOCK
-  final List<String> _historial = const [
-    '12/08 · 2 × Agua Bidón 12L',
-    '04/07 · 1 × Soda 2L',
-    '21/06 · 1 × Agua Bidón 20L',
-  ];
-
-  late Future<Map<String, dynamic>> _futureCliente;
-  final _service = ClienteService();
+  final _clienteService = ClienteService();
+  final _productoService = ProductoService();
+  final _visitaService = VisitaService();
 
   @override
   void initState() {
     super.initState();
-    _futureCliente = _service.obtenerCliente(widget.legajoCliente);
+    // Detalle del cliente (persona, direcciones, cuentas, historicos, etc.)
+    _futureClienteDetalle = _clienteService.obtenerDetalleCliente(
+      widget.legajoCliente,
+    );
+
+    // Productos de la lista seleccionada, con precio
+    _futureProductos = _productoService.listarProductosDeLista(
+      widget.idListaPrecios,
+    );
   }
 
   // -------- Helpers --------
+
+  Future<void> _registrarVisita(String estado) async {
+    try {
+      await _visitaService.crearVisita(
+        legajo: widget.legajoCliente,
+        estado: estado,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo registrar la visita: $e')),
+      );
+    }
+  }
+
   double get _total {
     double t = 0;
-    _carrito.forEach((nombre, cant) {
-      final precio = _catalogo[nombre] ?? 0;
-      t += precio * cant;
-    });
+    for (final item in _carrito.values) {
+      t += item.precioUnitario * item.cantidad;
+    }
     return t;
   }
 
   bool get _ventaValida => _carrito.isNotEmpty;
 
-  void _agregarProducto(String nombre) {
+  void _agregarProducto(int idProducto, String nombre, double precioUnitario) {
     setState(() {
-      _carrito.update(nombre, (v) => v + 1, ifAbsent: () => 1);
+      final existente = _carrito[idProducto];
+      if (existente != null) {
+        existente.cantidad++;
+      } else {
+        _carrito[idProducto] = _CarritoItem(
+          idProducto: idProducto,
+          nombre: nombre,
+          precioUnitario: precioUnitario,
+          cantidad: 1,
+        );
+      }
     });
   }
 
-  void _eliminarProducto(String nombre) {
+  void _eliminarProducto(int idProducto) {
     setState(() {
-      _carrito.remove(nombre);
+      _carrito.remove(idProducto);
     });
   }
 
-  Future<void> _editarCantidad(String nombre) async {
-    final cantActual = _carrito[nombre] ?? 1;
+  Future<void> _editarCantidad(int idProducto) async {
+    final item = _carrito[idProducto];
+    if (item == null) return;
+
     final nueva = await showDialog<int>(
       context: context,
-      builder: (_) => _CantidadDialog(cantidadInicial: cantActual),
+      builder: (_) => _CantidadDialog(cantidadInicial: item.cantidad),
     );
     if (nueva == null) return;
+
     setState(() {
       if (nueva <= 0) {
-        _carrito.remove(nombre);
+        _carrito.remove(idProducto);
       } else {
-        _carrito[nombre] = nueva;
+        item.cantidad = nueva;
       }
     });
   }
@@ -92,7 +137,33 @@ class _VentaScreenState extends State<VentaScreen> {
     String legajo,
     double deuda,
   ) async {
-    // acá después pegás al endpoint real
+    // Si por alguna razón se llegó acá sin ítems, no sigo
+    if (_carrito.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No hay productos en la venta')),
+      );
+      return;
+    }
+
+    // 1) Mapear el carrito → List<LineaVenta>
+    final List<LineaVenta> items = [];
+    int i = 1;
+
+    _carrito.forEach((nombreProd, item) {
+      items.add(
+        LineaVenta(
+          nroPedido: item.idProducto.toString(),
+          producto: item.nombre,
+          cantidad: item.cantidad,
+          precioUnitario: item.precioUnitario,
+        ),
+      );
+      i++;
+    });
+
+    final total = _total;
+
+    // 2) Navegar a PagoScreen con los datos reales
     final ok = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => PagoScreen(
@@ -100,32 +171,25 @@ class _VentaScreenState extends State<VentaScreen> {
           legajo: legajo,
           fecha: DateTime.now(),
           deudaActual: deuda,
-          items: const [
-            LineaVenta(
-              nroPedido: '015',
-              producto: 'Agua de 20 Lts',
-              cantidad: 2,
-              precioUnitario: 3500,
-            ),
-            LineaVenta(
-              nroPedido: '015',
-              producto: 'Dispenser Frio Calor',
-              cantidad: 1,
-              precioUnitario: 20000,
-            ),
-          ],
-          total: 27000,
+          items: items, // 👈 carrito real
+          total: total, // 👈 total real
         ),
       ),
     );
 
-    if (ok == true) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Venta confirmada')),
-        );
-        Navigator.pop(context);
-      }
+    // 3) Si pago OK, cierro la venta (y acá después podés registrar la visita/venta en el back)
+    if (ok == true && mounted) {
+      // Si ya implementaste lo de Visita:
+      // await _registrarVisita(VisitaEstado.compra);
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Venta confirmada')));
+
+      // Podés limpiar el carrito si querés:
+      // setState(() => _carrito.clear());
+
+      Navigator.pop(context);
     }
   }
 
@@ -150,29 +214,31 @@ class _VentaScreenState extends State<VentaScreen> {
         ],
       ),
     );
-    if (ok == true) {
-      // TODO: pegar al endpoint de no compra
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Visita marcada como "No compra"')),
-        );
-        Navigator.pop(context);
-      }
+    if (ok == true && mounted) {
+      // Registrar visita como NO_COMPRA
+      await _registrarVisita(VisitaEstado.noCompra);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Visita marcada como "No compra"')),
+      );
+      Navigator.pop(context);
     }
   }
 
-  void _postergar() {
-    // TODO: endpoint de postergar
+  void _postergar() async {
+    // Registrar visita como POSTERGADA
+    await _registrarVisita(VisitaEstado.postergada);
+
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('Visita postergada (demo)')));
+    ).showSnackBar(const SnackBar(content: Text('Visita postergada')));
     Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<Map<String, dynamic>>(
-      future: _futureCliente,
+      future: _futureClienteDetalle,
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
           return const Scaffold(
@@ -186,25 +252,64 @@ class _VentaScreenState extends State<VentaScreen> {
           );
         }
 
-        final cli = snap.data!;
+        final cli = snap.data!; // este es el detalle del cliente
         final persona = cli['persona'] ?? {};
-        final nombre =
-            '${persona['nombre'] ?? ''} ${persona['apellido'] ?? ''}'.trim();
+        final nombre = '${persona['nombre'] ?? ''} ${persona['apellido'] ?? ''}'
+            .trim();
         final legajoStr = cli['legajo'].toString();
-        final direccion = ''; // cuando tu GET de cliente lo traiga, lo usás acá
-        final deuda = 0.0; // lo mismo, cuando tengas cuenta corriente
 
-        return _buildScaffold(nombre, direccion, legajoStr, deuda);
+        // ---- Dirección: tomamos la primera de "direcciones" ----
+        String direccion = '';
+        final direcciones = (cli['direcciones'] as List?) ?? [];
+        if (direcciones.isNotEmpty) {
+          final d0 = direcciones.first as Map<String, dynamic>;
+          final partes = <String>[];
+
+          final dirBase = (d0['direccion'] ?? '').toString().trim();
+          if (dirBase.isNotEmpty) partes.add(dirBase);
+
+          final zona = (d0['zona'] ?? '').toString().trim();
+          if (zona.isNotEmpty) partes.add('Zona $zona');
+
+          direccion = partes.join(' · ');
+        }
+
+        // ---- Deuda: primera cuenta de "cuentas" ----
+        double deuda = 0.0;
+        final cuentas = (cli['cuentas'] as List?) ?? [];
+        if (cuentas.isNotEmpty) {
+          final c0 = cuentas.first as Map<String, dynamic>;
+          final rawDeuda = c0['deuda'] ?? 0;
+          if (rawDeuda is num) {
+            deuda = rawDeuda.toDouble();
+          } else if (rawDeuda is String) {
+            deuda = double.tryParse(rawDeuda) ?? 0.0;
+          }
+        }
+
+        // ---- Historial: viene dentro de "historicos" ----
+        final historicos = (cli['historicos'] as List?) ?? [];
+
+        return _buildScaffold(
+          nombreCliente: nombre,
+          direccion: direccion,
+          legajo: legajoStr,
+          deuda: deuda,
+          historicos: historicos,
+          dataCliente: cli, // 👈 acá pasamos el detalle completo
+        );
       },
     );
   }
 
-  Widget _buildScaffold(
-    String nombreCliente,
-    String direccion,
-    String legajo,
-    double deuda,
-  ) {
+  Widget _buildScaffold({
+    required String nombreCliente,
+    required String direccion,
+    required String legajo,
+    required double deuda,
+    required List<dynamic> historicos,
+    required Map<String, dynamic> dataCliente, // 👈 NUEVO
+  }) {
     final cs = Theme.of(context).colorScheme;
     final w = MediaQuery.of(context).size.width;
     final isMobile = w < 600;
@@ -221,23 +326,36 @@ class _VentaScreenState extends State<VentaScreen> {
         appBar: AppBar(
           backgroundColor: AppColors.azul,
           foregroundColor: Colors.white,
-          title: _TitleCliente(
-            nombre: nombreCliente,
-            direccion: direccion,
-          ),
+          title: _TitleCliente(nombre: nombreCliente, direccion: direccion),
           actions: [
             IconButton(
               tooltip: 'Editar cliente',
               icon: const Icon(Icons.edit),
-              onPressed: () {
-                // TODO: editar cliente
+              onPressed: () async {
+                final res = await AppShellActions.push(
+                  context,
+                  '/cliente/edit', // ajustá al nombre real de tu ruta
+                  arguments: {
+                    'legajo': widget.legajoCliente,
+                    'data': dataCliente, // 👈 ahora usamos el parámetro
+                  },
+                );
+
+                // Si se guardó y el edit hace `Navigator.pop(true)`
+                if (res == true && mounted) {
+                  setState(() {
+                    // recargo los datos del cliente para refrescar dirección, deuda, etc.
+                    _futureClienteDetalle = _clienteService
+                        .obtenerDetalleCliente(widget.legajoCliente);
+                  });
+                }
               },
             ),
             IconButton(
               tooltip: 'Ver ubicación',
               icon: const Icon(Icons.location_on),
               onPressed: () {
-                // TODO: mapa
+                // TODO: abrir mapa con dirección del cliente
               },
             ),
           ],
@@ -261,7 +379,7 @@ class _VentaScreenState extends State<VentaScreen> {
             children: [
               _tabVentaActual(context, cs, legajo, deuda, nombreCliente),
               _tabProductos(context, cs),
-              _tabHistorial(context, cs),
+              _tabHistorial(context, cs, historicos),
             ],
           ),
         ),
@@ -325,14 +443,19 @@ class _VentaScreenState extends State<VentaScreen> {
             ),
           ),
 
-        for (final entry in _carrito.entries) ...[
-          Card(
+        // 👇 ACA VA LA PARTE CORREGIDA
+        ..._carrito.entries.map((entry) {
+          final int idProducto = entry.key;
+          final item = entry.value; // _CarritoItem
+
+          return Card(
             margin: const EdgeInsets.symmetric(vertical: 6),
             child: ListTile(
               leading: const Icon(Icons.local_drink),
-              title: Text(entry.key),
+              title: Text(item.nombre),
               subtitle: Text(
-                'Cantidad: ${entry.value} · \$${(_catalogo[entry.key] ?? 0).toStringAsFixed(0)} c/u',
+                'ID: $idProducto · Cantidad: ${item.cantidad} · '
+                '\$${item.precioUnitario.toStringAsFixed(0)} c/u',
               ),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -340,60 +463,89 @@ class _VentaScreenState extends State<VentaScreen> {
                   IconButton(
                     tooltip: 'Editar cantidad',
                     icon: const Icon(Icons.edit),
-                    onPressed: () => _editarCantidad(entry.key),
+                    onPressed: () => _editarCantidad(idProducto),
                   ),
                   IconButton(
                     tooltip: 'Quitar',
                     icon: const Icon(Icons.close),
-                    onPressed: () => _eliminarProducto(entry.key),
+                    onPressed: () => _eliminarProducto(idProducto),
                   ),
                 ],
               ),
             ),
-          ),
-        ],
-
-        const SizedBox(height: 8),
-        Align(
-          alignment: Alignment.centerRight,
-          child: Text(
-            'Total: \$${_total.toStringAsFixed(0)}',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Colors.green.shade700,
-                  fontWeight: FontWeight.bold,
-                ),
-          ),
-        ),
+          );
+        }),
       ],
     );
   }
 
   Widget _tabProductos(BuildContext context, ColorScheme cs) {
-    final nombres = _catalogo.keys.toList();
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: nombres.length,
-      itemBuilder: (context, i) {
-        final nombre = nombres[i];
-        final precio = _catalogo[nombre]!;
-        return Card(
-          child: ListTile(
-            leading: const Icon(Icons.add_shopping_cart),
-            title: Text(nombre),
-            subtitle: Text('\$${precio.toStringAsFixed(0)}'),
-            trailing: FilledButton(
-              onPressed: () => _agregarProducto(nombre),
-              style: FilledButton.styleFrom(backgroundColor: AppColors.azul),
-              child: const Text('Agregar'),
+    return FutureBuilder<List<dynamic>>(
+      future: _futureProductos,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snap.hasError) {
+          return Center(child: Text('Error cargando productos: ${snap.error}'));
+        }
+
+        final productos = snap.data ?? [];
+        if (productos.isEmpty) {
+          return Center(
+            child: Text(
+              'No hay productos cargados para esta lista de precios',
+              style: Theme.of(context).textTheme.bodyLarge,
             ),
-          ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: productos.length,
+          itemBuilder: (context, i) {
+            final p = productos[i] as Map<String, dynamic>;
+            final idProducto = p['id_producto'] as int;
+            final nombre = (p['nombre'] ?? '').toString();
+            double precio = 0;
+
+            final rawPrecio = p['precio'];
+            if (rawPrecio is num) {
+              precio = rawPrecio.toDouble();
+            } else if (rawPrecio is String) {
+              precio = double.tryParse(rawPrecio) ?? 0.0;
+            }
+
+            return Card(
+              child: ListTile(
+                leading: const Icon(Icons.add_shopping_cart),
+                title: Text(nombre),
+                subtitle: Text(
+                  precio > 0
+                      ? '\$${precio.toStringAsFixed(0)}'
+                      : 'Sin precio definido',
+                ),
+                trailing: FilledButton(
+                  onPressed: () => _agregarProducto(idProducto, nombre, precio),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.azul,
+                  ),
+                  child: const Text('Agregar'),
+                ),
+              ),
+            );
+          },
         );
       },
     );
   }
 
-  Widget _tabHistorial(BuildContext context, ColorScheme cs) {
-    if (_historial.isEmpty) {
+  Widget _tabHistorial(
+    BuildContext context,
+    ColorScheme cs,
+    List<dynamic> historicos,
+  ) {
+    if (historicos.isEmpty) {
       return Center(
         child: Text(
           'Sin historial',
@@ -401,16 +553,33 @@ class _VentaScreenState extends State<VentaScreen> {
         ),
       );
     }
+
     return ListView.separated(
       padding: const EdgeInsets.all(16),
-      itemCount: _historial.length,
+      itemCount: historicos.length,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (_, i) => Card(
-        child: ListTile(
-          leading: const Icon(Icons.history),
-          title: Text(_historial[i]),
-        ),
-      ),
+      itemBuilder: (_, i) {
+        final h = historicos[i] as Map<String, dynamic>;
+        final fechaStr = (h['fecha'] ?? '').toString();
+        final obs = (h['observacion'] ?? '').toString();
+        final evento = (h['evento'] as Map<String, dynamic>?) ?? {};
+        final nombreEvento = (evento['nombre'] ?? evento['descripcion'] ?? '')
+            .toString();
+
+        return Card(
+          child: ListTile(
+            leading: const Icon(Icons.history),
+            title: Text(nombreEvento.isNotEmpty ? nombreEvento : 'Evento'),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (fechaStr.isNotEmpty) Text(fechaStr),
+                if (obs.isNotEmpty) Text(obs),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -622,8 +791,3 @@ class ConfirmAction extends StatelessWidget {
     );
   }
 }
-
-
-
-
-
