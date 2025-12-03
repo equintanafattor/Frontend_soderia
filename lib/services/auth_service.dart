@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // 🔧 mientras uses el backend real, poné esto en false
-const bool kFakeAuth = true;
+const bool kFakeAuth = false;
 
 class AuthService {
   final Dio _dio = Dio(

@@ -26,9 +26,10 @@ class PagoScreen extends StatefulWidget {
   final String nombreCliente;
   final String legajo;
   final DateTime fecha;
-  final double deudaActual; // para mostrar en rojo si > 0
-  final List<LineaVenta> items; // ítems de la venta (para el recibo)
-  final double total; // total de la venta
+  final double deudaActual;
+  final double saldoAFavorActual; // 👈 saldo a favor al entrar a la pantalla
+  final List<LineaVenta> items;
+  final double total;
 
   const PagoScreen({
     super.key,
@@ -36,6 +37,7 @@ class PagoScreen extends StatefulWidget {
     required this.legajo,
     required this.fecha,
     required this.deudaActual,
+    required this.saldoAFavorActual,
     required this.items,
     required this.total,
   });
@@ -47,31 +49,61 @@ class PagoScreen extends StatefulWidget {
 class _PagoScreenState extends State<PagoScreen> {
   final _pedidoService = PedidoService();
 
-  // Chips de montos rápidos (pueden variar según tu lógica)
-  late final List<num> _montosRapidos = [
-    widget.total * 2, // ejemplo: total + deuda posible
-    widget.total + widget.deudaActual,
-    widget.total,
-  ].map((v) => v.clamp(0, double.infinity)).toList();
+  // Chips de montos rápidos:
+  // - total de la venta
+  // - deuda (si existe)
+  // - total + deuda (si ambos existen)
+  List<num> get _montosRapidos {
+    final montos = <num>[];
+
+    final total = widget.total;
+    final deuda = widget.deudaActual;
+
+    // 1) Monto del pedido
+    if (total > 0) {
+      montos.add(total);
+    }
+
+    // 2) Sólo deuda, si tiene
+    if (deuda > 0) {
+      montos.add(deuda);
+    }
+
+    // 3) Suma de ambos, si ambos existen
+    final suma = total + deuda;
+    if (total > 0 && deuda > 0 && suma > 0) {
+      montos.add(suma);
+    }
+
+    return montos;
+  }
 
   final TextEditingController _otroCtrl = TextEditingController();
   double? _montoElegido;
   MedioPago _medio = MedioPago.efectivo;
   bool _compartirComprobante = false;
 
-  String _money(num v) {
-    // si tenés intl, reemplazá por NumberFormat.currency(locale: 'es_AR', symbol: '\$').format(v)
-    return '\$${v.toStringAsFixed(0)}';
-  }
+  String _money(num v) => '\$${v.toStringAsFixed(0)}';
 
+  /// Valida el monto elegido:
+  /// - No puede ser null
+  /// - No puede ser negativo
+  /// - Puede ser 0 solo si el cliente tiene saldo a favor
   bool get _montoValido {
     final m = _montoElegido;
-    return m != null && m > 0;
+
+    if (m == null || m < 0) return false;
+
+    if (m == 0) {
+      // Sólo permito pagar 0 si tiene saldo a favor
+      return widget.saldoAFavorActual > 0;
+    }
+
+    return true;
   }
 
-  // Mapea tu enum de UI al id_medio_pago de tu tabla medio_pago
+  // Mapea enum de UI al id_medio_pago
   int _mapMedioPagoToId(MedioPago medio) {
-    // TODO: reemplazá estos valores con los reales de tu tabla medio_pago
     switch (medio) {
       case MedioPago.efectivo:
         return 1;
@@ -82,7 +114,7 @@ class _PagoScreenState extends State<PagoScreen> {
     }
   }
 
-  /// Decide el `estado` del pedido según total, deuda y lo que paga el cliente.
+  /// Decide el estado del pedido según total, deuda, saldo a favor y pago.
   ///
   /// Debe matchear con tu Enum del back:
   /// "pendiente", "abonado", "abonado parcialmente",
@@ -90,27 +122,32 @@ class _PagoScreenState extends State<PagoScreen> {
   String _resolverEstadoPedido({
     required double totalVenta,
     required double deudaActual,
+    required double saldoAFavor,
     required double montoAbonado,
   }) {
-    final requerido = totalVenta + deudaActual;
-    const double epsilon = 0.01;
+    const epsilon = 0.01;
 
-    if (montoAbonado <= 0) {
-      // Creás el pedido pero queda pendiente de pago
-      return 'pendiente';
-    }
+    // igual que en el back:
+    // neto_anterior = deuda - saldo
+    final netoAnterior = deudaActual - saldoAFavor;
 
-    if ((montoAbonado - requerido).abs() < epsilon) {
-      // Pagó todo: venta + deuda -> queda al día
+    // neto_nuevo = neto_anterior + total - abonado
+    final netoNuevo = netoAnterior + totalVenta - montoAbonado;
+
+    if (netoNuevo.abs() < epsilon) {
+      // Queda justo al día
       return 'abonado';
     }
 
-    if (montoAbonado < requerido - epsilon) {
-      // Pagó algo, pero no todo
+    if (netoNuevo > epsilon) {
+      // Sigue debiendo algo
+      if (montoAbonado <= 0) {
+        return 'pendiente';
+      }
       return 'abonado parcialmente';
     }
 
-    // Pagó de más
+    // netoNuevo < 0  => queda con saldo a favor
     return 'cliente pago de más';
   }
 
@@ -123,7 +160,6 @@ class _PagoScreenState extends State<PagoScreen> {
   Future<void> _confirmar() async {
     if (!_montoValido) return;
 
-    // 1) Preguntar confirmación
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -157,26 +193,17 @@ class _PagoScreenState extends State<PagoScreen> {
 
       final idMedio = _mapMedioPagoToId(_medio);
 
-      // 2) Calcular estado según lo que paga el cliente
+      // Estado según pago + saldo a favor
       final estado = _resolverEstadoPedido(
         totalVenta: widget.total,
         deudaActual: widget.deudaActual,
+        saldoAFavor: widget.saldoAFavorActual,
         montoAbonado: _montoElegido!,
       );
 
-      // 3) (Opcional) obtener id_repartodia real
-      // Si todavía no tenés endpoint, dejá esto como:
-      //   final idRepartoDia = 1;
+      // Por ahora dejamos el reparto día fijo
       int idRepartoDia = 1;
 
-      // Si querés usar el servicio real:
-      /*
-    final repService = RepartoDiaService();
-    final rep = await repService.obtenerRepartoDiaActual(idEmpresa: 1);
-    idRepartoDia = rep['id_repartodia'] as int;
-    */
-
-      // 4) Crear pedido
       final pedido = await _pedidoService.crearPedido(
         legajo: legajoInt,
         idMedioPago: idMedio,
@@ -184,19 +211,17 @@ class _PagoScreenState extends State<PagoScreen> {
         montoTotal: widget.total,
         montoAbonado: _montoElegido!,
         idEmpresa: 1,
-        estado: estado, // 👈 el que resolvimos con _resolverEstadoPedido
+        estado: estado,
         idRepartoDia: idRepartoDia,
       );
 
       final idPedido = pedido['id_pedido'] as int;
 
-      // 5) Confirmar pedido
       await _pedidoService.confirmarPedido(
         idPedido: idPedido,
         idRepartoDia: idRepartoDia,
       );
 
-      // 6) Aviso al usuario
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -206,13 +231,12 @@ class _PagoScreenState extends State<PagoScreen> {
         ),
       );
 
-      // 7) Compartir comprobante (si está activado)
       if (_compartirComprobante) {
         await _shareComprobante();
       }
 
       if (mounted) {
-        Navigator.pop(context, true); // devolvés true a VentaScreen
+        Navigator.pop(context, true);
       }
     } catch (e) {
       if (!mounted) return;
@@ -222,14 +246,18 @@ class _PagoScreenState extends State<PagoScreen> {
     }
   }
 
-  // 🔹 helper para saber si queda saldo al día (solo UI)
+  // helper UI
   bool get _saldoAlDia {
     if (!_montoValido) return false;
-    final requerido = widget.total + widget.deudaActual;
-    return _montoElegido! + 0.0001 >= requerido; // tolerancia por parseo
+
+    const epsilon = 0.01;
+
+    final netoAnterior = widget.deudaActual - widget.saldoAFavorActual;
+    final netoNuevo = netoAnterior + widget.total - (_montoElegido ?? 0);
+
+    return netoNuevo <= epsilon;
   }
 
-  // 🔹 bottom sheet de “Compartir comprobante”
   Future<void> _showShareSheet() {
     return showModalBottomSheet(
       context: context,
@@ -251,7 +279,6 @@ class _PagoScreenState extends State<PagoScreen> {
                 leading: const Icon(Icons.chat),
                 title: const Text('WhatsApp'),
                 onTap: () {
-                  // TODO: integrar share hacia WhatsApp con el PDF/recibo
                   Navigator.pop(context);
                 },
               ),
@@ -259,7 +286,6 @@ class _PagoScreenState extends State<PagoScreen> {
                 leading: const Icon(Icons.email_outlined),
                 title: const Text('Email'),
                 onTap: () {
-                  // TODO: integrar share por email (adjuntar PDF/recibo)
                   Navigator.pop(context);
                 },
               ),
@@ -267,7 +293,6 @@ class _PagoScreenState extends State<PagoScreen> {
                 leading: const Icon(Icons.print_outlined),
                 title: const Text('Imprimir'),
                 onTap: () {
-                  // TODO: integrar impresión del comprobante
                   Navigator.pop(context);
                 },
               ),
@@ -285,6 +310,7 @@ class _PagoScreenState extends State<PagoScreen> {
       legajo: widget.legajo,
       fecha: widget.fecha,
       deudaAnterior: widget.deudaActual,
+      saldoAFavorAnterior: widget.saldoAFavorActual,
       totalVenta: widget.total,
       montoPagado: _montoElegido!,
       medioPago: _medio.name,
@@ -341,6 +367,7 @@ class _PagoScreenState extends State<PagoScreen> {
                     nombre: widget.nombreCliente,
                     legajo: widget.legajo,
                     deuda: widget.deudaActual,
+                    saldoAFavor: widget.saldoAFavorActual,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -393,13 +420,26 @@ class _PagoScreenState extends State<PagoScreen> {
               spacing: 10,
               runSpacing: 10,
               children: [
+                // Chip para usar solo saldo a favor (pago = 0)
+                if (widget.saldoAFavorActual > 0)
+                  _MontoChip(
+                    label: 'Usar saldo a favor',
+                    selected: _montoElegido == 0,
+                    onTap: () {
+                      setState(() {
+                        _montoElegido = 0;
+                        _otroCtrl.clear();
+                      });
+                    },
+                  ),
+
                 for (final m in _montosRapidos)
                   _MontoChip(
                     label: _money(m),
                     selected: _montoElegido == m,
                     onTap: () {
                       setState(() {
-                        _montoElegido = m as double?;
+                        _montoElegido = m.toDouble();
                         _otroCtrl.clear();
                       });
                     },
@@ -410,8 +450,8 @@ class _PagoScreenState extends State<PagoScreen> {
                   selected: _otroActivo,
                   onTap: () {
                     setState(() {
-                      _montoElegido = null; // activa “Otro”
-                      _otroCtrl.text = ''; // limpio el campo
+                      _montoElegido = null;
+                      _otroCtrl.text = '';
                     });
                   },
                   filled: _otroActivo,
@@ -423,11 +463,13 @@ class _PagoScreenState extends State<PagoScreen> {
                     child: TextField(
                       controller: _otroCtrl,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         isDense: true,
-                        labelText: 'Importe',
+                        labelText: widget.saldoAFavorActual > 0
+                            ? 'Importe (puede ser 0)'
+                            : 'Importe',
                         prefixText: '\$ ',
-                        border: OutlineInputBorder(),
+                        border: const OutlineInputBorder(),
                       ),
                       onChanged: (txt) {
                         final cleaned = txt.replaceAll(RegExp(r'[^0-9.]'), '');
@@ -481,7 +523,6 @@ class _PagoScreenState extends State<PagoScreen> {
                 const Text('Compartir comprobante'),
                 Switch(
                   value: _compartirComprobante,
-                  // ignore: deprecated_member_use
                   activeColor: AppColors.azul,
                   onChanged: (v) => setState(() => _compartirComprobante = v),
                 ),
@@ -500,10 +541,13 @@ class _EncabezadoCliente extends StatelessWidget {
   final String nombre;
   final String legajo;
   final double deuda;
+  final double saldoAFavor;
+
   const _EncabezadoCliente({
     required this.nombre,
     required this.legajo,
     required this.deuda,
+    required this.saldoAFavor,
   });
 
   @override
@@ -533,6 +577,22 @@ class _EncabezadoCliente extends StatelessWidget {
               '\$ ${deuda.toStringAsFixed(0)}',
               style: TextStyle(
                 color: deuda > 0 ? Colors.red : Colors.green,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Row(
+          children: [
+            Text(
+              'Saldo a favor: ',
+              style: TextStyle(color: cs.onSurfaceVariant),
+            ),
+            Text(
+              '\$ ${saldoAFavor.toStringAsFixed(0)}',
+              style: const TextStyle(
+                color: Colors.teal,
                 fontWeight: FontWeight.bold,
               ),
             ),

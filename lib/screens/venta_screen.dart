@@ -40,7 +40,7 @@ class _CarritoItem {
 }
 
 class _VentaScreenState extends State<VentaScreen> {
-  // Carrito actual (clave: nombre producto → item)
+  // Carrito actual (clave: id_producto → item)
   final Map<int, _CarritoItem> _carrito = {};
 
   // Futuros para cliente (detalle) y productos
@@ -136,6 +136,7 @@ class _VentaScreenState extends State<VentaScreen> {
     String nombreCliente,
     String legajo,
     double deuda,
+    double saldoAFavor,
   ) async {
     // Si por alguna razón se llegó acá sin ítems, no sigo
     if (_carrito.isEmpty) {
@@ -147,9 +148,8 @@ class _VentaScreenState extends State<VentaScreen> {
 
     // 1) Mapear el carrito → List<LineaVenta>
     final List<LineaVenta> items = [];
-    int i = 1;
 
-    _carrito.forEach((nombreProd, item) {
+    _carrito.forEach((_, item) {
       items.add(
         LineaVenta(
           nroPedido: item.idProducto.toString(),
@@ -158,7 +158,6 @@ class _VentaScreenState extends State<VentaScreen> {
           precioUnitario: item.precioUnitario,
         ),
       );
-      i++;
     });
 
     final total = _total;
@@ -171,23 +170,18 @@ class _VentaScreenState extends State<VentaScreen> {
           legajo: legajo,
           fecha: DateTime.now(),
           deudaActual: deuda,
-          items: items, // 👈 carrito real
-          total: total, // 👈 total real
+          saldoAFavorActual: saldoAFavor, // 👈 el que ya calculás del back
+          items: items,
+          total: total, 
         ),
       ),
     );
 
-    // 3) Si pago OK, cierro la venta (y acá después podés registrar la visita/venta en el back)
+    // 3) Si pago OK
     if (ok == true && mounted) {
-      // Si ya implementaste lo de Visita:
-      // await _registrarVisita(VisitaEstado.compra);
-
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Venta confirmada')));
-
-      // Podés limpiar el carrito si querés:
-      // setState(() => _carrito.clear());
 
       Navigator.pop(context);
     }
@@ -274,17 +268,25 @@ class _VentaScreenState extends State<VentaScreen> {
           direccion = partes.join(' · ');
         }
 
-        // ---- Deuda: primera cuenta de "cuentas" ----
+        // ---- Deuda / saldo a favor: primera cuenta de "cuentas" ----
         double deuda = 0.0;
+        double saldoAFavor = 0.0;
+
+        double _toDouble(dynamic v) {
+          if (v is num) return v.toDouble();
+          if (v is String) return double.tryParse(v) ?? 0.0;
+          return 0.0;
+        }
+
         final cuentas = (cli['cuentas'] as List?) ?? [];
         if (cuentas.isNotEmpty) {
           final c0 = cuentas.first as Map<String, dynamic>;
+
           final rawDeuda = c0['deuda'] ?? 0;
-          if (rawDeuda is num) {
-            deuda = rawDeuda.toDouble();
-          } else if (rawDeuda is String) {
-            deuda = double.tryParse(rawDeuda) ?? 0.0;
-          }
+          final rawSaldo = c0['saldo'] ?? 0;
+
+          deuda = _toDouble(rawDeuda);
+          saldoAFavor = _toDouble(rawSaldo);
         }
 
         // ---- Historial: viene dentro de "historicos" ----
@@ -295,8 +297,9 @@ class _VentaScreenState extends State<VentaScreen> {
           direccion: direccion,
           legajo: legajoStr,
           deuda: deuda,
+          saldoAFavor: saldoAFavor,
           historicos: historicos,
-          dataCliente: cli, // 👈 acá pasamos el detalle completo
+          dataCliente: cli,
         );
       },
     );
@@ -307,8 +310,9 @@ class _VentaScreenState extends State<VentaScreen> {
     required String direccion,
     required String legajo,
     required double deuda,
+    required double saldoAFavor,
     required List<dynamic> historicos,
-    required Map<String, dynamic> dataCliente, // 👈 NUEVO
+    required Map<String, dynamic> dataCliente,
   }) {
     final cs = Theme.of(context).colorScheme;
     final w = MediaQuery.of(context).size.width;
@@ -317,7 +321,8 @@ class _VentaScreenState extends State<VentaScreen> {
     final confirm = ConfirmAction(
       enabled: _ventaValida,
       total: _total,
-      onConfirm: () => _confirmarVenta(nombreCliente, legajo, deuda),
+      onConfirm: () =>
+          _confirmarVenta(nombreCliente, legajo, deuda, saldoAFavor),
     );
 
     return DefaultTabController(
@@ -334,17 +339,15 @@ class _VentaScreenState extends State<VentaScreen> {
               onPressed: () async {
                 final res = await AppShellActions.push(
                   context,
-                  '/cliente/edit', // ajustá al nombre real de tu ruta
+                  '/cliente/edit',
                   arguments: {
                     'legajo': widget.legajoCliente,
-                    'data': dataCliente, // 👈 ahora usamos el parámetro
+                    'data': dataCliente,
                   },
                 );
 
-                // Si se guardó y el edit hace `Navigator.pop(true)`
                 if (res == true && mounted) {
                   setState(() {
-                    // recargo los datos del cliente para refrescar dirección, deuda, etc.
                     _futureClienteDetalle = _clienteService
                         .obtenerDetalleCliente(widget.legajoCliente);
                   });
@@ -377,7 +380,14 @@ class _VentaScreenState extends State<VentaScreen> {
           padding: EdgeInsets.only(bottom: isMobile ? 84 : 0),
           child: TabBarView(
             children: [
-              _tabVentaActual(context, cs, legajo, deuda, nombreCliente),
+              _tabVentaActual(
+                context,
+                cs,
+                legajo,
+                deuda,
+                saldoAFavor,
+                nombreCliente,
+              ),
               _tabProductos(context, cs),
               _tabHistorial(context, cs, historicos),
             ],
@@ -394,12 +404,13 @@ class _VentaScreenState extends State<VentaScreen> {
     ColorScheme cs,
     String legajo,
     double deuda,
+    double saldoAFavor,
     String nombreCliente,
   ) {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _HeaderInfo(legajo: legajo, deuda: deuda),
+        _HeaderInfo(legajo: legajo, deuda: deuda, saldoAFavor: saldoAFavor),
         const SizedBox(height: 12),
 
         Wrap(
@@ -443,10 +454,9 @@ class _VentaScreenState extends State<VentaScreen> {
             ),
           ),
 
-        // 👇 ACA VA LA PARTE CORREGIDA
         ..._carrito.entries.map((entry) {
           final int idProducto = entry.key;
-          final item = entry.value; // _CarritoItem
+          final item = entry.value;
 
           return Card(
             margin: const EdgeInsets.symmetric(vertical: 6),
@@ -610,7 +620,13 @@ class _TitleCliente extends StatelessWidget {
 class _HeaderInfo extends StatelessWidget {
   final String legajo;
   final double deuda;
-  const _HeaderInfo({required this.legajo, required this.deuda});
+  final double saldoAFavor;
+
+  const _HeaderInfo({
+    required this.legajo,
+    required this.deuda,
+    required this.saldoAFavor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -636,6 +652,14 @@ class _HeaderInfo extends StatelessWidget {
                   value: '\$ ${deuda.toStringAsFixed(0)}',
                   valueStyle: TextStyle(
                     color: deuda > 0 ? Colors.red : Colors.green,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                _InfoItem(
+                  label: 'Saldo a favor',
+                  value: '\$ ${saldoAFavor.toStringAsFixed(0)}',
+                  valueStyle: const TextStyle(
+                    color: Colors.teal,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
