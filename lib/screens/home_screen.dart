@@ -1,12 +1,12 @@
 // ignore_for_file: deprecated_member_use
 
 import 'package:flutter/material.dart';
+import 'package:frontend_soderia/core/enums/estado_visita.dart';
 import 'package:frontend_soderia/core/state/todos_filter.dart';
 
 import 'package:frontend_soderia/widgets/day_filter_buttons.dart';
 import 'package:frontend_soderia/widgets/visit_card.dart';
 
-// Nuevo service + modelos reales
 import 'package:frontend_soderia/services/agenda_visitas_service.dart';
 import 'package:frontend_soderia/models/clientes_por_dia.dart';
 import 'package:frontend_soderia/services/direccion_cliente_service.dart';
@@ -14,7 +14,7 @@ import 'package:frontend_soderia/models/direccion_cliente.dart';
 
 class HomeScreen extends StatefulWidget {
   final String nombreUsuario;
-  final void Function(int index)? onRequestTab; // callback al shell
+  final void Function(int index)? onRequestTab;
 
   const HomeScreen({super.key, required this.nombreUsuario, this.onRequestTab});
 
@@ -30,7 +30,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   late DateTime _fechaObjetivo;
   late Future<ClientesPorDia> _futureAgenda;
-  late final VoidCallback _homeDayFilterListener; // 👈 nuevo
+  late final VoidCallback _homeDayFilterListener;
+
+  void _recargarAgenda() {
+    setState(() {
+      _futureAgenda = _agendaService.obtenerClientesPorFecha(
+        _soloFecha(_fechaObjetivo),
+      );
+    });
+  }
 
   @override
   void initState() {
@@ -41,23 +49,15 @@ class _HomeScreenState extends State<HomeScreen> {
       _soloFecha(_fechaObjetivo),
     );
 
-    // Listener para cambios que vengan de otros lados (TodosScreen)
     _homeDayFilterListener = () {
       final value = homeDayFilter.value;
       if (value == null) return;
 
-      // Opcional: si quisieras limpiar el valor después de usarlo:
-      // homeDayFilter.value = null;
-
       if (value == 'Todos') {
-        // Si algún día querés que "Todos" signifique algo en Home
-        setState(() {
-          filtroSeleccionado = 'Todos';
-        });
+        setState(() => filtroSeleccionado = 'Todos');
         return;
       }
 
-      // 'Hoy' | 'Mañana' | 'Ayer'
       final hoy = DateTime.now();
       final nuevaFecha = _fechaParaFiltro(hoy, value);
 
@@ -88,7 +88,6 @@ class _HomeScreenState extends State<HomeScreen> {
         return base.add(const Duration(days: 1));
       case 'Ayer':
         return base.subtract(const Duration(days: 1));
-      case 'Hoy':
       default:
         return base;
     }
@@ -96,10 +95,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _onFilterChanged(String nuevoFiltro) {
     if (nuevoFiltro == 'Todos') {
-      setState(() {
-        filtroSeleccionado = nuevoFiltro;
-      });
-      widget.onRequestTab?.call(1); // ir a TodosScreen
+      setState(() => filtroSeleccionado = nuevoFiltro);
+      widget.onRequestTab?.call(1);
       return;
     }
 
@@ -111,7 +108,6 @@ class _HomeScreenState extends State<HomeScreen> {
       _fechaObjetivo = nuevaFecha;
       _futureAgenda = _agendaService.obtenerClientesPorFecha(
         _soloFecha(_fechaObjetivo),
-        // si querés filtrar por turno: turno: 'Mañana'
       );
     });
   }
@@ -124,11 +120,10 @@ class _HomeScreenState extends State<HomeScreen> {
       color: cs.background,
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 8),
               Text(
                 'Hola, ${widget.nombreUsuario}!',
                 style: TextStyle(
@@ -157,8 +152,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     if (snapshot.hasError) {
                       return Center(
                         child: Text(
-                          'Error al cargar las visitas:\n${snapshot.error}',
-                          textAlign: TextAlign.center,
+                          'Error al cargar visitas\n${snapshot.error}',
                           style: TextStyle(color: cs.error),
                         ),
                       );
@@ -169,7 +163,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     if (agenda == null || agenda.clientes.isEmpty) {
                       return Center(
                         child: Text(
-                          'No hay visitas para $filtroSeleccionado.',
+                          'No hay visitas para $filtroSeleccionado',
                           style: TextStyle(color: cs.onBackground),
                         ),
                       );
@@ -180,44 +174,46 @@ class _HomeScreenState extends State<HomeScreen> {
                       itemBuilder: (context, index) {
                         final c = agenda.clientes[index];
 
-                        // Por cada cliente pedimos su dirección principal
+                        // 🔴 MAPEO REAL DEL ESTADO
+                        final estado = mapEstadoVisita(c.estadoVisita);
+
                         return FutureBuilder<DireccionCliente?>(
                           future: _direccionService.obtenerDireccionPrincipal(
                             c.legajo,
                           ),
                           builder: (context, dirSnapshot) {
-                            String direccionTexto = '';
+                            String direccionTexto = 'Sin dirección';
 
                             if (dirSnapshot.connectionState ==
                                 ConnectionState.waiting) {
                               direccionTexto = 'Cargando dirección...';
-                            } else if (dirSnapshot.hasError) {
-                              direccionTexto = 'Error al cargar dirección';
-                            } else {
-                              final dir = dirSnapshot.data;
-                              if (dir != null) {
-                                direccionTexto = dir.descripcionCorta;
-                              } else {
-                                direccionTexto = 'Sin dirección cargada';
-                              }
+                            } else if (dirSnapshot.hasData &&
+                                dirSnapshot.data != null) {
+                              direccionTexto =
+                                  dirSnapshot.data!.descripcionCorta;
                             }
 
                             return VisitCard(
                               nombre: c.nombreCompleto,
                               direccion: direccionTexto,
-                              visitado:
-                                  false, // todavía no tenemos estado de visita en este endpoint
-                              turnoVisita:
-                                  c.turnoVisita, // esto lo agregamos antes
-                              onTap: () {
+                              estado: estado,
+                              turnoVisita: c.turnoVisita,
+                              onTap: () async {
                                 final legajo = c.legajo;
-                                Navigator.of(
-                                  context,
-                                  rootNavigator: true,
-                                ).pushNamed(
-                                  '/venta',
-                                  arguments: {'legajo': legajo},
-                                );
+
+                                final result =
+                                    await Navigator.of(
+                                      context,
+                                      rootNavigator: true,
+                                    ).pushNamed(
+                                      '/venta',
+                                      arguments: {'legajo': legajo},
+                                    );
+
+                                // Si volvió algo (ej: true), recargamos
+                                if (result == true) {
+                                  _recargarAgenda();
+                                }
                               },
                             );
                           },

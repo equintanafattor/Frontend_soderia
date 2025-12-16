@@ -6,6 +6,7 @@ class ClientePorDiaItem {
   final String? nombre;
   final String? apellido;
   final String? turnoVisita;
+  final String estadoVisita; // 👈 NUEVO
 
   ClientePorDiaItem({
     required this.legajo,
@@ -13,10 +14,10 @@ class ClientePorDiaItem {
     this.nombre,
     this.apellido,
     this.turnoVisita,
+    required this.estadoVisita,
   });
 
   String get nombreCompleto {
-    // Maneja nulos de forma amable
     final n = nombre ?? '';
     final a = apellido ?? '';
     if (n.isEmpty && a.isEmpty) return 'Sin nombre';
@@ -32,6 +33,8 @@ class ClientePorDiaItem {
       nombre: json['nombre'] as String?,
       apellido: json['apellido'] as String?,
       turnoVisita: json['turno_visita'] as String?,
+      estadoVisita:
+          (json['estado_visita'] as String?) ?? 'pendiente',
     );
   }
 }

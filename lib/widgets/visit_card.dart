@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/colors.dart';
+import 'package:frontend_soderia/core/enums/estado_visita.dart';
 
 class VisitCard extends StatelessWidget {
   final String nombre;
   final String direccion;
-  final bool visitado;
-  final String? turnoVisita; // 👈 nuevo
+  final EstadoVisita estado;
+  final String? turnoVisita;
   final VoidCallback? onTap;
 
   const VisitCard({
     super.key,
     required this.nombre,
     required this.direccion,
-    required this.visitado,
-    this.turnoVisita, // 👈 nuevo
+    required this.estado,
+    this.turnoVisita,
     this.onTap,
   });
 
@@ -21,10 +22,37 @@ class VisitCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    final Color chipColor = visitado ? AppColors.verde : AppColors.celeste;
-    final Color chipText = AppColors.blanco;
-    final String chipLabel = visitado ? 'Visitado' : 'Pendiente';
-    final IconData leadIcon = visitado ? Icons.check_circle : Icons.schedule;
+    // ===== Derivamos UI desde el estado =====
+    late final Color chipColor;
+    late final String chipLabel;
+    late final IconData leadIcon;
+
+    switch (estado) {
+      case EstadoVisita.visitado:
+        chipColor = AppColors.verde;
+        chipLabel = 'Visitado';
+        leadIcon = Icons.check_circle;
+        break;
+
+      case EstadoVisita.noCompro:
+        chipColor = Colors.grey;
+        chipLabel = 'No compró';
+        leadIcon = Icons.close;
+        break;
+
+      case EstadoVisita.postergado:
+        chipColor = Colors.orange;
+        chipLabel = 'Postergado';
+        leadIcon = Icons.schedule;
+        break;
+
+      case EstadoVisita.pendiente:
+      default:
+        chipColor = AppColors.celeste;
+        chipLabel = 'Pendiente';
+        leadIcon = Icons.hourglass_empty;
+        break;
+    }
 
     final String turnoLabel = (turnoVisita ?? '').trim();
 
@@ -35,19 +63,18 @@ class VisitCard extends StatelessWidget {
         margin: const EdgeInsets.symmetric(vertical: 8),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: cs.surface, // fondo blanco del tema
+          color: cs.surface,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: AppColors.bordeSuave),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Ícono de estado
+            // ===== Ícono de estado =====
             Container(
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                // ignore: deprecated_member_use
                 color: chipColor.withOpacity(0.15),
                 shape: BoxShape.circle,
               ),
@@ -55,12 +82,12 @@ class VisitCard extends StatelessWidget {
             ),
             const SizedBox(width: 12),
 
-            // Nombre + turno + dirección
+            // ===== Nombre + turno + dirección =====
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Nombre (título)
+                  // Nombre
                   Text(
                     nombre,
                     style: TextStyle(
@@ -70,9 +97,10 @@ class VisitCard extends StatelessWidget {
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
+
                   const SizedBox(height: 4),
 
-                  // Turno de visita (si viene)
+                  // Turno (si existe)
                   if (turnoLabel.isNotEmpty) ...[
                     Row(
                       children: [
@@ -88,14 +116,13 @@ class VisitCard extends StatelessWidget {
                             color: AppColors.grisTexto,
                             fontSize: 13,
                           ),
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
                     const SizedBox(height: 4),
                   ],
 
-                  // Dirección (subtítulo) si no está vacía
+                  // Dirección
                   if (direccion.isNotEmpty)
                     Row(
                       children: [
@@ -114,7 +141,6 @@ class VisitCard extends StatelessWidget {
                             ),
                             overflow: TextOverflow.ellipsis,
                             maxLines: 1,
-                            softWrap: false,
                           ),
                         ),
                       ],
@@ -125,17 +151,18 @@ class VisitCard extends StatelessWidget {
 
             const SizedBox(width: 12),
 
-            // Chip de estado
+            // ===== Chip de estado =====
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
                 color: chipColor,
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
                 chipLabel,
-                style: TextStyle(
-                  color: chipText,
+                style: const TextStyle(
+                  color: AppColors.blanco,
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.2,
@@ -148,3 +175,4 @@ class VisitCard extends StatelessWidget {
     );
   }
 }
+

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/colors.dart';
 import 'package:printing/printing.dart';
+
 import '../utils/pdf_generator.dart';
 import 'package:frontend_soderia/services/pedido_service.dart';
+import 'package:frontend_soderia/services/reparto_dia_service.dart'; // 👈 NUEVO
 
 class LineaVenta {
   final String nroPedido;
@@ -27,7 +29,7 @@ class PagoScreen extends StatefulWidget {
   final String legajo;
   final DateTime fecha;
   final double deudaActual;
-  final double saldoAFavorActual; // 👈 saldo a favor al entrar a la pantalla
+  final double saldoAFavorActual;
   final List<LineaVenta> items;
   final double total;
 
@@ -48,6 +50,7 @@ class PagoScreen extends StatefulWidget {
 
 class _PagoScreenState extends State<PagoScreen> {
   final _pedidoService = PedidoService();
+  final _repartoDiaService =   RepartoDiaService(baseUrl: 'http://localhost:8500'); // 👈 HOST SOLITO
 
   // Chips de montos rápidos:
   // - total de la venta
@@ -59,17 +62,12 @@ class _PagoScreenState extends State<PagoScreen> {
     final total = widget.total;
     final deuda = widget.deudaActual;
 
-    // 1) Monto del pedido
     if (total > 0) {
       montos.add(total);
     }
-
-    // 2) Sólo deuda, si tiene
     if (deuda > 0) {
       montos.add(deuda);
     }
-
-    // 3) Suma de ambos, si ambos existen
     final suma = total + deuda;
     if (total > 0 && deuda > 0 && suma > 0) {
       montos.add(suma);
@@ -95,14 +93,12 @@ class _PagoScreenState extends State<PagoScreen> {
     if (m == null || m < 0) return false;
 
     if (m == 0) {
-      // Sólo permito pagar 0 si tiene saldo a favor
       return widget.saldoAFavorActual > 0;
     }
 
     return true;
   }
 
-  // Mapea enum de UI al id_medio_pago
   int _mapMedioPagoToId(MedioPago medio) {
     switch (medio) {
       case MedioPago.efectivo:
@@ -114,11 +110,6 @@ class _PagoScreenState extends State<PagoScreen> {
     }
   }
 
-  /// Decide el estado del pedido según total, deuda, saldo a favor y pago.
-  ///
-  /// Debe matchear con tu Enum del back:
-  /// "pendiente", "abonado", "abonado parcialmente",
-  /// "cliente no compra", "pedido postergado", "cliente pago de más".
   String _resolverEstadoPedido({
     required double totalVenta,
     required double deudaActual,
@@ -127,28 +118,52 @@ class _PagoScreenState extends State<PagoScreen> {
   }) {
     const epsilon = 0.01;
 
-    // igual que en el back:
-    // neto_anterior = deuda - saldo
-    final netoAnterior = deudaActual - saldoAFavor;
+    if (montoAbonado < 0) {
+      return 'pendiente';
+    }
 
-    // neto_nuevo = neto_anterior + total - abonado
-    final netoNuevo = netoAnterior + totalVenta - montoAbonado;
+    final deudaActualDec = deudaActual;
+    final saldoActualDec = saldoAFavor;
 
-    if (netoNuevo.abs() < epsilon) {
-      // Queda justo al día
+    final A = montoAbonado;
+
+    final saldoUsado = A < saldoActualDec ? A : saldoActualDec;
+
+    final deudaTmp = deudaActualDec + totalVenta - A;
+
+    double deudaNueva;
+    double saldoGenerado;
+
+    if (deudaTmp >= 0) {
+      deudaNueva = deudaTmp;
+      saldoGenerado = 0;
+    } else {
+      deudaNueva = 0;
+      saldoGenerado = -deudaTmp;
+    }
+
+    final saldoNuevo = saldoActualDec - saldoUsado + saldoGenerado;
+
+    final deudaCasiCero = deudaNueva.abs() < epsilon;
+    final saldoCasiCero = saldoNuevo.abs() < epsilon;
+
+    if (deudaCasiCero && saldoCasiCero) {
       return 'abonado';
     }
 
-    if (netoNuevo > epsilon) {
-      // Sigue debiendo algo
-      if (montoAbonado <= 0) {
-        return 'pendiente';
-      }
+    if (!deudaCasiCero && montoAbonado <= 0) {
+      return 'pendiente';
+    }
+
+    if (!deudaCasiCero && montoAbonado > 0) {
       return 'abonado parcialmente';
     }
 
-    // netoNuevo < 0  => queda con saldo a favor
-    return 'cliente pago de más';
+    if (deudaCasiCero && saldoNuevo > epsilon) {
+      return 'cliente pago de más';
+    }
+
+    return 'pendiente';
   }
 
   @override
@@ -201,9 +216,16 @@ class _PagoScreenState extends State<PagoScreen> {
         montoAbonado: _montoElegido!,
       );
 
-      // Por ahora dejamos el reparto día fijo
-      int idRepartoDia = 1;
+      // 👇 AHORA OBTENEMOS EL REPARTO REAL DESDE EL BACK
+      final reparto = await _repartoDiaService.obtenerPorFecha(
+        fecha: widget.fecha,
+        idEmpresa: 1,
+        // si más adelante manejás usuario logueado, pasás idUsuario acá
+        // idUsuario: ...
+      );
+      final int idRepartoDia = reparto['id_repartodia'] as int;
 
+      // Crear pedido
       final pedido = await _pedidoService.crearPedido(
         legajo: legajoInt,
         idMedioPago: idMedio,
@@ -217,6 +239,7 @@ class _PagoScreenState extends State<PagoScreen> {
 
       final idPedido = pedido['id_pedido'] as int;
 
+      // Confirmar pedido
       await _pedidoService.confirmarPedido(
         idPedido: idPedido,
         idRepartoDia: idRepartoDia,
@@ -246,7 +269,6 @@ class _PagoScreenState extends State<PagoScreen> {
     }
   }
 
-  // helper UI
   bool get _saldoAlDia {
     if (!_montoValido) return false;
 
@@ -358,7 +380,6 @@ class _PagoScreenState extends State<PagoScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // Encabezado
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -375,15 +396,10 @@ class _PagoScreenState extends State<PagoScreen> {
               ],
             ),
             const SizedBox(height: 12),
-
             const Divider(thickness: 1.4),
             const SizedBox(height: 4),
-
-            // Cabecera tabla
             _TablaHeader(),
             const SizedBox(height: 4),
-
-            // Filas
             ...widget.items.map(
               (it) => _TablaRow(
                 nro: it.nroPedido,
@@ -395,8 +411,6 @@ class _PagoScreenState extends State<PagoScreen> {
             ),
             const SizedBox(height: 8),
             const Divider(thickness: 1.4),
-
-            // Total
             Align(
               alignment: Alignment.centerRight,
               child: Text(
@@ -407,10 +421,7 @@ class _PagoScreenState extends State<PagoScreen> {
                 ),
               ),
             ),
-
             const SizedBox(height: 16),
-
-            // Monto a abonar
             Text(
               'El cliente abonará:',
               style: Theme.of(context).textTheme.titleMedium,
@@ -420,7 +431,6 @@ class _PagoScreenState extends State<PagoScreen> {
               spacing: 10,
               runSpacing: 10,
               children: [
-                // Chip para usar solo saldo a favor (pago = 0)
                 if (widget.saldoAFavorActual > 0)
                   _MontoChip(
                     label: 'Usar saldo a favor',
@@ -432,7 +442,6 @@ class _PagoScreenState extends State<PagoScreen> {
                       });
                     },
                   ),
-
                 for (final m in _montosRapidos)
                   _MontoChip(
                     label: _money(m),
@@ -444,7 +453,6 @@ class _PagoScreenState extends State<PagoScreen> {
                       });
                     },
                   ),
-
                 _MontoChip(
                   label: 'Otro',
                   selected: _otroActivo,
@@ -456,7 +464,6 @@ class _PagoScreenState extends State<PagoScreen> {
                   },
                   filled: _otroActivo,
                 ),
-
                 if (_otroActivo)
                   SizedBox(
                     width: 160,
@@ -482,7 +489,6 @@ class _PagoScreenState extends State<PagoScreen> {
                   ),
               ],
             ),
-
             const SizedBox(height: 8),
             if (_saldoAlDia)
               Row(
@@ -495,10 +501,7 @@ class _PagoScreenState extends State<PagoScreen> {
                   ),
                 ],
               ),
-
             const SizedBox(height: 16),
-
-            // Medio de pago
             Text(
               'Medio de pago:',
               style: Theme.of(context).textTheme.titleMedium,
@@ -513,10 +516,7 @@ class _PagoScreenState extends State<PagoScreen> {
               ],
               onChanged: (v) => setState(() => _medio = v),
             ),
-
             const SizedBox(height: 16),
-
-            // Compartir comprobante
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [

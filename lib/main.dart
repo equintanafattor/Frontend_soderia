@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:frontend_soderia/screens/reportes/reporte_screen.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'package:frontend_soderia/core/navigation/destinations.dart';
@@ -130,21 +131,13 @@ AppShell _buildAppShell(String usuario) {
     /// 5 Productos
     /// 6 Calendario
     pagesBuilder: (select) => [
-      HomeScreen(
-        nombreUsuario: usuario,
-        onRequestTab: select,
-      ),
-      TodosScreen(
-        nombreUsuario: usuario,
-        onRequestTab: select,
-      ),
-      const Placeholder(),            // Reportes (por ahora)
-      const UsuariosListScreen(),     // Usuarios
-      const ClientesListScreen(),     // Clientes
-      const ProductosListScreen(),    // Productos
-      CalendarioScreen(
-        nombreUsuario: usuario,
-      ),
+      HomeScreen(nombreUsuario: usuario, onRequestTab: select),
+      TodosScreen(nombreUsuario: usuario, onRequestTab: select),
+      const ReportesScreen(),
+      const UsuariosListScreen(), // Usuarios
+      const ClientesListScreen(), // Clientes
+      const ProductosListScreen(), // Productos
+      CalendarioScreen(nombreUsuario: usuario),
     ],
 
     // Título dinámico: en Inicio lo dejamos vacío

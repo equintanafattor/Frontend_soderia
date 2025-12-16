@@ -3,6 +3,8 @@
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/navigation/app_shell_actions.dart';
 import 'package:frontend_soderia/services/cliente_service.dart';
+import 'package:printing/printing.dart';
+import 'package:frontend_soderia/utils/estado_cuenta_pdf.dart';
 
 class ClienteDetailScreen extends StatefulWidget {
   final int legajo;
@@ -414,37 +416,40 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                 _SectionCard(
                   title: 'Cuenta',
                   child: cuentas.isEmpty
-                      ? const Text('Sin cuenta')
-                      : Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      ? const Text('Sin cuentas')
+                      : Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
                           children: cuentas.map((c0) {
                             final c = c0 as Map;
-                            return Card(
-                              margin: const EdgeInsets.symmetric(vertical: 6),
-                              color: cs.surface,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '${c['tipo_de_cuenta'] ?? 'Cuenta'}',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text('Saldo: ${c['saldo']}'),
-                                    Text('Deuda: ${c['deuda']}'),
-                                    Text('Bidones: ${c['numero_bidones']}'),
-                                    if (c['estado'] != null)
-                                      Text('Estado: ${c['estado']}'),
-                                  ],
-                                ),
-                              ),
+
+                            final tipo =
+                                (c['tipo_de_cuenta']?.toString().isNotEmpty ??
+                                    false)
+                                ? c['tipo_de_cuenta']
+                                : 'Cuenta';
+
+                            return _CuentaMiniCard(
+                              tipo: tipo,
+                              saldo: c['saldo'],
+                              deuda: c['deuda'],
+                              bidones: c['numero_bidones'],
+                              estado: c['estado'],
+                              onPdf: () async {
+                                final pdfBytes = await generarEstadoCuentaPDF(
+                                  nombreCliente: nombre,
+                                  legajo: widget.legajo.toString(),
+                                  fecha: DateTime.now(),
+                                  deuda: _toDouble(c['deuda']),
+                                  saldoAFavor: _toDouble(c['saldo']),
+                                  ultimosPedidos: pedidos
+                                      .cast<Map<String, dynamic>>(),
+                                );
+
+                                await Printing.layoutPdf(
+                                  onLayout: (_) async => pdfBytes,
+                                );
+                              },
                             );
                           }).toList(),
                         ),
@@ -621,4 +626,87 @@ class _InfoChip extends StatelessWidget {
       ),
     );
   }
+}
+
+class _CuentaMiniCard extends StatelessWidget {
+  final String tipo;
+  final dynamic saldo;
+  final dynamic deuda;
+  final dynamic bidones;
+  final dynamic estado;
+  final VoidCallback onPdf;
+
+  const _CuentaMiniCard({
+    required this.tipo,
+    required this.saldo,
+    required this.deuda,
+    required this.bidones,
+    required this.estado,
+    required this.onPdf,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return SizedBox(
+      width: 240, // 👈 clave para que entren varias por fila
+      child: Card(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        color: cs.surface,
+        elevation: 1,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // TÍTULO
+              Text(
+                tipo,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+              ),
+
+              const SizedBox(height: 6),
+              Text('Deuda: ${deuda ?? 0}'),
+              Text('Saldo: ${saldo ?? 0}'),
+              Text('Bidones: ${bidones ?? 0}'),
+
+              if (estado != null && estado.toString().isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    'Estado: $estado',
+                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                  ),
+                ),
+
+              const SizedBox(height: 8),
+
+              Align(
+                alignment: Alignment.centerRight,
+                child: IconButton(
+                  icon: const Icon(Icons.picture_as_pdf),
+                  tooltip: 'Estado de cuenta',
+                  onPressed: onPdf,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// HELPERS
+
+double _toDouble(dynamic v) {
+  if (v == null) return 0;
+  if (v is num) return v.toDouble();
+  if (v is String) {
+    return double.tryParse(v.replaceAll(',', '.')) ?? 0;
+  }
+  return 0;
 }
