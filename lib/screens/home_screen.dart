@@ -2,6 +2,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/enums/estado_visita.dart';
+import 'package:frontend_soderia/core/navigation/destinations.dart';
+import 'package:frontend_soderia/core/navigation/shell_state.dart';
 import 'package:frontend_soderia/core/state/todos_filter.dart';
 
 import 'package:frontend_soderia/widgets/day_filter_buttons.dart';
@@ -31,6 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late DateTime _fechaObjetivo;
   late Future<ClientesPorDia> _futureAgenda;
   late final VoidCallback _homeDayFilterListener;
+  late final VoidCallback _shellListener;
 
   void _recargarAgenda() {
     setState(() {
@@ -71,11 +74,21 @@ class _HomeScreenState extends State<HomeScreen> {
     };
 
     homeDayFilter.addListener(_homeDayFilterListener);
+
+    _shellListener = () {
+      // Si el tab activo es Home (index 0)
+      if (shellState.value == kIndexInicio) {
+        _recargarAgenda();
+      }
+    };
+
+    shellState.addListener(_shellListener);
   }
 
   @override
   void dispose() {
     homeDayFilter.removeListener(_homeDayFilterListener);
+    shellState.removeListener(_shellListener);
     super.dispose();
   }
 
@@ -199,18 +212,15 @@ class _HomeScreenState extends State<HomeScreen> {
                               estado: estado,
                               turnoVisita: c.turnoVisita,
                               onTap: () async {
-                                final legajo = c.legajo;
-
                                 final result =
                                     await Navigator.of(
                                       context,
                                       rootNavigator: true,
                                     ).pushNamed(
                                       '/venta',
-                                      arguments: {'legajo': legajo},
+                                      arguments: {'legajo': c.legajo},
                                     );
 
-                                // Si volvió algo (ej: true), recargamos
                                 if (result == true) {
                                   _recargarAgenda();
                                 }

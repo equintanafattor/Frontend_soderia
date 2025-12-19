@@ -81,16 +81,17 @@ class _LoginScreenState extends State<LoginScreen> {
     final isWide = MediaQuery.of(context).size.width >= 800;
 
     final leftPanel = Container(
-      color: AppColors.verde, // panel verde de tu paleta
-      child: const Center(
-        child: Text(
-          'SAN MIGUEL',
-          style: TextStyle(
-            fontSize: 36,
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.0,
-          ),
+      color: AppColors.verde,
+      child: Center(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth > 600;
+            return Image.asset(
+              'assets/images/logo_san_miguel.png',
+              width: isWide ? 360 : 240,
+              fit: BoxFit.contain,
+            );
+          },
         ),
       ),
     );

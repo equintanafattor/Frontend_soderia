@@ -34,9 +34,9 @@ class _ProductosListScreenState extends State<ProductosListScreen> {
       setState(() => _data = list);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     } finally {
       if (mounted) setState(() => _cargando = false);
@@ -138,13 +138,22 @@ class _ProductosListScreenState extends State<ProductosListScreen> {
                 child: OutlinedButton.icon(
                   onPressed: null,
                   icon: const Icon(Icons.sort),
-                  label: Text(
-                    _orden,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  label: Text(_orden, overflow: TextOverflow.ellipsis),
                 ),
               ),
               const SizedBox(width: 8),
+
+              // 👉 Botón Listas de precios
+              OutlinedButton.icon(
+                icon: const Icon(Icons.request_quote),
+                label: const Text('Listas de precios'),
+                onPressed: () {
+                  AppShellActions.push(context, '/listas-precios');
+                },
+              ),
+
+              const SizedBox(width: 8),
+
               FilledButton.icon(
                 onPressed: () async {
                   final result = await AppShellActions.push(
@@ -177,10 +186,9 @@ class _ProductosListScreenState extends State<ProductosListScreen> {
                       final litrosTxt = p.litros != null
                           ? '${p.litros!.toStringAsFixed(1)} Lts'
                           : 'Sin litros';
-                      final tipoTxt =
-                          (p.tipoDispenser ?? '').isNotEmpty
-                              ? p.tipoDispenser!
-                              : 'Sin tipo';
+                      final tipoTxt = (p.tipoDispenser ?? '').isNotEmpty
+                          ? p.tipoDispenser!
+                          : 'Sin tipo';
 
                       final estadoTxt = p.estado == null
                           ? ''
@@ -193,9 +201,7 @@ class _ProductosListScreenState extends State<ProductosListScreen> {
                         tileColor: cs.surface,
                         leading: CircleAvatar(
                           child: Text(
-                            (p.nombre.isNotEmpty
-                                    ? p.nombre[0]
-                                    : '?')
+                            (p.nombre.isNotEmpty ? p.nombre[0] : '?')
                                 .toUpperCase(),
                           ),
                         ),
@@ -285,4 +291,3 @@ class _ProductosListScreenState extends State<ProductosListScreen> {
     );
   }
 }
-

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:frontend_soderia/screens/listas_precios/lista_precio_detail_screen.dart';
 import 'package:frontend_soderia/screens/reportes/reporte_screen.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
@@ -26,6 +27,8 @@ import 'package:frontend_soderia/screens/usuarios/usuarios_list_screen.dart';
 import 'package:frontend_soderia/screens/clientes/clientes_list_screen.dart';
 import 'package:frontend_soderia/screens/clientes/cliente_detail_screen.dart';
 import 'package:frontend_soderia/screens/clientes/cliente_edit_screen.dart';
+import 'package:frontend_soderia/screens/listas_precios/listas_precios_list_screen.dart';
+import 'package:frontend_soderia/screens/listas_precios/lista_precio_form_screen.dart';
 
 // 👇 NUEVO: listado de productos
 import 'package:frontend_soderia/screens/productos/productos_list_screen.dart';
@@ -106,6 +109,26 @@ class FrontendSoderiaApp extends StatelessWidget {
           // fallback si viene mal llamado
           return const Scaffold(
             body: Center(child: Text('Faltan datos para editar el cliente')),
+          );
+        },
+
+        // === Listas de precios ===
+        '/listas-precios': (_) => const ListasPreciosListScreen(),
+
+        '/listas-precios/new': (_) => const ListaPrecioFormScreen(),
+
+        '/listas-precios/detail': (ctx) {
+          final args = ModalRoute.of(ctx)!.settings.arguments;
+
+          if (args is Map && args['id'] is int && args['nombre'] is String) {
+            return ListaPrecioDetailScreen(
+              idLista: args['id'] as int,
+              nombreLista: args['nombre'] as String,
+            );
+          }
+
+          return const Scaffold(
+            body: Center(child: Text('Faltan datos de la lista')),
           );
         },
       },

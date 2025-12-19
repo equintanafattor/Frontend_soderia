@@ -172,7 +172,7 @@ class _VentaScreenState extends State<VentaScreen> {
           deudaActual: deuda,
           saldoAFavorActual: saldoAFavor, // 👈 el que ya calculás del back
           items: items,
-          total: total, 
+          total: total,
         ),
       ),
     );
@@ -183,7 +183,8 @@ class _VentaScreenState extends State<VentaScreen> {
         context,
       ).showSnackBar(const SnackBar(content: Text('Venta confirmada')));
 
-      Navigator.pop(context);
+      // Navigator.pop(context);
+      Navigator.of(context).pop(true);
     }
   }
 
@@ -215,18 +216,21 @@ class _VentaScreenState extends State<VentaScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Visita marcada como "No compra"')),
       );
-      Navigator.pop(context);
+      // Navigator.pop(context);
+      Navigator.of(context).pop(true);
     }
   }
 
   void _postergar() async {
-    // Registrar visita como POSTERGADA
     await _registrarVisita(VisitaEstado.postergada);
+
+    if (!mounted) return;
 
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('Visita postergada')));
-    Navigator.pop(context);
+
+    Navigator.of(context).pop(true); // 👈 CLAVE
   }
 
   @override
