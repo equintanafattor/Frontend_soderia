@@ -1,13 +1,17 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/services/cliente_service.dart';
 
 class FrecuenciaModal extends StatefulWidget {
   final int idDia;
+  final List<Map<String, dynamic>> clientesDelDia;
   final void Function(String modo, String turno, int? refCliente) onConfirm;
 
   const FrecuenciaModal({
     super.key,
     required this.idDia,
+    required this.clientesDelDia,
     required this.onConfirm,
   });
 
@@ -19,26 +23,15 @@ class _FrecuenciaModalState extends State<FrecuenciaModal> {
   String _modo = 'final';
   String _turno = 'mañana';
   int? _refCliente;
-  List<dynamic> _clientesExistentes = [];
-  bool _loading = true;
+  late final List<Map<String, dynamic>> _clientesExistentes;
 
   @override
   void initState() {
     super.initState();
-    _loadClientes();
-  }
-
-  Future<void> _loadClientes() async {
-    final service = ClienteService();
-    try {
-      final list = await service.listarClientesPorIdDia(widget.idDia);
-      setState(() {
-        _clientesExistentes = list;
-        _loading = false;
-      });
-    } catch (_) {
-      setState(() => _loading = false);
-    }
+    _clientesExistentes = widget.clientesDelDia;
+    debugPrint(
+      '🧪 Modal día ${widget.idDia} → clientes: ${_clientesExistentes.length}',
+    );
   }
 
   @override
@@ -79,12 +72,7 @@ class _FrecuenciaModalState extends State<FrecuenciaModal> {
             const SizedBox(height: 12),
 
             if (_modo == 'despues')
-              _loading
-                  ? const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8),
-                      child: LinearProgressIndicator(minHeight: 2),
-                    )
-                  : _clientesExistentes.isEmpty
+              _clientesExistentes.isEmpty
                   ? const Text(
                       'No hay clientes en ese día para poner “después de”.',
                       style: TextStyle(fontSize: 13, color: Colors.grey),
@@ -94,18 +82,13 @@ class _FrecuenciaModalState extends State<FrecuenciaModal> {
                       decoration: const InputDecoration(
                         labelText: 'Cliente de referencia',
                       ),
-                      items: _clientesExistentes.map<DropdownMenuItem<int>>((
-                        c,
-                      ) {
-                        final int legajo = c['legajo'] as int;
-                        final String nombre = (c['nombre'] ?? '') as String;
-                        final String apellido = (c['apellido'] ?? '') as String;
-                        final label = (nombre.isNotEmpty || apellido.isNotEmpty)
-                            ? '$nombre $apellido'
-                            : 'Cliente $legajo';
+                      items: _clientesExistentes.map((c) {
+                        final int legajo = c['legajo'];
+                        final nombre = c['nombre'] ?? '';
+                        final apellido = c['apellido'] ?? '';
                         return DropdownMenuItem<int>(
                           value: legajo,
-                          child: Text(label),
+                          child: Text('$nombre $apellido'.trim()),
                         );
                       }).toList(),
                       onChanged: (v) => setState(() => _refCliente = v),

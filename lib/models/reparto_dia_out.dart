@@ -19,16 +19,25 @@ class RepartoDiaOut {
     this.observacion,
   });
 
+  /// 👇 helper estático (NO depende de instancia)
+  static double _parseNum(dynamic v) {
+    if (v == null) return 0;
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v) ?? 0;
+    throw Exception('Valor numérico inválido: $v');
+  }
+
   factory RepartoDiaOut.fromJson(Map<String, dynamic> json) {
     return RepartoDiaOut(
       idRepartoDia: json['id_repartodia'] as int,
       idUsuario: json['id_usuario'] as int,
       idEmpresa: json['id_empresa'] as int,
-      fecha: DateTime.parse(json['fecha'] as String),
-      totalRecaudado: (json['total_recaudado'] as num).toDouble(),
-      totalEfectivo: (json['total_efectivo'] as num).toDouble(),
-      totalVirtual: (json['total_virtual'] as num).toDouble(),
-      observacion: json['observacion'] as String?,
+      fecha: DateTime.parse(json['fecha']),
+      totalRecaudado: _parseNum(json['total_recaudado']),
+      totalEfectivo: _parseNum(json['total_efectivo']),
+      totalVirtual: _parseNum(json['total_virtual']),
+      observacion: json['observacion'],
     );
   }
 }
+

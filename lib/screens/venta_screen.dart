@@ -5,6 +5,7 @@ import 'package:frontend_soderia/core/colors.dart';
 import 'package:frontend_soderia/core/navigation/app_shell_actions.dart';
 import 'package:frontend_soderia/screens/pago_screen.dart';
 import 'package:frontend_soderia/services/cliente_service.dart';
+import 'package:frontend_soderia/services/lista_precio_service.dart';
 import 'package:frontend_soderia/services/producto_service.dart';
 import 'package:frontend_soderia/screens/clientes/cliente_edit_screen.dart';
 import 'package:frontend_soderia/services/visita_service.dart';
@@ -46,23 +47,23 @@ class _VentaScreenState extends State<VentaScreen> {
   // Futuros para cliente (detalle) y productos
   late Future<Map<String, dynamic>> _futureClienteDetalle;
   late Future<List<dynamic>> _futureProductos;
+  int? _idListaSeleccionada;
+  late Future<List<dynamic>> _futureListasPrecios;
 
   final _clienteService = ClienteService();
   final _productoService = ProductoService();
   final _visitaService = VisitaService();
+  final _listaPrecioService = ListaPrecioService();
 
   @override
   void initState() {
     super.initState();
-    // Detalle del cliente (persona, direcciones, cuentas, historicos, etc.)
+
     _futureClienteDetalle = _clienteService.obtenerDetalleCliente(
       widget.legajoCliente,
     );
 
-    // Productos de la lista seleccionada, con precio
-    _futureProductos = _productoService.listarProductosDeLista(
-      widget.idListaPrecios,
-    );
+    _futureListasPrecios = _listaPrecioService.listarListas();
   }
 
   // -------- Helpers --------
@@ -110,6 +111,14 @@ class _VentaScreenState extends State<VentaScreen> {
   void _eliminarProducto(int idProducto) {
     setState(() {
       _carrito.remove(idProducto);
+    });
+  }
+
+  void _seleccionarLista(int idLista) {
+    setState(() {
+      _idListaSeleccionada = idLista;
+      _carrito.clear(); // 🔒 evita mezclar precios
+      _futureProductos = _productoService.listarProductosDeLista(idLista);
     });
   }
 
@@ -380,24 +389,77 @@ class _VentaScreenState extends State<VentaScreen> {
         floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
         floatingActionButton: isMobile ? null : confirm,
         bottomNavigationBar: isMobile ? confirm : null,
-        body: Padding(
-          padding: EdgeInsets.only(bottom: isMobile ? 84 : 0),
-          child: TabBarView(
-            children: [
-              _tabVentaActual(
-                context,
-                cs,
-                legajo,
-                deuda,
-                saldoAFavor,
-                nombreCliente,
+        body: Column(
+          children: [
+            _selectorListaPrecios(),
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(bottom: isMobile ? 84 : 0),
+                child: TabBarView(
+                  children: [
+                    _tabVentaActual(
+                      context,
+                      cs,
+                      legajo,
+                      deuda,
+                      saldoAFavor,
+                      nombreCliente,
+                    ),
+                    _tabProductos(context, cs),
+                    _tabHistorial(context, cs, historicos),
+                  ],
+                ),
               ),
-              _tabProductos(context, cs),
-              _tabHistorial(context, cs, historicos),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _selectorListaPrecios() {
+    return FutureBuilder<List<dynamic>>(
+      future: _futureListasPrecios,
+      builder: (context, snap) {
+        if (!snap.hasData) {
+          return const Padding(
+            padding: EdgeInsets.all(12),
+            child: LinearProgressIndicator(),
+          );
+        }
+
+        final listas = snap.data!;
+        if (listas.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.all(12),
+            child: Text('No hay listas de precios disponibles'),
+          );
+        }
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+          child: DropdownButtonFormField<int>(
+            value: _idListaSeleccionada,
+            decoration: const InputDecoration(
+              labelText: 'Lista de precios',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            items: listas
+                .where((l) => l['estado'] == 'ACTIVA')
+                .map(
+                  (l) => DropdownMenuItem<int>(
+                    value: l['id_lista'],
+                    child: Text(l['nombre']),
+                  ),
+                )
+                .toList(),
+            onChanged: (v) {
+              if (v != null) _seleccionarLista(v);
+            },
+          ),
+        );
+      },
     );
   }
 
@@ -494,6 +556,10 @@ class _VentaScreenState extends State<VentaScreen> {
   }
 
   Widget _tabProductos(BuildContext context, ColorScheme cs) {
+    if (_idListaSeleccionada == null) {
+      return const Center(child: Text('Seleccioná una lista de precios'));
+    }
+
     return FutureBuilder<List<dynamic>>(
       future: _futureProductos,
       builder: (context, snap) {

@@ -3,8 +3,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/models/producto.dart';
 import 'package:frontend_soderia/services/producto_service.dart';
-import 'package:frontend_soderia/widgets/common/choice_chips.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:frontend_soderia/services/lista_precio_service.dart';
+import 'package:frontend_soderia/models/lista_precio_ref.dart';
+import 'package:frontend_soderia/models/producto_precio_input.dart';
+import 'package:frontend_soderia/widgets/productos/producto_listas_precio_editor.dart';
 
 class ProductoAddScreen extends StatefulWidget {
   const ProductoAddScreen({super.key, this.initial});
@@ -17,203 +20,225 @@ class ProductoAddScreen extends StatefulWidget {
 
 class _ProductoAddScreenState extends State<ProductoAddScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _tipo = TextEditingController();
-  final _precio = TextEditingController();
-  final _stock = TextEditingController();
-  final _sku = TextEditingController();
-  double? _litros; // 12 o 20 o custom
+
+  final _nombreCtrl = TextEditingController();
+  final _stockCtrl = TextEditingController();
+
   bool _activo = true;
+  bool _saving = false;
+
   XFile? _image;
 
   final _service = ProductoService();
-  bool _saving = false;
 
-  bool get _isValid =>
-      _formKey.currentState?.validate() == true && _litros != null && !_saving;
+  bool get _isEdit => widget.initial != null;
 
-  @override
-  void initState() {
-    super.initState();
-    final p = widget.initial;
-    if (p != null) {
-      _tipo.text = p.nombre;
-      _litros = p.litros;
-      _activo = p.estado ?? true;
-      // precio / stock / sku / imagen por ahora no se mapean al back
+  bool get _isValid => _formKey.currentState?.validate() == true && !_saving;
+
+  final _listaPrecioService = ListaPrecioService();
+
+  List<ListaPrecioRef> _listas = [];
+  List<ProductoPrecioInput> _precios = [];
+
+  bool _cargandoListas = true;
+
+  Future<void> _loadListas() async {
+    try {
+      final raw = await _listaPrecioService.listarListas();
+      setState(() {
+        _listas = raw.map((e) {
+          final id = e['id_lista'];
+
+          if (id == null) {
+            throw Exception('Lista de precio sin id_lista: $e');
+          }
+
+          return ListaPrecioRef(
+            id: id as int,
+            nombre: e['nombre'].toString().toLowerCase(),
+          );
+        }).toList();
+
+        _cargandoListas = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error al cargar listas: $e')));
     }
   }
 
   @override
+  void initState() {
+    super.initState();
+
+    final p = widget.initial;
+    if (p != null) {
+      _nombreCtrl.text = p.nombre;
+      _activo = p.estado ?? true;
+    }
+
+    _loadListas();
+  }
+
+  @override
   void dispose() {
-    _tipo.dispose();
-    _precio.dispose();
-    _stock.dispose();
-    _sku.dispose();
+    _nombreCtrl.dispose();
+    _stockCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final isEdit = widget.initial != null;
+    final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isEdit ? 'Editar producto' : 'Agregar producto'),
+        title: Text(_isEdit ? 'Editar producto' : 'Nuevo producto'),
         actions: [
-          IconButton(
+          TextButton.icon(
+            onPressed: _isValid ? _submit : null,
             icon: _saving
                 ? const SizedBox(
-                    width: 24,
-                    height: 24,
+                    width: 16,
+                    height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Icon(Icons.check),
-            onPressed: _isValid ? _submit : null,
+                : const Icon(Icons.save),
+            label: const Text('Guardar'),
           ),
         ],
       ),
-      body: Form(
-        key: _formKey,
-        autovalidateMode: AutovalidateMode.onUserInteraction,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            _tf('Tipo / Nombre', _tipo, validator: _req),
-            const SizedBox(height: 12),
-            Text(
-              'Cantidad de litros',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            SingleChoiceChips<double>(
-              items: const [20, 12],
-              selected: _litros,
-              labelOf: (v) => '${v.toStringAsFixed(0)} Lts.',
-              onChanged: (v) => setState(() => _litros = v),
-            ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              icon: const Icon(Icons.edit),
-              label: const Text('Otro...'),
-              onPressed: () async {
-                final v = await _askNumber(context, title: 'Litros');
-                if (v != null) setState(() => _litros = v);
-              },
-            ),
-            const Divider(height: 32),
-            _tf(
-              'Precio (solo visual, aún no se guarda)',
-              _precio,
-              keyboard: TextInputType.number,
-              validator: _money,
-            ),
-            _tf(
-              'Stock inicial (solo visual, aún no se guarda)',
-              _stock,
-              keyboard: TextInputType.number,
-              validator: _intPos,
-            ),
-            _tf('Código/SKU (solo visual, aún no se guarda)', _sku),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.attachment),
-                    label: Text(
-                      _image == null ? 'Adjuntar imagen' : 'Cambiar imagen',
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              // ===== HEADER =====
+              if (_isEdit)
+                Card(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 1,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        _InfoChip(
+                          label: 'ID producto',
+                          value: widget.initial!.idProducto.toString(),
+                        ),
+                      ],
                     ),
-                    onPressed: _pickImage,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Switch.adaptive(
-                  value: _activo,
-                  onChanged: (v) => setState(() => _activo = v),
-                ),
-                const Text('Activo'),
-              ],
-            ),
-            if (_image != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.file(
-                    File(_image!.path),
-                    height: 140,
-                    fit: BoxFit.cover,
-                  ),
+
+              if (_isEdit) const SizedBox(height: 16),
+
+              // ===== DATOS DEL PRODUCTO =====
+              _SectionCard(
+                title: 'Datos del producto',
+                child: Column(
+                  children: [
+                    TextFormField(
+                      controller: _nombreCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Nombre',
+                        hintText: 'ej: bidon 20l retornable',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      textInputAction: TextInputAction.next,
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          return 'Ingresá el nombre del producto';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _stockCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Stock inicial',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return null;
+                        if (int.tryParse(v) == null) {
+                          return 'Debe ser un número entero';
+                        }
+                        if (int.parse(v) < 0) {
+                          return 'No puede ser negativo';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    SwitchListTile.adaptive(
+                      value: _activo,
+                      onChanged: (v) => setState(() => _activo = v),
+                      title: const Text('Producto activo'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ],
                 ),
               ),
-            const SizedBox(height: 80),
-          ],
-        ),
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: FilledButton.icon(
-            onPressed: _isValid ? _submit : null,
-            icon: const Icon(Icons.save),
-            label: Text(isEdit ? 'Guardar cambios' : 'Guardar'),
+
+              // ===== IMAGEN =====
+              _SectionCard(
+                title: 'Imagen',
+                child: Column(
+                  children: [
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.image),
+                      label: Text(
+                        _image == null ? 'Adjuntar imagen' : 'Cambiar imagen',
+                      ),
+                      onPressed: _pickImage,
+                    ),
+                    if (_image != null) ...[
+                      const SizedBox(height: 12),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.file(
+                          File(_image!.path),
+                          height: 160,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+              // ===== LISTAS DE PRECIOS =====
+              _SectionCard(
+                title: 'Listas de precios',
+                child: _cargandoListas
+                    ? const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    : ProductoListasPrecioEditor(
+                        listasDisponibles: _listas,
+                        initial: _precios,
+                        onChanged: (values) {
+                          _precios = values;
+                        },
+                      ),
+              ),
+            ],
           ),
         ),
-      ),
-    );
-  }
-
-  // Helpers
-  Widget _tf(
-    String label,
-    TextEditingController c, {
-    String? Function(String?)? validator,
-    TextInputType? keyboard,
-  }) =>
-      TextFormField(
-        controller: c,
-        decoration: InputDecoration(labelText: label),
-        validator: validator,
-        keyboardType: keyboard,
-      );
-
-  String? _req(String? v) =>
-      (v == null || v.trim().isEmpty) ? 'Obligatorio' : null;
-
-  String? _money(String? v) {
-    if (_req(v) != null) return 'Obligatorio';
-    return RegExp(r'^\d+([.,]\d{1,2})?$').hasMatch(v!.replaceAll(',', '.'))
-        ? null
-        : 'Formato: 1234.56';
-  }
-
-  String? _intPos(String? v) =>
-      (RegExp(r'^[0-9]+$').hasMatch(v ?? '')) ? null : 'Entero ≥ 0';
-
-  Future<double?> _askNumber(BuildContext ctx, {required String title}) async {
-    final ctrl = TextEditingController();
-    return showDialog<double>(
-      context: ctx,
-      builder: (_) => AlertDialog(
-        title: Text(title),
-        content: TextField(
-          controller: ctrl,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(hintText: 'Ej: 8'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final v = double.tryParse(ctrl.text.replaceAll(',', '.'));
-              Navigator.pop(ctx, v);
-            },
-            child: const Text('Aceptar'),
-          ),
-        ],
       ),
     );
   }
@@ -224,56 +249,108 @@ class _ProductoAddScreenState extends State<ProductoAddScreen> {
       source: ImageSource.gallery,
       imageQuality: 85,
     );
-    if (img != null) setState(() => _image = img);
+    if (img != null) {
+      setState(() => _image = img);
+    }
   }
 
   Future<void> _submit() async {
     if (!_isValid) return;
-    setState(() => _saving = true);
 
+    final preciosPayload = _precios.map((p) => p.toJson()).toList();
+
+    setState(() => _saving = true);
     try {
-      final nombre = _tipo.text.trim();
-      final litros = _litros;
+      final nombre = _nombreCtrl.text.trim().toLowerCase();
       final activo = _activo;
 
-      if (widget.initial == null) {
-        // Alta
-        await _service.crear(
-          nombre: nombre,
-          litros: litros,
-          estado: activo,
-        );
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Producto creado')),
-          );
-        }
-      } else {
-        // Edición
+      if (_isEdit) {
         await _service.actualizar(
           widget.initial!.idProducto,
           nombre: nombre,
-          litros: litros,
           estado: activo,
         );
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Producto actualizado')),
-          );
-        }
+      } else {
+        await _service.crear(nombre: nombre, estado: activo);
       }
 
-      if (mounted) {
-        Navigator.pop(context, true); // true => se modificó algo
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_isEdit ? 'Producto actualizado' : 'Producto creado'),
+        ),
+      );
+      Navigator.pop(context, true);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al guardar: $e')),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+}
+
+// ===== UI Helpers reutilizados (alineados a ClienteEdit) =====
+
+class _SectionCard extends StatelessWidget {
+  final String title;
+  final Widget child;
+
+  const _SectionCard({required this.title, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: cs.surface,
+      elevation: 0.5,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _InfoChip({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: cs.primaryContainer.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        '$label: $value',
+        style: TextStyle(
+          fontSize: 11,
+          color: cs.onPrimaryContainer,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
   }
 }

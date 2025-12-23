@@ -21,6 +21,7 @@ import 'package:frontend_soderia/screens/venta_screen.dart';
 import 'package:frontend_soderia/screens/clientes/cliente_add_screen.dart';
 import 'package:frontend_soderia/screens/productos/producto_add_screen.dart';
 import 'package:frontend_soderia/screens/usuarios/usuario_add_screen.dart';
+import 'package:frontend_soderia/screens/clientes/cuenta/cliente_cuenta_add_screen.dart';
 
 // Listar / detalle / edición
 import 'package:frontend_soderia/screens/usuarios/usuarios_list_screen.dart';
@@ -67,6 +68,13 @@ class FrontendSoderiaApp extends StatelessWidget {
         '/cliente/new': (_) => const ClienteAddScreen(),
         '/producto/new': (_) => const ProductoAddScreen(),
         '/usuario/new': (_) => const UsuarioAddScreen(),
+        '/cliente/cuenta/new': (context) {
+          final args =
+              ModalRoute.of(context)!.settings.arguments
+                  as Map<String, dynamic>;
+
+          return ClienteCuentaAddScreen(legajo: args['legajo'] as int);
+        },
 
         // === Detalle de cliente (blindado) ===
         '/cliente/detail': (ctx) {

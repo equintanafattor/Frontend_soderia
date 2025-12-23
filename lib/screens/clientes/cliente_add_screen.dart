@@ -120,11 +120,17 @@ class _ClienteAddScreenState extends State<ClienteAddScreen> {
                 // días tildados → si no tienen config, abrir modal
                 for (final dia in newSet) {
                   if (!_frecuenciasConfig.containsKey(dia)) {
+                    // 1️⃣ traer clientes del back
+                    final clientes = await ClienteService()
+                        .listarClientesPorIdDia(dia);
+
+                    // 2️⃣ abrir modal con esos clientes
                     final confirmed = await showModalBottomSheet<bool>(
                       context: context,
                       isScrollControlled: true,
                       builder: (_) => FrecuenciaModal(
                         idDia: dia,
+                        clientesDelDia: clientes.cast<Map<String, dynamic>>(),
                         onConfirm: (modo, turno, refCliente) {
                           _frecuenciasConfig[dia] = {
                             'modo': modo,
@@ -136,7 +142,6 @@ class _ClienteAddScreenState extends State<ClienteAddScreen> {
                     );
 
                     if (confirmed != true) {
-                      // no confirmó → no guardamos y queda sin config
                       _frecuenciasConfig.remove(dia);
                     }
                   }

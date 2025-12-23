@@ -1,5 +1,9 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/services/cliente_service.dart';
+import 'package:frontend_soderia/widgets/common/frecuencia_modal.dart';
+
 
 class ClienteEditScreen extends StatefulWidget {
   final int legajo;
@@ -29,6 +33,8 @@ class _ClienteEditScreenState extends State<ClienteEditScreen> {
   final List<_TelefonoFormData> _telefonos = [];
   final List<_EmailFormData> _emails = [];
 
+  final Map<String, Map<String, dynamic>> _frecuenciaConfig = {};
+
   // Frecuencia (días y turno)
   final Set<String> _diasSeleccionados = {}; // 'lun','mar',...
   String? _turnoVisita; // 'manana','tarde','noche', null
@@ -53,6 +59,38 @@ class _ClienteEditScreenState extends State<ClienteEditScreen> {
   };
 
   bool _saving = false;
+
+  Future<void> _agregarDiaConConfig(String dia) async {
+    final idDia = _idDiaPorCodigo[dia];
+    if (idDia == null) return;
+
+    // Traer clientes del día (para "después de")
+    List<Map<String, dynamic>> clientesDelDia = [];
+    try {
+      final list = await _service.listarClientesPorIdDia(idDia);
+      clientesDelDia = List<Map<String, dynamic>>.from(list);
+    } catch (_) {}
+
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => FrecuenciaModal(
+        idDia: idDia,
+        clientesDelDia: clientesDelDia,
+        onConfirm: (modo, turno, refCliente) {
+          _frecuenciaConfig[dia] = {
+            'modo': modo,
+            'turno': turno,
+            'ref': refCliente,
+          };
+        },
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() => _diasSeleccionados.add(dia));
+    }
+  }
 
   @override
   void initState() {
@@ -271,13 +309,16 @@ class _ClienteEditScreenState extends State<ClienteEditScreen> {
   }
 
   void _toggleDia(String dia) {
-    setState(() {
-      if (_diasSeleccionados.contains(dia)) {
+    if (_diasSeleccionados.contains(dia)) {
+      // quitar día
+      setState(() {
         _diasSeleccionados.remove(dia);
-      } else {
-        _diasSeleccionados.add(dia);
-      }
-    });
+        _frecuenciaConfig.remove(dia);
+      });
+    } else {
+      // agregar día → abrir modal
+      _agregarDiaConConfig(dia);
+    }
   }
 
   @override
@@ -685,43 +726,99 @@ class _ClienteEditScreenState extends State<ClienteEditScreen> {
                             label: 'Lun',
                             value: 'lun',
                             selected: _diasSeleccionados.contains('lun'),
-                            onTap: () => _toggleDia('lun'),
+                            onTap: () {
+                              if (_diasSeleccionados.contains('lun')) {
+                                // Ya estaba seleccionado → reconfigurar (volver a abrir modal)
+                                _agregarDiaConConfig('lun');
+                              } else {
+                                // Día nuevo → abrir modal y agregar
+                                _toggleDia('lun');
+                              }
+                            },
                           ),
                           _DiaChip(
                             label: 'Mar',
                             value: 'mar',
                             selected: _diasSeleccionados.contains('mar'),
-                            onTap: () => _toggleDia('mar'),
+                            onTap: () {
+                              if (_diasSeleccionados.contains('mar')) {
+                                // Ya estaba seleccionado → reconfigurar (volver a abrir modal)
+                                _agregarDiaConConfig('mar');
+                              } else {
+                                // Día nuevo → abrir modal y agregar
+                                _toggleDia('mar');
+                              }
+                            },
                           ),
                           _DiaChip(
                             label: 'Mié',
                             value: 'mie',
                             selected: _diasSeleccionados.contains('mie'),
-                            onTap: () => _toggleDia('mie'),
+                            onTap: () {
+                              if (_diasSeleccionados.contains('mie')) {
+                                // Ya estaba seleccionado → reconfigurar (volver a abrir modal)
+                                _agregarDiaConConfig('mie');
+                              } else {
+                                // Día nuevo → abrir modal y agregar
+                                _toggleDia('mie');
+                              }
+                            },
                           ),
                           _DiaChip(
                             label: 'Jue',
                             value: 'jue',
                             selected: _diasSeleccionados.contains('jue'),
-                            onTap: () => _toggleDia('jue'),
+                            onTap: () {
+                              if (_diasSeleccionados.contains('jue')) {
+                                // Ya estaba seleccionado → reconfigurar (volver a abrir modal)
+                                _agregarDiaConConfig('jue');
+                              } else {
+                                // Día nuevo → abrir modal y agregar
+                                _toggleDia('jue');
+                              }
+                            },
                           ),
                           _DiaChip(
                             label: 'Vie',
                             value: 'vie',
                             selected: _diasSeleccionados.contains('vie'),
-                            onTap: () => _toggleDia('vie'),
+                            onTap: () {
+                              if (_diasSeleccionados.contains('vie')) {
+                                // Ya estaba seleccionado → reconfigurar (volver a abrir modal)
+                                _agregarDiaConConfig('vie');
+                              } else {
+                                // Día nuevo → abrir modal y agregar
+                                _toggleDia('vie');
+                              }
+                            },
                           ),
                           _DiaChip(
                             label: 'Sáb',
                             value: 'sab',
                             selected: _diasSeleccionados.contains('sab'),
-                            onTap: () => _toggleDia('sab'),
+                            onTap: () {
+                              if (_diasSeleccionados.contains('sab')) {
+                                // Ya estaba seleccionado → reconfigurar (volver a abrir modal)
+                                _agregarDiaConConfig('sab');
+                              } else {
+                                // Día nuevo → abrir modal y agregar
+                                _toggleDia('sab');
+                              }
+                            },
                           ),
                           _DiaChip(
                             label: 'Dom',
                             value: 'dom',
                             selected: _diasSeleccionados.contains('dom'),
-                            onTap: () => _toggleDia('dom'),
+                            onTap: () {
+                              if (_diasSeleccionados.contains('dom')) {
+                                // Ya estaba seleccionado → reconfigurar (volver a abrir modal)
+                                _agregarDiaConConfig('dom');
+                              } else {
+                                // Día nuevo → abrir modal y agregar
+                                _toggleDia('dom');
+                              }
+                            },
                           ),
                         ],
                       ),

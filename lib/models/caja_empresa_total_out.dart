@@ -4,8 +4,9 @@ class CajaEmpresaTotalOut {
   CajaEmpresaTotalOut({required this.total});
 
   factory CajaEmpresaTotalOut.fromJson(Map<String, dynamic> json) {
+    final v = json['total'];
     return CajaEmpresaTotalOut(
-      total: (json['total'] as num).toDouble(),
+      total: v is num ? v.toDouble() : double.tryParse(v.toString()) ?? 0,
     );
   }
 }

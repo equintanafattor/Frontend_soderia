@@ -205,4 +205,19 @@ class ClienteService {
       throw Exception('Error ${res.statusCode}: ${res.body}');
     }
   }
+
+  Future<void> crearCuenta({
+    required int legajo,
+    required Map<String, dynamic> payload,
+  }) async {
+    final resp = await http.post(
+      Uri.parse('$baseUrl/$legajo/cuentas'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    );
+
+    if (resp.statusCode != 201) {
+      throw Exception('Error creando cuenta: ${resp.body}');
+    }
+  }
 }

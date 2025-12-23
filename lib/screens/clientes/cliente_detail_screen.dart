@@ -5,6 +5,7 @@ import 'package:frontend_soderia/core/navigation/app_shell_actions.dart';
 import 'package:frontend_soderia/services/cliente_service.dart';
 import 'package:printing/printing.dart';
 import 'package:frontend_soderia/utils/estado_cuenta_pdf.dart';
+import 'package:frontend_soderia/screens/clientes/cuenta/cliente_cuenta_add_screen.dart';
 
 class ClienteDetailScreen extends StatefulWidget {
   final int legajo;
@@ -414,7 +415,22 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
 
                 // CUENTA
                 _SectionCard(
-                  title: 'Cuenta',
+                  title: 'Cuentas',
+                  trailing: IconButton(
+                    icon: const Icon(Icons.add),
+                    tooltip: 'Crear nueva cuenta',
+                    onPressed: () async {
+                      final ok = await AppShellActions.push(
+                        context,
+                        '/cliente/cuenta/new',
+                        arguments: {'legajo': widget.legajo},
+                      );
+
+                      if (ok == true && mounted) {
+                        _reload();
+                      }
+                    },
+                  ),
                   child: cuentas.isEmpty
                       ? const Text('Sin cuentas')
                       : Wrap(
@@ -557,27 +573,35 @@ class _ClienteFullData {
 class _SectionCard extends StatelessWidget {
   final String title;
   final Widget child;
+  final Widget? trailing;
 
-  const _SectionCard({required this.title, required this.child});
+  const _SectionCard({required this.title, required this.child, this.trailing});
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      color: cs.surface,
       elevation: 0.5,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                if (trailing != null) trailing!,
+              ],
             ),
             const SizedBox(height: 8),
             child,

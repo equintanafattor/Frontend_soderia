@@ -57,10 +57,7 @@ class AppShellActions {
     String route, {
     Object? arguments,
   }) {
-    return Navigator.of(
-      context,
-      rootNavigator: true,
-    ).pushNamed(route, arguments: arguments);
+    return Navigator.of(context).pushNamed(route, arguments: arguments);
   }
 
   // 👇 también acepta arguments
