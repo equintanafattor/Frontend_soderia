@@ -1,6 +1,10 @@
 // screens/productos/producto_add_screen.dart
+// ignore_for_file: deprecated_member_use
+
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:frontend_soderia/core/navigation/app_shell_actions.dart';
+import 'package:frontend_soderia/core/navigation/destinations.dart';
 import 'package:frontend_soderia/models/producto.dart';
 import 'package:frontend_soderia/services/producto_service.dart';
 import 'package:image_picker/image_picker.dart';
@@ -22,7 +26,7 @@ class _ProductoAddScreenState extends State<ProductoAddScreen> {
   final _formKey = GlobalKey<FormState>();
 
   final _nombreCtrl = TextEditingController();
-  final _stockCtrl = TextEditingController();
+  // final _stockCtrl = TextEditingController();
 
   bool _activo = true;
   bool _saving = false;
@@ -85,7 +89,7 @@ class _ProductoAddScreenState extends State<ProductoAddScreen> {
   @override
   void dispose() {
     _nombreCtrl.dispose();
-    _stockCtrl.dispose();
+    // _stockCtrl.dispose();
     super.dispose();
   }
 
@@ -163,7 +167,7 @@ class _ProductoAddScreenState extends State<ProductoAddScreen> {
                       },
                     ),
                     const SizedBox(height: 12),
-                    TextFormField(
+                    /*                     TextFormField(
                       controller: _stockCtrl,
                       decoration: const InputDecoration(
                         labelText: 'Stock inicial',
@@ -181,7 +185,7 @@ class _ProductoAddScreenState extends State<ProductoAddScreen> {
                         }
                         return null;
                       },
-                    ),
+                    ), */
                     const SizedBox(height: 12),
                     SwitchListTile.adaptive(
                       value: _activo,
@@ -275,12 +279,34 @@ class _ProductoAddScreenState extends State<ProductoAddScreen> {
       }
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      final messenger = ScaffoldMessenger.of(context);
+
+      messenger.showSnackBar(
         SnackBar(
-          content: Text(_isEdit ? 'Producto actualizado' : 'Producto creado'),
+          content: Text(
+            _isEdit
+                ? 'Producto actualizado'
+                : 'Producto creado. Cargá el stock desde Stock.',
+          ),
+          action: _isEdit
+              ? null
+              : SnackBarAction(
+                  label: 'Ir a Stock',
+                  onPressed: () {
+                    // cerramos ProductoAdd
+                    Navigator.pop(context);
+
+                    // saltamos al tab Stock
+                    AppShellActions.jumpToTab(context, kIndexStock);
+                  },
+                ),
         ),
       );
-      Navigator.pop(context, true);
+
+      // si es edición, volvemos normalmente
+      if (_isEdit) {
+        Navigator.pop(context, true);
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(

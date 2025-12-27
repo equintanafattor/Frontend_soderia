@@ -16,6 +16,7 @@ import 'package:frontend_soderia/screens/home_screen.dart';
 import 'package:frontend_soderia/screens/todos_screen.dart';
 import 'package:frontend_soderia/screens/calendario_screen.dart';
 import 'package:frontend_soderia/screens/venta_screen.dart';
+import 'package:frontend_soderia/screens/stock/stock_list_screen.dart';
 
 // Altas
 import 'package:frontend_soderia/screens/clientes/cliente_add_screen.dart';
@@ -162,13 +163,14 @@ AppShell _buildAppShell(String usuario) {
     /// 5 Productos
     /// 6 Calendario
     pagesBuilder: (select) => [
-      HomeScreen(nombreUsuario: usuario, onRequestTab: select),
-      TodosScreen(nombreUsuario: usuario, onRequestTab: select),
-      const ReportesScreen(),
-      const UsuariosListScreen(), // Usuarios
-      const ClientesListScreen(), // Clientes
-      const ProductosListScreen(), // Productos
-      CalendarioScreen(nombreUsuario: usuario),
+      HomeScreen(nombreUsuario: usuario, onRequestTab: select), // 0
+      TodosScreen(nombreUsuario: usuario, onRequestTab: select), // 1
+      const ReportesScreen(), // 2
+      const UsuariosListScreen(), // 3
+      const ClientesListScreen(), // 4
+      const ProductosListScreen(), // 5
+      const StockListScreen(), // 6
+      CalendarioScreen(nombreUsuario: usuario), // 7
     ],
 
     // Título dinámico: en Inicio lo dejamos vacío
@@ -206,6 +208,11 @@ AppShell _buildAppShell(String usuario) {
           onPressed: () => AppShellActions.push(ctx, '/producto/new'),
           child: const Icon(Icons.inventory_2),
         );
+      }
+
+      // FAB Stock → ninguno
+      if (index == kIndexStock) {
+        return null;
       }
 
       return null;

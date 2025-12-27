@@ -1,6 +1,7 @@
 // lib/screens/productos/productos_list_screen.dart
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/navigation/app_shell_actions.dart';
+import 'package:frontend_soderia/core/navigation/destinations.dart';
 import 'package:frontend_soderia/models/producto.dart';
 import 'package:frontend_soderia/services/producto_service.dart';
 import 'package:frontend_soderia/screens/productos/producto_add_screen.dart';
@@ -106,7 +107,7 @@ class _ProductosListScreenState extends State<ProductosListScreen> {
                   onChanged: (_) => setState(() {}),
                   decoration: const InputDecoration(
                     prefixIcon: Icon(Icons.search),
-                    hintText: 'Buscar por nombre, litros o tipo...',
+                    hintText: 'Buscar por nombre, litros o tipo de producto...',
                     border: OutlineInputBorder(),
                     isDense: true,
                   ),
@@ -275,6 +276,13 @@ class _ProductosListScreenState extends State<ProductosListScreen> {
                                     );
                                   }
                                 }
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.warehouse),
+                              tooltip: 'Ver stock',
+                              onPressed: () {
+                                AppShellActions.jumpToTab(context, kIndexStock);
                               },
                             ),
                           ],
