@@ -1,12 +1,19 @@
 // ignore_for_file: deprecated_member_use
 
 import 'package:flutter/material.dart';
-import 'package:frontend_soderia/services/cliente_service.dart';
 
 class FrecuenciaModal extends StatefulWidget {
   final int idDia;
   final List<Map<String, dynamic>> clientesDelDia;
-  final void Function(String modo, String turno, int? refCliente) onConfirm;
+
+  /// posicion: inicio | final | despues
+  /// turno: manana | tarde
+  /// despuesDeLegajo: int?
+  final void Function(
+    String posicion,
+    String turno,
+    int? despuesDeLegajo,
+  ) onConfirm;
 
   const FrecuenciaModal({
     super.key,
@@ -20,18 +27,23 @@ class FrecuenciaModal extends StatefulWidget {
 }
 
 class _FrecuenciaModalState extends State<FrecuenciaModal> {
-  String _modo = 'final';
-  String _turno = 'mañana';
-  int? _refCliente;
+  String _posicion = 'final';
+  String _turno = 'manana';
+  int? _despuesDeLegajo;
+
   late final List<Map<String, dynamic>> _clientesExistentes;
 
   @override
   void initState() {
     super.initState();
     _clientesExistentes = widget.clientesDelDia;
-    debugPrint(
-      '🧪 Modal día ${widget.idDia} → clientes: ${_clientesExistentes.length}',
-    );
+  }
+
+  bool get _puedeConfirmar {
+    if (_posicion == 'despues') {
+      return _despuesDeLegajo != null;
+    }
+    return true;
   }
 
   @override
@@ -54,31 +66,39 @@ class _FrecuenciaModalState extends State<FrecuenciaModal> {
             ),
             const SizedBox(height: 16),
 
-            // modo
+            // 📍 Posición
             DropdownButtonFormField<String>(
-              value: _modo,
+              value: _posicion,
               decoration: const InputDecoration(labelText: 'Posición'),
               items: const [
                 DropdownMenuItem(value: 'inicio', child: Text('Al inicio')),
                 DropdownMenuItem(value: 'final', child: Text('Al final')),
                 DropdownMenuItem(
                   value: 'despues',
-                  child: Text('Después de...'),
+                  child: Text('Después de…'),
                 ),
               ],
-              onChanged: (v) => setState(() => _modo = v!),
+              onChanged: (v) {
+                setState(() {
+                  _posicion = v!;
+                  if (_posicion != 'despues') {
+                    _despuesDeLegajo = null;
+                  }
+                });
+              },
             ),
 
             const SizedBox(height: 12),
 
-            if (_modo == 'despues')
+            // 👤 Cliente de referencia
+            if (_posicion == 'despues')
               _clientesExistentes.isEmpty
                   ? const Text(
-                      'No hay clientes en ese día para poner “después de”.',
+                      'No hay clientes en ese día para usar como referencia.',
                       style: TextStyle(fontSize: 13, color: Colors.grey),
                     )
                   : DropdownButtonFormField<int>(
-                      value: _refCliente,
+                      value: _despuesDeLegajo,
                       decoration: const InputDecoration(
                         labelText: 'Cliente de referencia',
                       ),
@@ -91,29 +111,38 @@ class _FrecuenciaModalState extends State<FrecuenciaModal> {
                           child: Text('$nombre $apellido'.trim()),
                         );
                       }).toList(),
-                      onChanged: (v) => setState(() => _refCliente = v),
+                      onChanged: (v) =>
+                          setState(() => _despuesDeLegajo = v),
                     ),
 
             const SizedBox(height: 12),
 
+            // 🕒 Turno
             DropdownButtonFormField<String>(
               value: _turno,
               decoration: const InputDecoration(labelText: 'Turno'),
               items: const [
-                DropdownMenuItem(value: 'mañana', child: Text('Mañana')),
+                DropdownMenuItem(value: 'manana', child: Text('Mañana')),
                 DropdownMenuItem(value: 'tarde', child: Text('Tarde')),
               ],
               onChanged: (v) => setState(() => _turno = v!),
             ),
 
             const SizedBox(height: 24),
+
             Align(
               alignment: Alignment.centerRight,
               child: FilledButton(
-                onPressed: () {
-                  widget.onConfirm(_modo, _turno, _refCliente);
-                  Navigator.pop(context, true);
-                },
+                onPressed: _puedeConfirmar
+                    ? () {
+                        widget.onConfirm(
+                          _posicion,
+                          _turno,
+                          _despuesDeLegajo,
+                        );
+                        Navigator.pop(context, true);
+                      }
+                    : null,
                 child: const Text('Confirmar'),
               ),
             ),

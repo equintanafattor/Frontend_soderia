@@ -141,8 +141,13 @@ class _ClienteAddScreenState extends State<ClienteAddScreen> {
                       ),
                     );
 
-                    if (confirmed != true) {
-                      _frecuenciasConfig.remove(dia);
+                    if (confirmed == true) {
+                      setState(() => _frecuencia = newSet);
+                    } else {
+                      setState(() {
+                        _frecuenciasConfig.remove(dia);
+                        _frecuencia.remove(dia);
+                      });
                     }
                   }
                 }
@@ -324,8 +329,6 @@ class _ClienteAddScreenState extends State<ClienteAddScreen> {
         "direcciones": direcciones,
         "telefonos": telefonos,
         "emails": emails,
-        "dias_visita": diasVisita,
-        "turno_visita": turnoVisitaRoot,
         "frecuencias": frecuencias,
       };
 

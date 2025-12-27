@@ -130,20 +130,6 @@ class ClienteService {
   //     { "dia": "mie", "turno_visita": "manana" }
   //   ]
   // }
-  Future<List<dynamic>> actualizarFrecuencia(
-    int legajo,
-    Map<String, dynamic> payload,
-  ) async {
-    final resp = await http.put(
-      Uri.parse('$baseUrl/$legajo/dias-visita'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(payload),
-    );
-    if (resp.statusCode != 200) {
-      throw Exception('Error actualizando frecuencia: ${resp.body}');
-    }
-    return jsonDecode(resp.body) as List<dynamic>;
-  }
 
   Future<void> borrarCliente(int legajo) async {
     final resp = await http.delete(Uri.parse('$baseUrl/$legajo'));
@@ -218,6 +204,30 @@ class ClienteService {
 
     if (resp.statusCode != 201) {
       throw Exception('Error creando cuenta: ${resp.body}');
+    }
+  }
+
+  Future<void> moverClienteAgenda({
+    required int idCliente,
+    required int idDia,
+    required String turno,
+    required String posicion,
+    int? despuesDeLegajo,
+  }) async {
+    final res = await http.post(
+      Uri.parse('http://localhost:8500/agenda/mover'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'id_cliente': idCliente,
+        'id_dia': idDia,
+        'turno': turno,
+        'posicion': posicion,
+        if (despuesDeLegajo != null) 'despues_de_legajo': despuesDeLegajo,
+      }),
+    );
+
+    if (res.statusCode != 200) {
+      throw Exception('Error moviendo cliente: ${res.body}');
     }
   }
 }

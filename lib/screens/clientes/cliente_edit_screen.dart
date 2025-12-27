@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:frontend_soderia/services/cliente_service.dart';
 import 'package:frontend_soderia/widgets/common/frecuencia_modal.dart';
 
-
 class ClienteEditScreen extends StatefulWidget {
   final int legajo;
   final Map<String, dynamic> data;
@@ -223,6 +222,27 @@ class _ClienteEditScreenState extends State<ClienteEditScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _saving = true);
+
+    // Esto es para la agenda
+    List<Map<String, dynamic>> _buildFrecuenciasPayload() {
+      final List<Map<String, dynamic>> out = [];
+
+      for (final dia in _diasSeleccionados) {
+        final cfg = _frecuenciaConfig[dia];
+        if (cfg == null) continue;
+
+        out.add({
+          "dia": dia,
+          "turno": cfg['turno'] == 'tarde' ? 'tarde' : 'manana',
+          "posicion": cfg['modo'],
+          if (cfg['modo'] == 'despues' && cfg['ref'] != null)
+            "despues_de_legajo": cfg['ref'],
+        });
+      }
+
+      return out;
+    }
+
     try {
       final dniParsed = int.tryParse(_dniCtrl.text.trim());
 
@@ -264,7 +284,7 @@ class _ClienteEditScreenState extends State<ClienteEditScreen> {
           .where((d) => _diasSeleccionados.contains(d))
           .toList();
 
-      final List<Map<String, dynamic>> diasSemanasPayload = [];
+      /*       final List<Map<String, dynamic>> diasSemanasPayload = [];
       int orden = 1;
       for (final code in seleccionadosOrdenados) {
         final idDia = _idDiaPorCodigo[code];
@@ -276,22 +296,39 @@ class _ClienteEditScreenState extends State<ClienteEditScreen> {
           'orden': orden,
         });
         orden++;
-      }
+      } */
 
       // 6) payload UNIFICADO para ClienteDetalleUpdate
-      final payloadDetalle = <String, dynamic>{
+      final payloadDetalle = {
         'persona': personaPayload,
         'direcciones': direccionesPayload,
         'telefonos': telefonosPayload,
         'emails': emailsPayload,
-        'dias_semanas': diasSemanasPayload,
         'observacion': _observacionCtrl.text.trim().isEmpty
             ? null
             : _observacionCtrl.text.trim(),
       };
 
+      final frecuenciasPayload = _buildFrecuenciasPayload();
+
       // 7) Una sola llamada al back
       await _service.actualizarClienteDetalle(widget.legajo, payloadDetalle);
+
+      for (final dia in _diasSeleccionados) {
+        final cfg = _frecuenciaConfig[dia];
+        if (cfg == null) continue;
+
+        final idDia = _idDiaPorCodigo[dia];
+        if (idDia == null) continue;
+
+        await _service.moverClienteAgenda(
+          idCliente: widget.legajo,
+          idDia: idDia,
+          turno: cfg['turno'] == 'tarde' ? 'tarde' : 'manana',
+          posicion: cfg['modo'],
+          despuesDeLegajo: cfg['modo'] == 'despues' ? cfg['ref'] : null,
+        );
+      }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
