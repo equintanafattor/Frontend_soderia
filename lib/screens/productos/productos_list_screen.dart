@@ -155,6 +155,16 @@ class _ProductosListScreenState extends State<ProductosListScreen> {
 
               const SizedBox(width: 8),
 
+              OutlinedButton.icon(
+                icon: const Icon(Icons.inventory_2),
+                label: const Text('Combos'),
+                onPressed: () {
+                  AppShellActions.push(context, '/combos');
+                },
+              ),
+
+              const SizedBox(width: 8),
+
               FilledButton.icon(
                 onPressed: () async {
                   final result = await AppShellActions.push(

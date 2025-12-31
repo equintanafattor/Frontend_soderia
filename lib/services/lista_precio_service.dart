@@ -97,4 +97,60 @@ class ListaPrecioService {
 
     return jsonDecode(res.body) as List<dynamic>;
   }
+
+  // =========================
+  // Ítems con precio (productos + combos)
+  // =========================
+
+  /// Devuelve productos y combos con precio para una lista
+  Future<List<dynamic>> listarItemsDeLista(int idLista) async {
+    final uri = Uri.parse('$baseUrl/listas-precios/$idLista/items');
+    final res = await http.get(uri);
+
+    if (res.statusCode != 200) {
+      throw Exception(
+        'Error al listar ítems de la lista: ${res.statusCode} ${res.body}',
+      );
+    }
+
+    return jsonDecode(res.body) as List<dynamic>;
+  }
+
+  Future<List<dynamic>> listarCombosConPrecio(int idLista) async {
+    final uri = Uri.parse('$baseUrl/listas-precios/$idLista/combos');
+    final res = await http.get(uri);
+
+    if (res.statusCode != 200) {
+      throw Exception('Error al listar combos de la lista: ${res.statusCode}');
+    }
+
+    return jsonDecode(res.body) as List<dynamic>;
+  }
+
+  /// Upsert de precio de combo en lista
+  Future<void> upsertPrecioCombo({
+    required int idLista,
+    required int idCombo,
+    required double precio,
+  }) async {
+    final uri = Uri.parse('$baseUrl/listas-precios/$idLista/combos/$idCombo');
+
+    final body = jsonEncode({
+      'id_lista': idLista,
+      'id_combo': idCombo,
+      'precio': precio,
+    });
+
+    final res = await http.put(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: body,
+    );
+
+    if (res.statusCode != 200) {
+      throw Exception(
+        'Error al guardar precio de combo: ${res.statusCode} ${res.body}',
+      );
+    }
+  }
 }

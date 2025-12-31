@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/colors.dart';
+import 'package:frontend_soderia/services/combo_service.dart';
 import 'package:printing/printing.dart';
 
 import '../utils/pdf_generator.dart';
 import 'package:frontend_soderia/services/pedido_service.dart';
-import 'package:frontend_soderia/services/reparto_dia_service.dart'; // 👈 NUEVO
+import 'package:frontend_soderia/services/reparto_dia_service.dart';
 
 class LineaVenta {
   final String nroPedido;
@@ -22,7 +23,7 @@ class LineaVenta {
   double get subtotal => cantidad * precioUnitario;
 }
 
-enum MedioPago { efectivo, transferencia, otro }
+enum MedioPago { efectivo, transferencia, otro, mixtoReparto }
 
 class PagoScreen extends StatefulWidget {
   final String nombreCliente;
@@ -50,7 +51,9 @@ class PagoScreen extends StatefulWidget {
 
 class _PagoScreenState extends State<PagoScreen> {
   final _pedidoService = PedidoService();
-  final _repartoDiaService =   RepartoDiaService(baseUrl: 'http://localhost:8500'); // 👈 HOST SOLITO
+  final _repartoDiaService = RepartoDiaService(
+    baseUrl: 'http://localhost:8500',
+  ); // 👈 HOST SOLITO
 
   // Chips de montos rápidos:
   // - total de la venta
@@ -107,6 +110,8 @@ class _PagoScreenState extends State<PagoScreen> {
         return 2;
       case MedioPago.otro:
         return 3;
+      case MedioPago.mixtoReparto:
+        return 4;
     }
   }
 
@@ -209,13 +214,13 @@ class _PagoScreenState extends State<PagoScreen> {
       final idMedio = _mapMedioPagoToId(_medio);
 
       // Estado según pago + saldo a favor
-      final estado = _resolverEstadoPedido(
+      /*       final estado = _resolverEstadoPedido(
         totalVenta: widget.total,
         deudaActual: widget.deudaActual,
         saldoAFavor: widget.saldoAFavorActual,
         montoAbonado: _montoElegido!,
       );
-
+ */
       // 👇 AHORA OBTENEMOS EL REPARTO REAL DESDE EL BACK
       final reparto = await _repartoDiaService.obtenerPorFecha(
         fecha: widget.fecha,
@@ -233,8 +238,9 @@ class _PagoScreenState extends State<PagoScreen> {
         montoTotal: widget.total,
         montoAbonado: _montoElegido!,
         idEmpresa: 1,
-        estado: estado,
+        // estado: estado,
         idRepartoDia: idRepartoDia,
+        items: await _buildItemsPayload(),
       );
 
       final idPedido = pedido['id_pedido'] as int;
@@ -249,7 +255,7 @@ class _PagoScreenState extends State<PagoScreen> {
         SnackBar(
           content: Text(
             'Pedido #$idPedido creado y confirmado.\n'
-            'Estado: $estado · Pago ${_money(_montoElegido!)}',
+            'Pago registrado: ${_money(_montoElegido!)}',
           ),
         ),
       );
@@ -403,7 +409,9 @@ class _PagoScreenState extends State<PagoScreen> {
             ...widget.items.map(
               (it) => _TablaRow(
                 nro: it.nroPedido,
-                producto: it.producto,
+                producto: it.nroPedido.startsWith('combo')
+                    ? '📦 ${it.producto}'
+                    : it.producto,
                 cantidad: it.cantidad,
                 pu: it.precioUnitario,
                 pt: it.subtotal,
@@ -532,6 +540,31 @@ class _PagoScreenState extends State<PagoScreen> {
         ),
       ),
     );
+  }
+
+  // ---------------- HELPERS UI ----------------
+
+  List<Map<String, dynamic>> _buildItemsPayload() {
+    return widget.items.map((it) {
+      final parts = it.nroPedido.split('-');
+      final tipo = parts[0]; // "producto" | "combo"
+      final id = int.parse(parts[1]);
+
+      if (tipo == 'combo') {
+        return {
+          'id_combo': id,
+          'cantidad': it.cantidad,
+          'precio_unitario': it.precioUnitario,
+        };
+      }
+
+      // producto simple
+      return {
+        'id_producto': id,
+        'cantidad': it.cantidad,
+        'precio_unitario': it.precioUnitario,
+      };
+    }).toList();
   }
 }
 

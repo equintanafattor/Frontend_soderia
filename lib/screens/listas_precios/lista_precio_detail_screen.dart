@@ -62,6 +62,20 @@ class _ListaPrecioDetailScreenState extends State<ListaPrecioDetailScreen> {
         title: Text('Lista: ${widget.nombreLista}'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.inventory_2),
+            tooltip: 'Precios de combos',
+            onPressed: () {
+              AppShellActions.push(
+                context,
+                '/listas-precios/combos-precios',
+                arguments: {
+                  'idLista': widget.idLista,
+                  'nombreLista': widget.nombreLista,
+                },
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.edit),
             tooltip: 'Editar lista',
             onPressed: () => AppShellActions.push(
@@ -72,6 +86,7 @@ class _ListaPrecioDetailScreenState extends State<ListaPrecioDetailScreen> {
           ),
         ],
       ),
+
       floatingActionButton: FloatingActionButton.extended(
         icon: const Icon(Icons.add),
         label: const Text('Agregar producto'),
@@ -94,6 +109,7 @@ class _ListaPrecioDetailScreenState extends State<ListaPrecioDetailScreen> {
                     '\$${p['precio']}',
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
+
                   trailing: IconButton(
                     icon: const Icon(Icons.edit),
                     tooltip: 'Editar precio',

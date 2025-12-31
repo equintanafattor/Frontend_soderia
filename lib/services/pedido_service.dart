@@ -11,8 +11,9 @@ class PedidoService {
     required double montoTotal,
     required double montoAbonado,
     required int idEmpresa,
-    required String estado,        // 👈 importante
-    int? idRepartoDia,             // opcional
+    // required String estado,
+    required List<Map<String, dynamic>> items,
+    int? idRepartoDia,
     String? observacion,
   }) async {
     final uri = Uri.parse(baseUrl);
@@ -24,7 +25,8 @@ class PedidoService {
       'fecha': fecha.toIso8601String(),
       'monto_total': montoTotal,
       'monto_abonado': montoAbonado,
-      'estado': estado,           // 👈 mandamos el estado correcto
+      // 'estado': estado,
+      'items': items, 
       if (idRepartoDia != null) 'id_repartodia': idRepartoDia,
       if (observacion != null && observacion.trim().isNotEmpty)
         'observacion': observacion.trim(),
@@ -40,9 +42,7 @@ class PedidoService {
       return jsonDecode(res.body) as Map<String, dynamic>;
     }
 
-    throw Exception(
-      'Error al crear pedido: ${res.statusCode} ${res.body}',
-    );
+    throw Exception('Error al crear pedido: ${res.statusCode} ${res.body}');
   }
 
   Future<Map<String, dynamic>> confirmarPedido({
@@ -64,8 +64,6 @@ class PedidoService {
       return jsonDecode(res.body) as Map<String, dynamic>;
     }
 
-    throw Exception(
-      'Error confirmando pedido: ${res.statusCode} ${res.body}',
-    );
+    throw Exception('Error confirmando pedido: ${res.statusCode} ${res.body}');
   }
 }

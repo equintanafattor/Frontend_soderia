@@ -1,4 +1,4 @@
-import 'dart:convert';
+// ignore_for_file: deprecated_member_use
 
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/colors.dart';
@@ -6,7 +6,6 @@ import 'package:frontend_soderia/core/navigation/app_shell_actions.dart';
 import 'package:frontend_soderia/screens/pago_screen.dart';
 import 'package:frontend_soderia/services/cliente_service.dart';
 import 'package:frontend_soderia/services/lista_precio_service.dart';
-import 'package:frontend_soderia/services/producto_service.dart';
 import 'package:frontend_soderia/screens/clientes/cliente_edit_screen.dart';
 import 'package:frontend_soderia/services/visita_service.dart';
 
@@ -26,14 +25,18 @@ class VentaScreen extends StatefulWidget {
 
 // ------------------- Modelo interno de carrito -------------------
 
-class _CarritoItem {
-  final int idProducto;
+enum TipoItemVenta { producto, combo }
+
+class CarritoItem {
+  final TipoItemVenta tipo;
+  final int idItem; // id_producto o id_combo
   final String nombre;
   final double precioUnitario;
   int cantidad;
 
-  _CarritoItem({
-    required this.idProducto,
+  CarritoItem({
+    required this.tipo,
+    required this.idItem,
     required this.nombre,
     required this.precioUnitario,
     required this.cantidad,
@@ -42,18 +45,24 @@ class _CarritoItem {
 
 class _VentaScreenState extends State<VentaScreen> {
   // Carrito actual (clave: id_producto → item)
-  final Map<int, _CarritoItem> _carrito = {};
+  final Map<String, CarritoItem> _carrito = {};
 
   // Futuros para cliente (detalle) y productos
   late Future<Map<String, dynamic>> _futureClienteDetalle;
-  late Future<List<dynamic>> _futureProductos;
   int? _idListaSeleccionada;
+  late Future<List<dynamic>> _futureItems;
   late Future<List<dynamic>> _futureListasPrecios;
+  String _key(TipoItemVenta tipo, int id) => '${tipo.name}-$id';
 
   final _clienteService = ClienteService();
-  final _productoService = ProductoService();
   final _visitaService = VisitaService();
   final _listaPrecioService = ListaPrecioService();
+
+  double _parsePrecio(dynamic v) {
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v) ?? 0.0;
+    return 0.0;
+  }
 
   @override
   void initState() {
@@ -92,25 +101,28 @@ class _VentaScreenState extends State<VentaScreen> {
 
   bool get _ventaValida => _carrito.isNotEmpty;
 
-  void _agregarProducto(int idProducto, String nombre, double precioUnitario) {
+  void _agregarItem(TipoItemVenta tipo, int id, String nombre, double precio) {
+    final key = _key(tipo, id);
+
     setState(() {
-      final existente = _carrito[idProducto];
+      final existente = _carrito[key];
       if (existente != null) {
         existente.cantidad++;
       } else {
-        _carrito[idProducto] = _CarritoItem(
-          idProducto: idProducto,
+        _carrito[key] = CarritoItem(
+          tipo: tipo,
+          idItem: id,
           nombre: nombre,
-          precioUnitario: precioUnitario,
+          precioUnitario: precio,
           cantidad: 1,
         );
       }
     });
   }
 
-  void _eliminarProducto(int idProducto) {
+  void _eliminarItem(String key) {
     setState(() {
-      _carrito.remove(idProducto);
+      _carrito.remove(key);
     });
   }
 
@@ -118,12 +130,12 @@ class _VentaScreenState extends State<VentaScreen> {
     setState(() {
       _idListaSeleccionada = idLista;
       _carrito.clear(); // 🔒 evita mezclar precios
-      _futureProductos = _productoService.listarProductosDeLista(idLista);
+      _futureItems = _listaPrecioService.listarItemsDeLista(idLista);
     });
   }
 
-  Future<void> _editarCantidad(int idProducto) async {
-    final item = _carrito[idProducto];
+  Future<void> _editarCantidad(String key) async {
+    final item = _carrito[key];
     if (item == null) return;
 
     final nueva = await showDialog<int>(
@@ -134,7 +146,7 @@ class _VentaScreenState extends State<VentaScreen> {
 
     setState(() {
       if (nueva <= 0) {
-        _carrito.remove(idProducto);
+        _carrito.remove(key);
       } else {
         item.cantidad = nueva;
       }
@@ -161,7 +173,7 @@ class _VentaScreenState extends State<VentaScreen> {
     _carrito.forEach((_, item) {
       items.add(
         LineaVenta(
-          nroPedido: item.idProducto.toString(),
+          nroPedido: '${item.tipo.name}-${item.idItem}',
           producto: item.nombre,
           cantidad: item.cantidad,
           precioUnitario: item.precioUnitario,
@@ -405,7 +417,7 @@ class _VentaScreenState extends State<VentaScreen> {
                       saldoAFavor,
                       nombreCliente,
                     ),
-                    _tabProductos(context, cs),
+                    _tabItems(context),
                     _tabHistorial(context, cs, historicos),
                   ],
                 ),
@@ -428,11 +440,23 @@ class _VentaScreenState extends State<VentaScreen> {
           );
         }
 
-        final listas = snap.data!;
-        if (listas.isEmpty) {
+        final activas = snap.data!
+            .where((l) => l['estado'] == 'ACTIVA')
+            .toList();
+
+        if (activas.isEmpty) {
           return const Padding(
             padding: EdgeInsets.all(12),
-            child: Text('No hay listas de precios disponibles'),
+            child: Text('No hay listas de precios activas'),
+          );
+        }
+
+        // ✅ Auto–selección segura
+        if (_idListaSeleccionada == null ||
+            !activas.any((l) => l['id_lista'] == _idListaSeleccionada)) {
+          _idListaSeleccionada = activas.first['id_lista'];
+          _futureItems = _listaPrecioService.listarItemsDeLista(
+            _idListaSeleccionada!,
           );
         }
 
@@ -445,8 +469,7 @@ class _VentaScreenState extends State<VentaScreen> {
               border: OutlineInputBorder(),
               isDense: true,
             ),
-            items: listas
-                .where((l) => l['estado'] == 'ACTIVA')
+            items: activas
                 .map(
                   (l) => DropdownMenuItem<int>(
                     value: l['id_lista'],
@@ -455,7 +478,9 @@ class _VentaScreenState extends State<VentaScreen> {
                 )
                 .toList(),
             onChanged: (v) {
-              if (v != null) _seleccionarLista(v);
+              if (v != null && v != _idListaSeleccionada) {
+                _seleccionarLista(v);
+              }
             },
           ),
         );
@@ -521,16 +546,22 @@ class _VentaScreenState extends State<VentaScreen> {
           ),
 
         ..._carrito.entries.map((entry) {
-          final int idProducto = entry.key;
+          final key = entry.key;
           final item = entry.value;
 
           return Card(
             margin: const EdgeInsets.symmetric(vertical: 6),
             child: ListTile(
-              leading: const Icon(Icons.local_drink),
+              leading: Icon(
+                item.tipo == TipoItemVenta.combo
+                    ? Icons
+                          .inventory_2 // 📦 combo
+                    : Icons.local_drink, // 💧 producto
+              ),
               title: Text(item.nombre),
               subtitle: Text(
-                'ID: $idProducto · Cantidad: ${item.cantidad} · '
+                '${item.tipo == TipoItemVenta.combo ? "Combo" : "Producto"} · '
+                'Cantidad: ${item.cantidad} · '
                 '\$${item.precioUnitario.toStringAsFixed(0)} c/u',
               ),
               trailing: Row(
@@ -539,12 +570,12 @@ class _VentaScreenState extends State<VentaScreen> {
                   IconButton(
                     tooltip: 'Editar cantidad',
                     icon: const Icon(Icons.edit),
-                    onPressed: () => _editarCantidad(idProducto),
+                    onPressed: () => _editarCantidad(key),
                   ),
                   IconButton(
                     tooltip: 'Quitar',
                     icon: const Icon(Icons.close),
-                    onPressed: () => _eliminarProducto(idProducto),
+                    onPressed: () => _eliminarItem(key),
                   ),
                 ],
               ),
@@ -555,61 +586,63 @@ class _VentaScreenState extends State<VentaScreen> {
     );
   }
 
-  Widget _tabProductos(BuildContext context, ColorScheme cs) {
+  Widget _tabItems(BuildContext context) {
     if (_idListaSeleccionada == null) {
       return const Center(child: Text('Seleccioná una lista de precios'));
     }
 
     return FutureBuilder<List<dynamic>>(
-      future: _futureProductos,
+      future: _futureItems,
       builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
+        if (!snap.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
-        if (snap.hasError) {
-          return Center(child: Text('Error cargando productos: ${snap.error}'));
-        }
 
-        final productos = snap.data ?? [];
-        if (productos.isEmpty) {
-          return Center(
-            child: Text(
-              'No hay productos cargados para esta lista de precios',
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
-          );
-        }
-
+        final items = snap.data!;
         return ListView.builder(
           padding: const EdgeInsets.all(16),
-          itemCount: productos.length,
-          itemBuilder: (context, i) {
-            final p = productos[i] as Map<String, dynamic>;
-            final idProducto = p['id_producto'] as int;
-            final nombre = (p['nombre'] ?? '').toString();
-            double precio = 0;
+          itemCount: items.length,
+          itemBuilder: (_, i) {
+            final it = items[i];
+            final tipo = it['tipo'] == 'combo'
+                ? TipoItemVenta.combo
+                : TipoItemVenta.producto;
 
-            final rawPrecio = p['precio'];
-            if (rawPrecio is num) {
-              precio = rawPrecio.toDouble();
-            } else if (rawPrecio is String) {
-              precio = double.tryParse(rawPrecio) ?? 0.0;
-            }
+            final double precio = _parsePrecio(it['precio']);
+
+            final icon = tipo == TipoItemVenta.combo
+                ? Icons.inventory_2
+                : Icons.local_drink;
+
+            // ✅ solo aplica a combos
+            final bool activo = (tipo == TipoItemVenta.combo)
+                ? (it['estado'] == true ||
+                      it['estado'] == 'true' ||
+                      it['estado'] == 1 ||
+                      (it['estado']?.toString().toLowerCase() == 'activo'))
+                : true;
 
             return Card(
               child: ListTile(
-                leading: const Icon(Icons.add_shopping_cart),
-                title: Text(nombre),
-                subtitle: Text(
-                  precio > 0
-                      ? '\$${precio.toStringAsFixed(0)}'
-                      : 'Sin precio definido',
-                ),
+                enabled: activo,
+                leading: Icon(icon, color: activo ? null : Colors.grey),
+                title: Text(it['nombre']),
+                subtitle: (tipo == TipoItemVenta.combo && !activo)
+                    ? const Text(
+                        'Combo inactivo',
+                        style: TextStyle(color: Colors.red),
+                      )
+                    : Text('\$${it['precio']}'),
+
                 trailing: FilledButton(
-                  onPressed: () => _agregarProducto(idProducto, nombre, precio),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.azul,
-                  ),
+                  onPressed: activo
+                      ? () => _agregarItem(
+                          tipo,
+                          it['id_item'],
+                          it['nombre'],
+                          _parsePrecio(it['precio']),
+                        )
+                      : null,
                   child: const Text('Agregar'),
                 ),
               ),

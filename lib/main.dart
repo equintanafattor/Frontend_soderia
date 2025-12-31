@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:frontend_soderia/screens/combos/combo_form_screen.dart';
+import 'package:frontend_soderia/screens/combos/combo_precio_screen.dart';
+import 'package:frontend_soderia/screens/combos/combo_productos_screen.dart';
+import 'package:frontend_soderia/screens/combos/combos_list_screen.dart';
 import 'package:frontend_soderia/screens/listas_precios/lista_precio_detail_screen.dart';
 import 'package:frontend_soderia/screens/reportes/reporte_screen.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -138,6 +142,53 @@ class FrontendSoderiaApp extends StatelessWidget {
 
           return const Scaffold(
             body: Center(child: Text('Faltan datos de la lista')),
+          );
+        },
+
+        '/listas-precios/combos-precios': (ctx) {
+          final args = ModalRoute.of(ctx)!.settings.arguments;
+
+          if (args is Map &&
+              args['idLista'] is int &&
+              args['nombreLista'] is String) {
+            return ComboPrecioScreen(
+              idLista: args['idLista'] as int,
+              nombreLista: args['nombreLista'] as String,
+            );
+          }
+
+          return const Scaffold(
+            body: Center(child: Text('Faltan datos de la lista de precios')),
+          );
+        },
+
+        // === Combos ===
+        '/combos': (_) => const CombosListScreen(),
+
+        '/combos/new': (_) => const ComboFormScreen(),
+
+        '/combos/edit': (ctx) {
+          final args = ModalRoute.of(ctx)!.settings.arguments;
+          if (args is int) {
+            return ComboFormScreen(idCombo: args);
+          }
+          return const Scaffold(
+            body: Center(child: Text('Falta id del combo')),
+          );
+        },
+
+        '/combos/productos': (ctx) {
+          final args = ModalRoute.of(ctx)!.settings.arguments;
+          if (args is Map &&
+              args['idCombo'] is int &&
+              args['nombre'] is String) {
+            return ComboProductosScreen(
+              idCombo: args['idCombo'],
+              nombreCombo: args['nombre'],
+            );
+          }
+          return const Scaffold(
+            body: Center(child: Text('Faltan datos del combo')),
           );
         },
       },
