@@ -28,11 +28,7 @@ class ComboService {
     final res = await http.post(
       Uri.parse(baseUrl),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'nombre': nombre,
-        'estado': estado,
-        'id_empresa': 1,
-      }),
+      body: jsonEncode({'nombre': nombre, 'estado': estado, 'id_empresa': 1}),
     );
 
     if (res.statusCode != 201) {
@@ -43,21 +39,26 @@ class ComboService {
 
   Future<Map<String, dynamic>> actualizar({
     required int idCombo,
-    required String nombre,
-    required bool estado,
+    String? nombre,
+    bool? estado,
+    List<Map<String, dynamic>>? productos,
   }) async {
+    final body = <String, dynamic>{};
+
+    if (nombre != null) body['nombre'] = nombre;
+    if (estado != null) body['estado'] = estado;
+    if (productos != null) body['productos'] = productos;
+
     final res = await http.put(
       Uri.parse('$baseUrl/$idCombo'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'nombre': nombre,
-        'estado': estado,
-      }),
+      body: jsonEncode(body),
     );
 
     if (res.statusCode != 200) {
       throw Exception('Error actualizando combo');
     }
+
     return jsonDecode(res.body);
   }
 }

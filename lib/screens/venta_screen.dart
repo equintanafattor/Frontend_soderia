@@ -77,6 +77,12 @@ class _VentaScreenState extends State<VentaScreen> {
 
   // -------- Helpers --------
 
+  bool _comboTienePrecio(Map<String, dynamic> item) {
+    if (item['tipo'] != 'combo') return true;
+    final precio = item['precio'];
+    return precio != null && precio > 0;
+  }
+
   Future<void> _registrarVisita(String estado) async {
     try {
       await _visitaService.crearVisita(
@@ -103,6 +109,13 @@ class _VentaScreenState extends State<VentaScreen> {
 
   void _agregarItem(TipoItemVenta tipo, int id, String nombre, double precio) {
     final key = _key(tipo, id);
+
+    if (tipo == TipoItemVenta.combo && precio <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Este combo no tiene precio asignado')),
+      );
+      return;
+    }
 
     setState(() {
       final existente = _carrito[key];
@@ -604,43 +617,58 @@ class _VentaScreenState extends State<VentaScreen> {
           itemCount: items.length,
           itemBuilder: (_, i) {
             final it = items[i];
+
             final tipo = it['tipo'] == 'combo'
                 ? TipoItemVenta.combo
                 : TipoItemVenta.producto;
 
+            final bool esCombo = tipo == TipoItemVenta.combo;
+            final bool tienePrecio = _comboTienePrecio(it);
+
             final double precio = _parsePrecio(it['precio']);
 
-            final icon = tipo == TipoItemVenta.combo
-                ? Icons.inventory_2
-                : Icons.local_drink;
-
-            // ✅ solo aplica a combos
-            final bool activo = (tipo == TipoItemVenta.combo)
+            // estado SOLO aplica a combos
+            final bool activo = esCombo
                 ? (it['estado'] == true ||
                       it['estado'] == 'true' ||
                       it['estado'] == 1 ||
                       (it['estado']?.toString().toLowerCase() == 'activo'))
                 : true;
 
+            // 👉 puede venderse?
+            final bool puedeVender = activo && (!esCombo || tienePrecio);
+
+            final icon = esCombo ? Icons.inventory_2 : Icons.local_drink;
+
             return Card(
               child: ListTile(
-                enabled: activo,
-                leading: Icon(icon, color: activo ? null : Colors.grey),
-                title: Text(it['nombre']),
-                subtitle: (tipo == TipoItemVenta.combo && !activo)
+                enabled: puedeVender,
+                leading: Icon(icon, color: puedeVender ? null : Colors.grey),
+                title: Text(
+                  it['nombre'],
+                  style: TextStyle(
+                    color: puedeVender ? null : Colors.grey,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: !activo && esCombo
                     ? const Text(
                         'Combo inactivo',
                         style: TextStyle(color: Colors.red),
                       )
-                    : Text('\$${it['precio']}'),
-
+                    : (esCombo && !tienePrecio)
+                    ? const Text(
+                        'Combo sin precio en esta lista',
+                        style: TextStyle(color: Colors.redAccent),
+                      )
+                    : Text('\$${precio.toStringAsFixed(0)}'),
                 trailing: FilledButton(
-                  onPressed: activo
+                  onPressed: puedeVender
                       ? () => _agregarItem(
                           tipo,
                           it['id_item'],
                           it['nombre'],
-                          _parsePrecio(it['precio']),
+                          precio,
                         )
                       : null,
                   child: const Text('Agregar'),

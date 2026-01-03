@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/colors.dart';
 import 'package:frontend_soderia/screens/combos/combo_productos_screen.dart';
 import 'package:frontend_soderia/services/combo_service.dart';
+import 'package:frontend_soderia/services/lista_precio_service.dart';
 
 class ComboFormScreen extends StatefulWidget {
   final int? idCombo;
@@ -13,12 +14,16 @@ class ComboFormScreen extends StatefulWidget {
 }
 
 class _ComboFormScreenState extends State<ComboFormScreen> {
-  final _service = ComboService();
+  final _comboService = ComboService();
+  final _listaPrecioService = ListaPrecioService();
   final _formKey = GlobalKey<FormState>();
 
   final _nombreCtrl = TextEditingController();
   bool _estado = true;
   bool _loading = false;
+
+  List<dynamic> _listas = [];
+  Map<int, double?> _preciosPorLista = {};
 
   bool get _esEdicion => widget.idCombo != null;
 
@@ -33,35 +38,90 @@ class _ComboFormScreenState extends State<ComboFormScreen> {
   Future<void> _cargar() async {
     setState(() => _loading = true);
     try {
-      final combo = await _service.obtener(widget.idCombo!);
+      final combo = await _comboService.obtener(widget.idCombo!);
       _nombreCtrl.text = combo['nombre'] ?? '';
       _estado = combo['estado'] == true;
+
+      _listas = await _listaPrecioService.listarListas();
+
+      for (final l in _listas) {
+        final precio = combo['precios']?[l['id_lista']];
+        if (precio != null) {
+          _preciosPorLista[l['id_lista']] = double.tryParse(precio.toString());
+        }
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
+  Future<void> _editarPrecioCombo(int idLista, String nombreLista) async {
+    final ctrl = TextEditingController(
+      text: _preciosPorLista[idLista]?.toStringAsFixed(0) ?? '',
+    );
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('Precio en $nombreLista'),
+        content: TextField(
+          controller: ctrl,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Precio',
+            prefixText: '\$ ',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+
+    if (ok == true) {
+      final precio = double.tryParse(ctrl.text);
+      if (precio == null || precio <= 0) return;
+
+      await _listaPrecioService.upsertPrecioCombo(
+        idLista: idLista,
+        idCombo: widget.idCombo!,
+        precio: precio,
+      );
+
+      setState(() {
+        _preciosPorLista[idLista] = precio;
+      });
+    }
+  }
+
+  /// 🔹 Guarda SOLO datos del combo (no productos)
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _loading = true);
     try {
       if (_esEdicion) {
-        await _service.actualizar(
+        await _comboService.actualizar(
           idCombo: widget.idCombo!,
           nombre: _nombreCtrl.text.trim(),
           estado: _estado,
         );
       } else {
-        await _service.crear(nombre: _nombreCtrl.text.trim(), estado: _estado);
+        await _comboService.crear(
+          nombre: _nombreCtrl.text.trim(),
+          estado: _estado,
+        );
       }
 
       if (mounted) Navigator.pop(context, true);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -87,10 +147,9 @@ class _ComboFormScreenState extends State<ComboFormScreen> {
               padding: const EdgeInsets.all(16),
               child: Form(
                 key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: ListView(
                   children: [
-                    // ---------------- Datos del combo ----------------
+                    // ---------------- Datos ----------------
                     TextFormField(
                       controller: _nombreCtrl,
                       decoration: const InputDecoration(
@@ -101,21 +160,16 @@ class _ComboFormScreenState extends State<ComboFormScreen> {
                           ? 'Ingresá un nombre'
                           : null,
                     ),
-
                     const SizedBox(height: 16),
-
                     SwitchListTile(
                       title: const Text('Combo activo'),
-                      subtitle: const Text(
-                        'Los combos inactivos no se pueden vender',
-                      ),
+                      subtitle: const Text('Los combos inactivos no se venden'),
                       value: _estado,
                       onChanged: (v) => setState(() => _estado = v),
                     ),
-
                     const SizedBox(height: 24),
 
-                    // ---------------- Productos del combo ----------------
+                    // ---------------- Productos ----------------
                     if (_esEdicion) ...[
                       Text(
                         'Productos del combo',
@@ -126,29 +180,52 @@ class _ComboFormScreenState extends State<ComboFormScreen> {
                         child: ListTile(
                           leading: const Icon(Icons.inventory_2),
                           title: const Text('Administrar productos'),
-                          subtitle: const Text(
-                            'Agregar productos y cantidades al combo',
-                          ),
                           trailing: const Icon(Icons.chevron_right),
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ComboProductosScreen(
-                                idCombo: widget.idCombo!,
-                                nombreCombo: _nombreCtrl.text,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ComboProductosScreen(
+                                  idCombo: widget.idCombo!,
+                                  nombreCombo: _nombreCtrl.text,
+                                ),
                               ),
-                            ),
-                          ),
+                            );
+                          },
                         ),
                       ),
                       const SizedBox(height: 24),
+
+                      // ---------------- Precios ----------------
+                      Text(
+                        'Precios por lista',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      ..._listas.where((l) => l['estado'] == 'ACTIVA').map((l) {
+                        final precio = _preciosPorLista[l['id_lista']];
+                        return Card(
+                          child: ListTile(
+                            title: Text(l['nombre']),
+                            subtitle: Text(
+                              precio != null
+                                  ? '\$${precio.toStringAsFixed(0)}'
+                                  : 'Sin precio',
+                              style: TextStyle(
+                                color: precio == null ? Colors.red : null,
+                              ),
+                            ),
+                            trailing: const Icon(Icons.edit),
+                            onTap: () =>
+                                _editarPrecioCombo(l['id_lista'], l['nombre']),
+                          ),
+                        );
+                      }),
+                      const SizedBox(height: 24),
                     ],
 
-                    const Spacer(),
-
-                    // ---------------- Guardar ----------------
+                    // ---------------- Guardar combo ----------------
                     SizedBox(
-                      width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
                         onPressed: _guardar,

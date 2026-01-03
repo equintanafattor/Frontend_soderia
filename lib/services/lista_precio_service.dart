@@ -133,12 +133,12 @@ class ListaPrecioService {
     required int idCombo,
     required double precio,
   }) async {
-    final uri = Uri.parse('$baseUrl/listas-precios/$idLista/combos/$idCombo');
+    final uri = Uri.parse(
+      '$baseUrl/listas-precios/$idLista/precios-combos/$idCombo',
+    );
 
     final body = jsonEncode({
-      'id_lista': idLista,
-      'id_combo': idCombo,
-      'precio': precio,
+      'precio': precio, // id_lista e id_combo los setea el backend
     });
 
     final res = await http.put(

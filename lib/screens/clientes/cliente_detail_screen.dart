@@ -6,6 +6,8 @@ import 'package:frontend_soderia/services/cliente_service.dart';
 import 'package:printing/printing.dart';
 import 'package:frontend_soderia/utils/estado_cuenta_pdf.dart';
 import 'package:frontend_soderia/screens/clientes/cuenta/cliente_cuenta_add_screen.dart';
+import 'package:frontend_soderia/services/documento_service.dart';
+import 'package:frontend_soderia/utils/open_pdf.dart';
 
 class ClienteDetailScreen extends StatefulWidget {
   final int legajo;
@@ -277,6 +279,19 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
           final observacion = (data['observacion'] ?? '').toString();
 
           final cuentas = (data['cuentas'] as List?) ?? const [];
+
+          final Map<String, dynamic>? cuentaPrincipal = cuentas.isNotEmpty
+              ? cuentas.first as Map<String, dynamic>
+              : null;
+
+          final double deudaActual = cuentaPrincipal != null
+              ? _toDouble(cuentaPrincipal['deuda'])
+              : 0;
+
+          final double saldoActual = cuentaPrincipal != null
+              ? _toDouble(cuentaPrincipal['saldo'])
+              : 0;
+
           final direcciones = (data['direcciones'] as List?) ?? const [];
           final telefonos = (data['telefonos'] as List?) ?? const [];
 
@@ -500,6 +515,11 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                         ),
                 ),
 
+                _SectionCard(
+                  title: 'Comprobantes',
+                  child: _ComprobantesClienteSection(legajo: widget.legajo),
+                ),
+
                 // HISTÓRICO (desde endpoint aparte)
                 _SectionCard(
                   title: 'Histórico',
@@ -532,27 +552,45 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                           }).toList(),
                         ),
                 ),
+
+                const SizedBox(height: 24),
+
+                FilledButton.icon(
+                  onPressed: cuentas.isEmpty
+                      ? null
+                      : () {
+                          AppShellActions.push(
+                            context,
+                            '/pago',
+                            arguments: {
+                              'legajo': widget.legajo,
+                              'id_empresa': 1,
+                              'deuda': deudaActual,
+                              'saldo': saldoActual,
+                            },
+                          );
+                        },
+                  icon: const Icon(Icons.payments),
+                  label: const Text('Registrar pago'),
+                ),
+
+                const SizedBox(height: 8),
+
+                OutlinedButton.icon(
+                  onPressed: () {
+                    AppShellActions.push(
+                      context,
+                      '/venta',
+                      arguments: {'legajo': widget.legajo},
+                    );
+                  },
+                  icon: const Icon(Icons.point_of_sale),
+                  label: const Text('Iniciar venta fuera de recorrido'),
+                ),
               ],
             ),
           );
         },
-      ),
-
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: FilledButton.icon(
-            onPressed: () {
-              AppShellActions.push(
-                context,
-                '/venta',
-                arguments: {'legajo': widget.legajo},
-              );
-            },
-            icon: const Icon(Icons.point_of_sale),
-            label: const Text('Iniciar venta fuera de recorrido'),
-          ),
-        ),
       ),
     );
   }
@@ -720,6 +758,61 @@ class _CuentaMiniCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ComprobantesClienteSection extends StatelessWidget {
+  final int legajo;
+
+  const _ComprobantesClienteSection({required this.legajo});
+
+  @override
+  Widget build(BuildContext context) {
+    final service = DocumentoService();
+
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: service.listarPorCliente(legajo),
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: LinearProgressIndicator(),
+          );
+        }
+
+        if (snap.hasError) {
+          return const Text('Error cargando comprobantes');
+        }
+
+        final docs = snap.data ?? [];
+
+        final comprobantes = docs
+            .where((d) => d['tipo_archivo'] == 'COMPROBANTE_PAGO')
+            .toList();
+
+        if (comprobantes.isEmpty) {
+          return const Text('Sin comprobantes registrados');
+        }
+
+        return Column(
+          children: comprobantes.map((d) {
+            final fecha = d['fecha']?.toString().split('T').first ?? '';
+
+            final url = 'http://localhost:8500${d['url']}';
+
+            return ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.picture_as_pdf),
+              title: Text(d['nombre_archivo']),
+              subtitle: Text(fecha),
+              trailing: const Icon(Icons.open_in_new),
+              onTap: () => openPdf(url),
+            );
+          }).toList(),
+        );
+      },
     );
   }
 }

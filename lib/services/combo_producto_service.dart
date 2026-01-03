@@ -56,4 +56,27 @@ class ComboProductoService {
       throw Exception('Error eliminando producto del combo');
     }
   }
+
+  Future<Map<String, dynamic>> obtener(int idCombo) async {
+    final res = await http.get(Uri.parse('$baseUrl/$idCombo'));
+    if (res.statusCode != 200) {
+      throw Exception('Error obteniendo combo');
+    }
+    return jsonDecode(res.body);
+  }
+
+  Future<void> actualizarProductos({
+    required int idCombo,
+    required List<Map<String, dynamic>> productos,
+  }) async {
+    final res = await http.put(
+      Uri.parse('$baseUrl/$idCombo/productos'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(productos),
+    );
+
+    if (res.statusCode != 200) {
+      throw Exception('Error actualizando productos del combo');
+    }
+  }
 }

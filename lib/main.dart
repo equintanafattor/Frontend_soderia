@@ -5,6 +5,7 @@ import 'package:frontend_soderia/screens/combos/combo_precio_screen.dart';
 import 'package:frontend_soderia/screens/combos/combo_productos_screen.dart';
 import 'package:frontend_soderia/screens/combos/combos_list_screen.dart';
 import 'package:frontend_soderia/screens/listas_precios/lista_precio_detail_screen.dart';
+import 'package:frontend_soderia/screens/pago_libre_screen.dart';
 import 'package:frontend_soderia/screens/reportes/reporte_screen.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
@@ -189,6 +190,18 @@ class FrontendSoderiaApp extends StatelessWidget {
           }
           return const Scaffold(
             body: Center(child: Text('Faltan datos del combo')),
+          );
+        },
+
+        // === PagoLibre ===
+        '/pago': (context) {
+          final args = ModalRoute.of(context)!.settings.arguments as Map;
+
+          return PagoLibreScreen(
+            legajo: args['legajo'],
+            idEmpresa: args['id_empresa'],
+            deuda: args['deuda'],
+            saldo: args['saldo'],
           );
         },
       },
