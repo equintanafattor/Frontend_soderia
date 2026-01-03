@@ -303,10 +303,9 @@ class _ProductoAddScreenState extends State<ProductoAddScreen> {
         ),
       );
 
-      // si es edición, volvemos normalmente
-      if (_isEdit) {
-        Navigator.pop(context, true);
-      }
+      // ✅ siempre avisamos que hubo cambios
+      Navigator.pop(context, true);
+      
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(

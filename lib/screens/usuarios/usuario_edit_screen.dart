@@ -22,6 +22,7 @@ class _UsuarioEditScreenState extends State<UsuarioEditScreen> {
   final _service = UsuarioService();
 
   bool get _isValid => _formKey.currentState?.validate() == true;
+  bool _saving = false;
 
   @override
   void initState() {
@@ -49,7 +50,7 @@ class _UsuarioEditScreenState extends State<UsuarioEditScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.check),
-            onPressed: _isValid ? _guardar : null,
+            onPressed: (_isValid && !_saving) ? _guardar : null,
           ),
         ],
       ),
@@ -111,12 +112,14 @@ class _UsuarioEditScreenState extends State<UsuarioEditScreen> {
   }
 
   Future<void> _guardar() async {
+    if (_saving) return;
+    setState(() => _saving = true);
     final u = widget.usuario;
     final actualizado = Usuario(
       id: u.id,
       nombre: _nombre.text.trim(),
       email: _mail.text.trim(),
-      rol: _rol,
+      rol: _rol.isEmpty ? u.rol : _rol,
       activo: _activo,
       createdAt: u.createdAt,
     );
@@ -124,12 +127,14 @@ class _UsuarioEditScreenState extends State<UsuarioEditScreen> {
     try {
       await _service.actualizarUsuario(actualizado);
       if (!mounted) return;
-      Navigator.of(context).pop(true);
+      Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al actualizar: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error al actualizar: $e')));
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 }

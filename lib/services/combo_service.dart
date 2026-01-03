@@ -61,4 +61,20 @@ class ComboService {
 
     return jsonDecode(res.body);
   }
+
+  Future<void> agregarProducto({
+    required int idCombo,
+    required int idProducto,
+    required int cantidad,
+  }) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/combos/$idCombo/productos'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'id_producto': idProducto, 'cantidad': cantidad}),
+    );
+
+    if (res.statusCode >= 400) {
+      throw Exception('Error al agregar producto al combo');
+    }
+  }
 }

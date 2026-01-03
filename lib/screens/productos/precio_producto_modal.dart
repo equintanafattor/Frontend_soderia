@@ -111,7 +111,7 @@ class _PrecioProductoModalState extends State<PrecioProductoModal> {
                           ),
                         )
                         .toList(),
-                    onChanged: (v) => _idProducto = v,
+                    onChanged: (v) => setState(() => _idProducto = v),
                   );
                 },
               ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/navigation/app_shell_actions.dart';
+import 'package:frontend_soderia/core/navigation/push_and_refresh.dart';
 import 'package:frontend_soderia/services/lista_precio_service.dart';
 import 'package:frontend_soderia/screens/productos/precio_producto_modal.dart';
 import 'package:frontend_soderia/screens/combos/precio_combo_modal.dart';
@@ -37,11 +38,16 @@ class _ListaPrecioDetailScreenState extends State<ListaPrecioDetailScreen> {
             IconButton(
               icon: const Icon(Icons.edit),
               tooltip: 'Editar lista',
-              onPressed: () => AppShellActions.push(
-                context,
-                '/listas-precios/edit',
-                arguments: widget.idLista,
-              ),
+              onPressed: () async {
+                await pushAndRefresh(
+                  context: context,
+                  route: '/listas-precios/edit',
+                  arguments: widget.idLista,
+                  onRefresh: () {
+                    Navigator.pop(context, true);
+                  },
+                );
+              },
             ),
           ],
         ),
@@ -78,9 +84,14 @@ class _ProductosTabState extends State<_ProductosTab> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      _productos = await _service.listarProductosConPrecio(widget.idLista);
+      final data = await _service.listarProductosConPrecio(widget.idLista);
+      if (mounted) {
+        setState(() => _productos = data);
+      }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -155,9 +166,14 @@ class _CombosTabState extends State<_CombosTab> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      _combos = await _service.listarCombosConPrecio(widget.idLista);
+      final data = await _service.listarCombosConPrecio(widget.idLista);
+      if (mounted) {
+        setState(() => _combos = data);
+      }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 

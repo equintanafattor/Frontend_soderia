@@ -181,8 +181,8 @@ class _ComboFormScreenState extends State<ComboFormScreen> {
                           leading: const Icon(Icons.inventory_2),
                           title: const Text('Administrar productos'),
                           trailing: const Icon(Icons.chevron_right),
-                          onTap: () {
-                            Navigator.push(
+                          onTap: () async {
+                            final changed = await Navigator.push<bool>(
                               context,
                               MaterialPageRoute(
                                 builder: (_) => ComboProductosScreen(
@@ -191,6 +191,11 @@ class _ComboFormScreenState extends State<ComboFormScreen> {
                                 ),
                               ),
                             );
+
+                            if (changed == true && mounted) {
+                              // 👉 opcional pero recomendado
+                              await _cargar();
+                            }
                           },
                         ),
                       ),

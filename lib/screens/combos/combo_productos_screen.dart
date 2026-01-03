@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/colors.dart';
 import 'package:frontend_soderia/models/producto.dart';
@@ -120,76 +122,105 @@ class _ComboProductosScreenState extends State<ComboProductosScreen> {
     }
   }
 
+  // -------------------- acciones locales --------------------
+
+  Future<bool> _onWillPop() async {
+    if (!_dirty) return true;
+
+    final salir = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Cambios sin guardar'),
+        content: const Text('Hay cambios sin guardar. ¿Querés salir igual?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Salir'),
+          ),
+        ],
+      ),
+    );
+
+    return salir == true;
+  }
+
   // -------------------- UI --------------------
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: AppColors.azul,
-        foregroundColor: Colors.white,
-        title: Text('Combo: ${widget.nombreCombo}'),
-        actions: [
-          if (_dirty)
-            const Padding(
-              padding: EdgeInsets.only(right: 16),
-              child: Icon(Icons.warning, color: Colors.amber),
-            ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openAgregarDialog,
-        icon: const Icon(Icons.add),
-        label: const Text('Agregar producto'),
-      ),
-      bottomNavigationBar: _dirty
-          ? SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    minimumSize: const Size.fromHeight(48),
-                  ),
-                  icon: const Icon(Icons.save),
-                  label: const Text(
-                    'Guardar cambios',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  onPressed: _guardar,
-                ),
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: AppColors.azul,
+          foregroundColor: Colors.white,
+          title: Text('Combo: ${widget.nombreCombo}'),
+          actions: [
+            if (_dirty)
+              const Padding(
+                padding: EdgeInsets.only(right: 16),
+                child: Icon(Icons.warning, color: Colors.amber),
               ),
-            )
-          : null,
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _productos.isEmpty
-          ? const Center(child: Text('Este combo no tiene productos'))
-          : ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: _productos.length,
-              separatorBuilder: (_, __) => const Divider(),
-              itemBuilder: (_, i) {
-                final p = _productos[i];
-                return ListTile(
-                  title: Text(p['nombre']),
-                  subtitle: Text('Cantidad: ${p['cantidad']}'),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.edit),
-                        onPressed: () => _openEditarCantidad(i),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete),
-                        onPressed: () => _eliminarProducto(i),
-                      ),
-                    ],
+          ],
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: _openAgregarDialog,
+          icon: const Icon(Icons.add),
+          label: const Text('Agregar producto'),
+        ),
+        bottomNavigationBar: _dirty
+            ? SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      minimumSize: const Size.fromHeight(48),
+                    ),
+                    icon: const Icon(Icons.save),
+                    label: const Text(
+                      'Guardar cambios',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    onPressed: _guardar,
                   ),
-                );
-              },
-            ),
+                ),
+              )
+            : null,
+        body: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : _productos.isEmpty
+            ? const Center(child: Text('Este combo no tiene productos'))
+            : ListView.separated(
+                padding: const EdgeInsets.all(16),
+                itemCount: _productos.length,
+                separatorBuilder: (_, __) => const Divider(),
+                itemBuilder: (_, i) {
+                  final p = _productos[i];
+                  return ListTile(
+                    title: Text(p['nombre']),
+                    subtitle: Text('Cantidad: ${p['cantidad']}'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit),
+                          onPressed: () => _openEditarCantidad(i),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete),
+                          onPressed: () => _eliminarProducto(i),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+      ),
     );
   }
 

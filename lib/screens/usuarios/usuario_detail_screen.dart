@@ -19,16 +19,19 @@ class UsuarioDetailScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.edit),
             onPressed: () async {
-              final updated = await Navigator.of(context).push(
+              final updated = await Navigator.of(context).push<bool>(
                 MaterialPageRoute(
                   builder: (_) => UsuarioEditScreen(usuario: usuario),
                 ),
               );
-              // Opcional: podrías manejar un refresh aquí
+
               if (updated == true && context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Usuario actualizado')),
                 );
+
+                // 🔑 PROPAGAR CAMBIO AL PADRE
+                Navigator.pop(context, true);
               }
             },
           ),
@@ -69,18 +72,16 @@ class UsuarioDetailScreen extends StatelessWidget {
                               : Icons.cancel_outlined,
                           size: 18,
                         ),
-                        label:
-                            Text(usuario.activo ? 'Activo' : 'Inactivo'),
+                        label: Text(usuario.activo ? 'Activo' : 'Inactivo'),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
                   Text(
                     'Creado: ${dateFmt.format(usuario.createdAt)}',
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: Theme.of(context).hintColor),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).hintColor,
+                    ),
                   ),
                 ],
               ),

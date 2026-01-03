@@ -16,6 +16,7 @@ extension RolX on Rol {
 
 class UsuarioAddScreen extends StatefulWidget {
   const UsuarioAddScreen({super.key});
+
   @override
   State<UsuarioAddScreen> createState() => _UsuarioAddScreenState();
 }
@@ -23,18 +24,18 @@ class UsuarioAddScreen extends StatefulWidget {
 class _UsuarioAddScreenState extends State<UsuarioAddScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  // Nuevo: nombre de usuario
-  final _username = TextEditingController();
+  bool _saving = false;
 
+  final _username = TextEditingController();
   final _nombre = TextEditingController();
   final _mail = TextEditingController();
   final _tel = TextEditingController();
+
   Rol? _rol;
   bool _activo = true;
 
   final _service = UsuarioService();
 
-  // Guardamos la contraseña generada para usar la MISMA en el POST
   String? _tempPass;
 
   bool get _isValid =>
@@ -56,8 +57,14 @@ class _UsuarioAddScreenState extends State<UsuarioAddScreen> {
         title: const Text('Agregar usuario'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.check),
-            onPressed: _isValid ? _submit : null,
+            icon: _saving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.check),
+            onPressed: (_isValid && !_saving) ? _submit : null,
           ),
         ],
       ),
@@ -67,14 +74,7 @@ class _UsuarioAddScreenState extends State<UsuarioAddScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // 👇 NUEVO campo: nombre de usuario (login)
-            _tf(
-              'Nombre de usuario',
-              _username,
-              validator: _req,
-              keyboard: TextInputType.text,
-            ),
-
+            _tf('Nombre de usuario', _username, validator: _req),
             _tf('Nombre y apellido', _nombre, validator: _req),
             _tf(
               'Email',
@@ -144,10 +144,11 @@ class _UsuarioAddScreenState extends State<UsuarioAddScreen> {
 
   Future<void> _genPass() async {
     final pass = _randomPass();
-    _tempPass = pass; // guardamos para usarla en el submit
+    _tempPass = pass;
 
     await Clipboard.setData(ClipboardData(text: pass));
     if (!mounted) return;
+
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -170,9 +171,8 @@ class _UsuarioAddScreenState extends State<UsuarioAddScreen> {
   }
 
   Future<void> _submit() async {
-    if (!_isValid) return;
+    if (!_isValid || _saving) return;
 
-    // Asegurarnos de tener contraseña generada
     if (_tempPass == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -184,13 +184,12 @@ class _UsuarioAddScreenState extends State<UsuarioAddScreen> {
       return;
     }
 
-    final username = _username.text.trim();
+    setState(() => _saving = true);
 
     try {
       await _service.crearUsuario(
-        nombreUsuario: username,
+        nombreUsuario: _username.text.trim(),
         contrasena: _tempPass!,
-        // Por ahora null hasta que lo ates a empleado/cliente
         legajoEmpleado: null,
         legajoCliente: null,
       );
@@ -200,12 +199,15 @@ class _UsuarioAddScreenState extends State<UsuarioAddScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Usuario guardado')));
-      Navigator.pop(context, true); // para que la lista recargue
+
+      Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Error al guardar usuario: $e')));
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 }

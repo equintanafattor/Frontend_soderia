@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/navigation/app_shell_actions.dart';
 import 'package:frontend_soderia/core/navigation/destinations.dart';
+import 'package:frontend_soderia/core/navigation/push_and_refresh.dart';
 import 'package:frontend_soderia/models/producto.dart';
 import 'package:frontend_soderia/services/producto_service.dart';
 import 'package:frontend_soderia/screens/productos/producto_add_screen.dart';
@@ -166,15 +167,11 @@ class _ProductosListScreenState extends State<ProductosListScreen> {
               const SizedBox(width: 8),
 
               FilledButton.icon(
-                onPressed: () async {
-                  final result = await AppShellActions.push(
-                    context,
-                    '/producto/new',
-                  );
-                  if (result == true && mounted) {
-                    _load();
-                  }
-                },
+                onPressed: () => pushAndRefresh(
+                  context: context,
+                  route: '/producto/new',
+                  onRefresh: _load,
+                ),
                 icon: const Icon(Icons.inventory_2),
                 label: const Text('Nuevo'),
               ),
@@ -229,12 +226,10 @@ class _ProductosListScreenState extends State<ProductosListScreen> {
                               tooltip: 'Editar',
                               onPressed: () async {
                                 // Para edición usamos push directo al screen
-                                final result = await Navigator.push<bool>(
+                                final result = await AppShellActions.push(
                                   context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        ProductoAddScreen(initial: p),
-                                  ),
+                                  '/producto/edit',
+                                  arguments: p,
                                 );
                                 if (result == true && mounted) {
                                   _refresh();

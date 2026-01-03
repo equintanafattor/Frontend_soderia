@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/navigation/app_shell_actions.dart';
+import 'package:frontend_soderia/core/navigation/push_and_refresh.dart';
 import 'package:frontend_soderia/services/lista_precio_service.dart';
 
 class ListasPreciosListScreen extends StatefulWidget {
@@ -26,7 +27,10 @@ class _ListasPreciosListScreenState extends State<ListasPreciosListScreen> {
   Future<void> _load() async {
     setState(() => _cargando = true);
     try {
-      _data = await _service.listarListas();
+      final list = await _service.listarListas();
+      if (mounted) {
+        setState(() => _data = list);
+      }
     } finally {
       if (mounted) {
         setState(() => _cargando = false);
@@ -57,9 +61,15 @@ class _ListasPreciosListScreenState extends State<ListasPreciosListScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         tooltip: 'Nueva lista',
-        onPressed: () => AppShellActions.push(context, '/listas-precios/new'),
+        onPressed: () => pushAndRefresh(
+          context: context,
+          route: '/listas-precios/new',
+          onRefresh: _load,
+        ),
+
         child: const Icon(Icons.add),
       ),
+
       body: Column(
         children: [
           Padding(
@@ -104,11 +114,17 @@ class _ListasPreciosListScreenState extends State<ListasPreciosListScreen> {
                               ? Colors.green.shade100
                               : Colors.grey.shade300,
                         ),
-                        onTap: () => AppShellActions.push(
-                          context,
-                          '/listas-precios/detail',
-                          arguments: {'id': l['id_lista'], 'nombre': nombre},
-                        ),
+                        onTap: () async {
+                          final changed = await AppShellActions.push(
+                            context,
+                            '/listas-precios/detail',
+                            arguments: {'id': l['id_lista'], 'nombre': nombre},
+                          );
+
+                          if (changed == true && mounted) {
+                            _load();
+                          }
+                        },
                       );
                     },
                   ),

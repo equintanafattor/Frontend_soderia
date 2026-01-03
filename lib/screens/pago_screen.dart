@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/colors.dart';
 import 'package:frontend_soderia/services/combo_service.dart';
@@ -372,171 +374,180 @@ class _PagoScreenState extends State<PagoScreen> {
       onPressed: _confirmar,
     );
 
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: AppColors.azul,
-        foregroundColor: Colors.white,
-        title: Text('Pago — ${widget.nombreCliente}'),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: isMobile ? null : confirmButton,
-      bottomNavigationBar: isMobile ? confirmButton : null,
-      body: Padding(
-        padding: EdgeInsets.only(bottom: isMobile ? 84 : 0),
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: _EncabezadoCliente(
-                    nombre: widget.nombreCliente,
-                    legajo: widget.legajo,
-                    deuda: widget.deudaActual,
-                    saldoAFavor: widget.saldoAFavorActual,
+    return WillPopScope(
+      onWillPop: () async {
+        Navigator.pop(context, false); // ⛔ no hubo cambios
+        return false; // evitamos el pop automático
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: AppColors.azul,
+          foregroundColor: Colors.white,
+          title: Text('Pago — ${widget.nombreCliente}'),
+        ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+        floatingActionButton: isMobile ? null : confirmButton,
+        bottomNavigationBar: isMobile ? confirmButton : null,
+        body: Padding(
+          padding: EdgeInsets.only(bottom: isMobile ? 84 : 0),
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: _EncabezadoCliente(
+                      nombre: widget.nombreCliente,
+                      legajo: widget.legajo,
+                      deuda: widget.deudaActual,
+                      saldoAFavor: widget.saldoAFavorActual,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                _FechaPill(fecha: widget.fecha),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const Divider(thickness: 1.4),
-            const SizedBox(height: 4),
-            _TablaHeader(),
-            const SizedBox(height: 4),
-            ...widget.items.map(
-              (it) => _TablaRow(
-                nro: it.nroPedido,
-                producto: it.nroPedido.startsWith('combo')
-                    ? '📦 ${it.producto}'
-                    : it.producto,
-                cantidad: it.cantidad,
-                pu: it.precioUnitario,
-                pt: it.subtotal,
+                  const SizedBox(width: 12),
+                  _FechaPill(fecha: widget.fecha),
+                ],
               ),
-            ),
-            const SizedBox(height: 8),
-            const Divider(thickness: 1.4),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                'Total: ${_money(widget.total)}',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: Colors.black87,
+              const SizedBox(height: 12),
+              const Divider(thickness: 1.4),
+              const SizedBox(height: 4),
+              _TablaHeader(),
+              const SizedBox(height: 4),
+              ...widget.items.map(
+                (it) => _TablaRow(
+                  nro: it.nroPedido,
+                  producto: it.nroPedido.startsWith('combo')
+                      ? '📦 ${it.producto}'
+                      : it.producto,
+                  cantidad: it.cantidad,
+                  pu: it.precioUnitario,
+                  pt: it.subtotal,
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'El cliente abonará:',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                if (widget.saldoAFavorActual > 0)
-                  _MontoChip(
-                    label: 'Usar saldo a favor',
-                    selected: _montoElegido == 0,
-                    onTap: () {
-                      setState(() {
-                        _montoElegido = 0;
-                        _otroCtrl.clear();
-                      });
-                    },
+              const SizedBox(height: 8),
+              const Divider(thickness: 1.4),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  'Total: ${_money(widget.total)}',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: Colors.black87,
                   ),
-                for (final m in _montosRapidos)
-                  _MontoChip(
-                    label: _money(m),
-                    selected: _montoElegido == m,
-                    onTap: () {
-                      setState(() {
-                        _montoElegido = m.toDouble();
-                        _otroCtrl.clear();
-                      });
-                    },
-                  ),
-                _MontoChip(
-                  label: 'Otro',
-                  selected: _otroActivo,
-                  onTap: () {
-                    setState(() {
-                      _montoElegido = null;
-                      _otroCtrl.text = '';
-                    });
-                  },
-                  filled: _otroActivo,
                 ),
-                if (_otroActivo)
-                  SizedBox(
-                    width: 160,
-                    child: TextField(
-                      controller: _otroCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        isDense: true,
-                        labelText: widget.saldoAFavorActual > 0
-                            ? 'Importe (puede ser 0)'
-                            : 'Importe',
-                        prefixText: '\$ ',
-                        border: const OutlineInputBorder(),
-                      ),
-                      onChanged: (txt) {
-                        final cleaned = txt.replaceAll(RegExp(r'[^0-9.]'), '');
-                        final val = double.tryParse(cleaned);
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'El cliente abonará:',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  if (widget.saldoAFavorActual > 0)
+                    _MontoChip(
+                      label: 'Usar saldo a favor',
+                      selected: _montoElegido == 0,
+                      onTap: () {
                         setState(() {
-                          _montoElegido = val;
+                          _montoElegido = 0;
+                          _otroCtrl.clear();
                         });
                       },
                     ),
+                  for (final m in _montosRapidos)
+                    _MontoChip(
+                      label: _money(m),
+                      selected: _montoElegido == m,
+                      onTap: () {
+                        setState(() {
+                          _montoElegido = m.toDouble();
+                          _otroCtrl.clear();
+                        });
+                      },
+                    ),
+                  _MontoChip(
+                    label: 'Otro',
+                    selected: _otroActivo,
+                    onTap: () {
+                      setState(() {
+                        _montoElegido = null;
+                        _otroCtrl.text = '';
+                      });
+                    },
+                    filled: _otroActivo,
                   ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            if (_saldoAlDia)
+                  if (_otroActivo)
+                    SizedBox(
+                      width: 160,
+                      child: TextField(
+                        controller: _otroCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          isDense: true,
+                          labelText: widget.saldoAFavorActual > 0
+                              ? 'Importe (puede ser 0)'
+                              : 'Importe',
+                          prefixText: '\$ ',
+                          border: const OutlineInputBorder(),
+                        ),
+                        onChanged: (txt) {
+                          final cleaned = txt.replaceAll(
+                            RegExp(r'[^0-9.]'),
+                            '',
+                          );
+                          final val = double.tryParse(cleaned);
+                          setState(() {
+                            _montoElegido = val;
+                          });
+                        },
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (_saldoAlDia)
+                Row(
+                  children: const [
+                    Icon(Icons.verified, color: Colors.green),
+                    SizedBox(width: 8),
+                    Text(
+                      'Saldo al día ✅',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
+              const SizedBox(height: 16),
+              Text(
+                'Medio de pago:',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              _Segmented<MedioPago>(
+                value: _medio,
+                items: const [
+                  (MedioPago.efectivo, 'Efectivo'),
+                  (MedioPago.transferencia, 'Transferencia'),
+                  (MedioPago.otro, 'Otro'),
+                ],
+                onChanged: (v) => setState(() => _medio = v),
+              ),
+              const SizedBox(height: 16),
               Row(
-                children: const [
-                  Icon(Icons.verified, color: Colors.green),
-                  SizedBox(width: 8),
-                  Text(
-                    'Saldo al día ✅',
-                    style: TextStyle(fontWeight: FontWeight.w700),
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Compartir comprobante'),
+                  Switch(
+                    value: _compartirComprobante,
+                    activeColor: AppColors.azul,
+                    onChanged: (v) => setState(() => _compartirComprobante = v),
                   ),
                 ],
               ),
-            const SizedBox(height: 16),
-            Text(
-              'Medio de pago:',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            _Segmented<MedioPago>(
-              value: _medio,
-              items: const [
-                (MedioPago.efectivo, 'Efectivo'),
-                (MedioPago.transferencia, 'Transferencia'),
-                (MedioPago.otro, 'Otro'),
-              ],
-              onChanged: (v) => setState(() => _medio = v),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Compartir comprobante'),
-                Switch(
-                  value: _compartirComprobante,
-                  activeColor: AppColors.azul,
-                  onChanged: (v) => setState(() => _compartirComprobante = v),
-                ),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

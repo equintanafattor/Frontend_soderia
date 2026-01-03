@@ -63,9 +63,9 @@ class _UsuariosListScreenState extends State<UsuariosListScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _cargando = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al cargar usuarios: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error al cargar usuarios: $e')));
     }
   }
 
@@ -189,20 +189,23 @@ class _UsuariosListScreenState extends State<UsuariosListScreen> {
                             const SizedBox(width: 8),
                             Text(
                               dateFmt.format(u.createdAt),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
+                              style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(color: cs.outline),
                             ),
                           ],
                         ),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  UsuarioDetailScreen(usuario: u),
-                            ),
-                          );
+                        onTap: () async {
+                          final changed = await Navigator.of(context)
+                              .push<bool>(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      UsuarioDetailScreen(usuario: u),
+                                ),
+                              );
+
+                          if (changed == true && mounted) {
+                            _cargar();
+                          }
                         },
                       );
                     },

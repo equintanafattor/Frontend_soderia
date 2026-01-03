@@ -197,7 +197,7 @@ class _ClientesListScreenState extends State<ClientesListScreen> {
                                   '/cliente/edit',
                                   arguments: {'legajo': legajo, 'data': c},
                                 );
-                                if (result != null && mounted) {
+                                if (result == true && mounted) {
                                   _refresh();
                                 }
                               },

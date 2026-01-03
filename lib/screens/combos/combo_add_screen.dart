@@ -72,13 +72,10 @@ class _ComboAddScreenState extends State<ComboAddScreen> {
 
       // 2️⃣ Agregar productos al combo
       for (final p in _productos) {
-        await http.post(
-          Uri.parse('http://localhost:8500/combos/$idCombo/productos'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'id_producto': p.idProducto,
-            'cantidad': p.cantidad,
-          }),
+        await comboService.agregarProducto(
+          idCombo: idCombo,
+          idProducto: p.idProducto,
+          cantidad: p.cantidad,
         );
       }
 
