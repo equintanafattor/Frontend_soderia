@@ -1,66 +1,50 @@
-🧊 Frontend – App de Repartos (Sodería)
+# 🧊 Frontend – App de Repartos (Sodería)
 
-Frontend de la App de Repartos para Sodería, desarrollado en Flutter, orientado a la gestión diaria de clientes, visitas, ventas, pagos, stock, combos y reportes.
+Frontend de la **App de Repartos para Sodería**, desarrollado en **Flutter**, orientado a la gestión diaria de clientes, visitas, ventas, pagos, stock, combos y reportes.
 
 Este proyecto consume un backend propio (FastAPI) y está pensado para uso interno de repartidores y administración.
 
-🚀 Tecnologías
+---
 
-Flutter (Material 3)
+## 🚀 Tecnologías
 
-Dart
+- **Flutter** (Material 3)
+- **Dart**
+- **HTTP / REST**
+- **Intl** (fechas y formatos)
+- **Flutter Dotenv** (variables de entorno)
+- Arquitectura por **screens + services + models**
 
-HTTP / REST
+---
 
-Intl (fechas y formatos)
+## 📱 Funcionalidades principales
 
-Flutter Dotenv (variables de entorno)
+- 🔐 **Login y autenticación**
+- 🏠 **Home / Dashboard**
+- 📆 **Calendario de repartos**
+- 👥 **Gestión de clientes**
+  - Alta / edición
+  - Días de visita y turnos
+  - Cuenta corriente
+- 🛒 **Ventas**
+  - Productos
+  - Combos
+  - Listas de precios
+- 💰 **Pagos**
+  - Medios de pago
+  - Registro en caja
+- 📦 **Stock**
+  - Ajustes manuales
+  - Movimientos
+- 📊 **Reportes**
+  - Repartos por rango de fechas
+  - Totales y estados de visita
 
-Arquitectura por screens + services + models
+---
 
-📱 Funcionalidades principales
+## 🧱 Estructura del proyecto
 
-🔐 Login y autenticación
-
-🏠 Home / Dashboard
-
-📆 Calendario de repartos
-
-👥 Gestión de clientes
-
-Alta / edición
-
-Días de visita y turnos
-
-Cuenta corriente
-
-🛒 Ventas
-
-Productos
-
-Combos
-
-Listas de precios
-
-💰 Pagos
-
-Medios de pago
-
-Registro en caja
-
-📦 Stock
-
-Ajustes manuales
-
-Movimientos
-
-📊 Reportes
-
-Repartos por rango de fechas
-
-Totales y estados de visita
-
-🧱 Estructura del proyecto
+```text
 lib/
 ├── core/
 │   ├── colors.dart
@@ -91,72 +75,82 @@ lib/
 │   └── clientes/
 │
 └── main.dart
+```
 
-⚙️ Configuración del entorno
-1️⃣ Variables de entorno
+## **Configuración del entorno**
 
-Crear un archivo .env en la raíz del proyecto:
+### Variables de entorno
 
+Crear un archivo `.env` en la raíz del proyecto:
+
+```env
 API_BASE_URL=http://localhost:8000
+```
+No subir el archivo .env al repositorio.
 
 
-⚠️ No subir el archivo .env al repositorio.
+## Instalación de dependencias
 
-2️⃣ Dependencias
+```
 flutter pub get
+```
 
-3️⃣ Ejecutar la app
+## Ejecución de la aplicación
+
+```
 flutter run
+```
 
+O seleccionar el dispositivo desde el IDE.
 
-O seleccionar el dispositivo desde tu IDE (Android / Web / Desktop).
+---
 
-🔌 Backend
+## **Backend**
 
-Este frontend depende del backend del proyecto:
+Este frontend depende de un backend desarrollado en FastAPI que expone endpoints REST para:
 
-FastAPI
+- Clientes
+- Productos
+- Combos
+- Ventas
+- Stock
+- Reportes
 
-Endpoints REST (clientes, productos, combos, ventas, stock, reportes)
+El backend debe estar en ejecución para el correcto funcionamiento de la aplicación.
 
-👉 Asegurate de tener el backend corriendo antes de usar la app.
+---
 
-🎨 UI / UX
+## **UI y UX**
 
-Material Design
+- Material Design
+- Estados visuales derivados del negocio
+- Manejo de estados de carga y error
+- Navegación centralizada mediante AppShell
 
-Colores y estados derivados del negocio
+---
 
-Feedback visual para:
+## **Convenciones de desarrollo**
 
-Cargando
+- La interfaz de usuario deriva del estado
+- Los services no manejan lógica de UI
+- Las screens no contienen lógica de negocio
+- Uso defensivo de mounted en operaciones asincrónicas
+- Refresco explícito luego de operaciones críticas (venta, pago, stock)
 
-Errores
+---
 
-Estados de visita
+## **Estado del proyecto**
 
-Navegación centralizada con AppShell
+- En desarrollo activo.
+- Uso interno.
+- Funcional para operación diaria.
+- En mejora continua.
 
-🧠 Convenciones importantes
+---
 
-La UI deriva siempre del estado, no de flags sueltos
-
-Los services no manejan UI
-
-Los screens no hacen lógica de negocio
-
-Manejo defensivo de mounted en async
-
-Refresh explícito después de operaciones críticas (venta, pago, stock)
-
-🛠️ Estado del proyecto
-
-🟡 En desarrollo activo
-✔️ Uso interno
-✔️ Funcional para operación diaria
-🔧 En mejora continua
-
-✍️ Autor
+## **Autor**
 
 Emmanuel Quintana Fattor
-Frontend Flutter / App de Repartos – Sodería San Miguel
+App de Repartos - Sodería San Miguel
+
+
