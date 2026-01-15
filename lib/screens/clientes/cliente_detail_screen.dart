@@ -530,7 +530,10 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
 
                   _SectionCard(
                     title: 'Comprobantes',
-                    child: _ComprobantesClienteSection(legajo: widget.legajo),
+                    child: _ComprobantesClienteSection(
+                      legajo: widget.legajo,
+                      telefonos: telefonos.cast<Map>(),
+                    ),
                   ),
 
                   // HISTÓRICO (desde endpoint aparte)
@@ -784,17 +787,70 @@ class _CuentaMiniCard extends StatelessWidget {
   }
 }
 
-class _ComprobantesClienteSection extends StatelessWidget {
+class _ComprobantesClienteSection extends StatefulWidget {
   final int legajo;
+  final List<Map> telefonos;
 
-  const _ComprobantesClienteSection({required this.legajo});
+  const _ComprobantesClienteSection({
+    required this.legajo,
+    required this.telefonos,
+  });
+
+  @override
+  State<_ComprobantesClienteSection> createState() =>
+      _ComprobantesClienteSectionState();
+}
+
+class _ComprobantesClienteSectionState
+    extends State<_ComprobantesClienteSection> {
+  final _service = DocumentoService();
+  late Future<List<Map<String, dynamic>>> _futureDocs;
+
+  @override
+  void initState() {
+    super.initState();
+    _futureDocs = _service.listarPorCliente(widget.legajo);
+  }
+
+  // Si querés refrescar manualmente:
+  void _refresh() {
+    setState(() {
+      _futureDocs = _service.listarPorCliente(widget.legajo);
+    });
+  }
+
+  String? _telefonoParaWhatsapp() {
+    if (widget.telefonos.isEmpty) return null;
+
+    final principal = widget.telefonos.firstWhere(
+      (t) => t['principal'] == true,
+      orElse: () => {},
+    );
+
+    final raw =
+        (principal.isNotEmpty
+                ? principal['nro_telefono']
+                : widget.telefonos.first['nro_telefono'])
+            ?.toString();
+
+    if (raw == null || raw.trim().isEmpty) return null;
+
+    final digits = raw.replaceAll(RegExp(r'\D'), '');
+    if (digits.startsWith('549')) return digits;
+    if (digits.startsWith('54')) return '549${digits.substring(2)}';
+
+    var d = digits;
+    if (d.startsWith('0')) d = d.substring(1);
+    if (d.startsWith('15')) d = d.substring(2);
+    return '549$d';
+  }
 
   @override
   Widget build(BuildContext context) {
-    final service = DocumentoService();
+    final phone = _telefonoParaWhatsapp();
 
     return FutureBuilder<List<Map<String, dynamic>>>(
-      future: service.listarPorCliente(legajo),
+      future: _futureDocs,
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
           return const Padding(
@@ -808,7 +864,6 @@ class _ComprobantesClienteSection extends StatelessWidget {
         }
 
         final docs = snap.data ?? [];
-
         final comprobantes = docs
             .where((d) => d['tipo_archivo'] == 'COMPROBANTE_PAGO')
             .toList();
@@ -820,7 +875,6 @@ class _ComprobantesClienteSection extends StatelessWidget {
         return Column(
           children: comprobantes.map((d) {
             final fecha = d['fecha']?.toString().split('T').first ?? '';
-
             final url = 'http://localhost:8500${d['url']}';
 
             return ListTile(
@@ -832,18 +886,25 @@ class _ComprobantesClienteSection extends StatelessWidget {
               trailing: PopupMenuButton<String>(
                 onSelected: (v) async {
                   if (v == 'ver') {
-                    openPdf(url);
+                    await openPdf(url);
+                    return;
                   }
-                  if (v == 'whatsapp') {
-                    await shareWhatsApp(
-                      phone: '5493435123456', // después lo sacamos del cliente
-                      message:
-                          '''
-Hola 👋
-Te comparto el comprobante de pago:
 
-$url
-''',
+                  if (v == 'whatsapp') {
+                    if (phone == null) {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('El cliente no tiene teléfono cargado'),
+                        ),
+                      );
+                      return;
+                    }
+
+                    await shareWhatsApp(
+                      phone: phone,
+                      message:
+                          'Hola 👋\nTe comparto el comprobante de pago:\n\n$url',
                     );
                   }
                 },

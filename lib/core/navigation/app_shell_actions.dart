@@ -4,6 +4,8 @@ import 'package:frontend_soderia/core/navigation/shell_state.dart';
 
 class AppShellActions {
   static Future<void> showAddSheet(BuildContext context) async {
+    final rootCtx = context; // 👈 guardamos el contexto "vivo" (pantalla)
+
     showModalBottomSheet(
       context: context,
       useRootNavigator: true,
@@ -17,24 +19,24 @@ class AppShellActions {
               title: const Text('Abrir calendario'),
               onTap: () {
                 Navigator.of(sheetCtx, rootNavigator: true).pop();
-                jumpToTab(context, kIndexCalendario);
+                jumpToTab(rootCtx, kIndexCalendario);
               },
             ),
             const Divider(),
             ListTile(
               leading: const Icon(Icons.person_add),
               title: const Text('Nuevo cliente'),
-              onTap: () => _closeAndPush(sheetCtx, '/cliente/new'),
+              onTap: () => _closeAndPush(rootCtx, sheetCtx, '/cliente/new'),
             ),
             ListTile(
               leading: const Icon(Icons.inventory_2),
               title: const Text('Nuevo producto'),
-              onTap: () => _closeAndPush(sheetCtx, '/producto/new'),
+              onTap: () => _closeAndPush(rootCtx, sheetCtx, '/producto/new'),
             ),
             ListTile(
               leading: const Icon(Icons.group_add),
               title: const Text('Nuevo usuario'),
-              onTap: () => _closeAndPush(sheetCtx, '/usuario/new'),
+              onTap: () => _closeAndPush(rootCtx, sheetCtx, '/usuario/new'),
             ),
             const SizedBox(height: 8),
           ],
@@ -44,14 +46,10 @@ class AppShellActions {
   }
 
   static void jumpToTab(BuildContext context, int index) {
-    Navigator.of(
-      context,
-      rootNavigator: true,
-    ).popUntil((route) => route.isFirst);
+    Navigator.of(context, rootNavigator: true).popUntil((r) => r.isFirst);
     shellState.selectTab(index);
   }
 
-  // 👇 ahora con arguments
   static Future<Object?> push(
     BuildContext context,
     String route, {
@@ -60,21 +58,29 @@ class AppShellActions {
     return Navigator.of(context).pushNamed(route, arguments: arguments);
   }
 
-  // 👇 también acepta arguments
   static void _closeAndPush(
+    BuildContext rootCtx,
     BuildContext sheetCtx,
     String route, {
     Object? arguments,
   }) {
+    // 1) Cerramos el sheet con su propio context (válido acá)
     Navigator.of(sheetCtx, rootNavigator: true).pop();
+
+    // 2) Después navegamos usando rootCtx (que sigue montado)
     Future.microtask(() async {
+      if (!rootCtx.mounted) return;
+
       final res = await Navigator.of(
-        sheetCtx,
+        rootCtx,
         rootNavigator: true,
       ).pushNamed(route, arguments: arguments);
+
+      if (!rootCtx.mounted) return;
+
       if (res == true) {
         ScaffoldMessenger.of(
-          sheetCtx,
+          rootCtx,
         ).showSnackBar(const SnackBar(content: Text('Guardado correctamente')));
       }
     });

@@ -3,10 +3,14 @@ class CajaEmpresaTotalOut {
 
   CajaEmpresaTotalOut({required this.total});
 
+  static double _parseNum(dynamic v) {
+    if (v == null) return 0;
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v) ?? 0;
+    return 0;
+  }
+
   factory CajaEmpresaTotalOut.fromJson(Map<String, dynamic> json) {
-    final v = json['total'];
-    return CajaEmpresaTotalOut(
-      total: v is num ? v.toDouble() : double.tryParse(v.toString()) ?? 0,
-    );
+    return CajaEmpresaTotalOut(total: _parseNum(json['total']));
   }
 }

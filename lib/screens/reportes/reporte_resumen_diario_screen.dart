@@ -1,4 +1,6 @@
 // reporte_resumen_diario_screen.dart
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -6,7 +8,6 @@ import 'package:frontend_soderia/services/reparto_dia_service.dart';
 import 'package:frontend_soderia/services/caja_empresa_service.dart';
 import 'package:frontend_soderia/models/reparto_dia_out.dart';
 import 'package:frontend_soderia/models/caja_empresa_total_out.dart';
-
 
 // import 'package:frontend_soderia/core/colors.dart';
 
@@ -20,10 +21,11 @@ class ReporteResumenDiarioScreen extends StatefulWidget {
 
 class _ReporteResumenDiarioScreenState
     extends State<ReporteResumenDiarioScreen> {
-  final _repartoService =
-      RepartoDiaService(baseUrl: 'http://localhost:8500/repartos-dia'); // adaptar
-  final _cajaService =
-      CajaEmpresaService(baseUrl: 'http://localhost:8500'); // adaptar
+  final _repartoService = RepartoDiaService(
+    baseUrl: 'http://localhost:8500',
+  ); // ✅
+
+  final _cajaService = CajaEmpresaService(); 
 
   DateTime _fecha = DateTime.now();
   bool _cargando = false;
@@ -235,9 +237,7 @@ class _ReporteResumenDiarioScreenState
               Icon(Icons.info_outline),
               SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  'No hay reparto registrado para esta fecha.',
-                ),
+                child: Text('No hay reparto registrado para esta fecha.'),
               ),
             ],
           ),
@@ -285,10 +285,7 @@ class _ReporteResumenDiarioScreenState
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
-            _buildDetalleRow(
-              'Total del día',
-              _formatMoney(_totalCaja!.total),
-            ),
+            _buildDetalleRow('Total del día', _formatMoney(_totalCaja!.total)),
             const SizedBox(height: 8),
             const Text(
               'Incluye cierres automáticos por reparto y otros movimientos de caja de la empresa.',
@@ -306,13 +303,8 @@ class _ReporteResumenDiarioScreenState
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '$label: ',
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-          Expanded(
-            child: Text(value),
-          ),
+          Text('$label: ', style: const TextStyle(fontWeight: FontWeight.w600)),
+          Expanded(child: Text(value)),
         ],
       ),
     );
@@ -351,8 +343,10 @@ class _KpiCard extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 valor,
-                style:
-                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ],
           ),

@@ -44,9 +44,17 @@ class DocumentosClienteSection extends StatelessWidget {
               title: Text(d['nombre_archivo']),
               subtitle: Text(fecha),
               trailing: const Icon(Icons.open_in_new),
-              onTap: () {
+              onTap: () async {
                 final url = 'http://localhost:8500${d['url']}';
-                openPdf(url);
+
+                try {
+                  await openPdf(url);
+                } catch (e) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('No se pudo abrir el PDF: $e')),
+                  );
+                }
               },
             );
           }).toList(),

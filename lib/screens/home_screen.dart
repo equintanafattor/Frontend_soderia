@@ -206,25 +206,30 @@ class _HomeScreenState extends State<HomeScreen> {
                                   dirSnapshot.data!.descripcionCorta;
                             }
 
+                            final estado = mapEstadoVisita(c.estadoVisita);
+
+                            final bool puedeEntrar =
+                                estado == EstadoVisita.pendiente ||
+                                estado == EstadoVisita.postergado;
+
                             return VisitCard(
                               nombre: c.nombreCompleto,
                               direccion: direccionTexto,
                               estado: estado,
                               turnoVisita: c.turnoVisita,
-                              onTap: () async {
-                                final result =
-                                    await Navigator.of(
-                                      context,
-                                      rootNavigator: true,
-                                    ).pushNamed(
-                                      '/venta',
-                                      arguments: {'legajo': c.legajo},
-                                    );
-
-                                if (result == true) {
-                                  _recargarAgenda();
-                                }
-                              },
+                              onTap: puedeEntrar
+                                  ? () async {
+                                      final res =
+                                          await Navigator.of(
+                                            context,
+                                            rootNavigator: true,
+                                          ).pushNamed(
+                                            '/venta',
+                                            arguments: {'legajo': c.legajo},
+                                          );
+                                      if (res == true) _recargarAgenda();
+                                    }
+                                  : null, // 👈 BLOQUEA EL TAP
                             );
                           },
                         );

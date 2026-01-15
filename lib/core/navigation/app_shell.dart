@@ -112,7 +112,17 @@ class _AppShellState extends State<AppShell> {
     final fab = widget.fabBuilder?.call(context, _index);
 
     // Contenido principal preservando estado por pestaña
-    final body = IndexedStack(index: _index, children: pages);
+    final body = IndexedStack(
+      index: _index,
+      children: [
+        for (var i = 0; i < pages.length; i++)
+          HeroMode(
+            enabled:
+                i == _index, // 👈 solo la pestaña visible puede tener heroes
+            child: pages[i],
+          ),
+      ],
+    );
 
     // ------- MÓVIL: AppBar + Drawer modal -------
     if (isMobile) {
@@ -137,6 +147,7 @@ class _AppShellState extends State<AppShell> {
             fab ??
             (_index == 0
                 ? FloatingActionButton.extended(
+                    heroTag: null,
                     icon: const Icon(Icons.add),
                     label: const Text('Agregar'),
                     onPressed: () => AppShellActions.showAddSheet(context),
@@ -251,18 +262,10 @@ class _ModalDrawer extends StatelessWidget {
               style: TextStyle(color: AppColors.azul),
             ),
             onTap: () async {
-              Navigator.pop(context); // cerrar el drawer
-
-              // Limpiar sesión
+              final nav = Navigator.of(context, rootNavigator: true);
+              Navigator.pop(context); // cerrar drawer
               await AuthService().logout();
-
-              // Navegar al login limpiando el stack
-              // (rootNavigator:true por si estás profundo en la jerarquía)
-              // ignore: use_build_context_synchronously
-              Navigator.of(
-                context,
-                rootNavigator: true,
-              ).pushNamedAndRemoveUntil('/login', (route) => false);
+              nav.pushNamedAndRemoveUntil('/login', (route) => false);
             },
           ),
         ],
@@ -317,15 +320,10 @@ class _PersistentDrawer extends StatelessWidget {
             style: TextStyle(color: AppColors.azul),
           ),
           onTap: () async {
-            // Limpiar sesión
+            final nav = Navigator.of(context, rootNavigator: true);
+            Navigator.pop(context); // cerrar drawer
             await AuthService().logout();
-
-            // Navegar al login limpiando el stack
-            // ignore: use_build_context_synchronously
-            Navigator.of(
-              context,
-              rootNavigator: true,
-            ).pushNamedAndRemoveUntil('/login', (route) => false);
+            nav.pushNamedAndRemoveUntil('/login', (route) => false);
           },
         ),
       ],

@@ -63,7 +63,6 @@ class _PagoLibreScreenState extends State<PagoLibreScreen> {
     setState(() => _loading = true);
 
     try {
-      // 🔹 1. Crear pago
       final result = await _pagoService.crearPagoLibre(
         legajo: widget.legajo,
         idEmpresa: widget.idEmpresa,
@@ -78,41 +77,45 @@ class _PagoLibreScreenState extends State<PagoLibreScreen> {
 
       if (!mounted) return;
 
-      showDialog(
+      final abrir = await showDialog<bool>(
         context: context,
-        builder: (_) => AlertDialog(
+        builder: (dialogCtx) => AlertDialog(
           title: const Text('Pago registrado'),
           content: const Text('¿Deseás abrir el comprobante?'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.of(dialogCtx).pop(false),
               child: const Text('Después'),
             ),
             FilledButton(
-              onPressed: () async {
-                Navigator.pop(context);
-                await openPdf(comprobanteUrl);
-              },
+              onPressed: () => Navigator.of(dialogCtx).pop(true),
               child: const Text('Ver comprobante'),
             ),
           ],
         ),
       );
 
-      Navigator.of(context).pop(true);
+      if (abrir == true) {
+        await openPdf(comprobanteUrl);
+      }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pago registrado correctamente')),
-      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true); // 👈 ahora sí: cerramos la screen
     } catch (e) {
       if (!mounted) return;
-
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Error registrando pago: $e')));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  @override
+  void dispose() {
+    _montoCtrl.dispose();
+    _obsCtrl.dispose();
+    super.dispose();
   }
 
   @override

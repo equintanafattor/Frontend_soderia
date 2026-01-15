@@ -1,6 +1,8 @@
 // reporte_repartos_screen.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:frontend_soderia/services/reparto_dia_service.dart';
+import 'package:frontend_soderia/models/reparto_dia_out.dart';
 
 class ReporteRepartosScreen extends StatefulWidget {
   const ReporteRepartosScreen({super.key});
@@ -10,12 +12,18 @@ class ReporteRepartosScreen extends StatefulWidget {
 }
 
 class _ReporteRepartosScreenState extends State<ReporteRepartosScreen> {
+  final _service = RepartoDiaService(baseUrl: 'http://localhost:8500');
+
   DateTime _desde = DateTime.now().subtract(const Duration(days: 7));
   DateTime _hasta = DateTime.now();
 
   bool _cargando = false;
   String? _error;
-  List<dynamic> _repartos = []; // después tipamos
+
+  List<RepartoDiaOut> _repartos = [];
+
+  int? _idEmpresa; // opcional
+  int? _idUsuario; // opcional
 
   @override
   void initState() {
@@ -30,21 +38,22 @@ class _ReporteRepartosScreenState extends State<ReporteRepartosScreen> {
     });
 
     try {
-      // TODO: llamar a tu servicio GET /repartos-dia?fecha_desde=&fecha_hasta=
-      // _repartos = await _service.getPorRango(...);
-      await Future.delayed(const Duration(milliseconds: 500)); // dummy
-      setState(() {
-        _repartos = []; // asignar lista real
-      });
+      final data = await _service.getPorRango(
+        desde: _desde,
+        hasta: _hasta,
+        idEmpresa: _idEmpresa,
+        idUsuario: _idUsuario,
+      );
+
+      setState(() => _repartos = data);
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
-      setState(() => _cargando = false);
+      if (mounted) setState(() => _cargando = false);
     }
   }
 
   Future<void> _pickRango() async {
-    // Podés usar un date range picker custom, por simplicidad 2 pickers:
     final desde = await showDatePicker(
       context: context,
       initialDate: _desde,
@@ -52,9 +61,10 @@ class _ReporteRepartosScreenState extends State<ReporteRepartosScreen> {
       lastDate: DateTime(2100),
     );
     if (desde == null) return;
+
     final hasta = await showDatePicker(
       context: context,
-      initialDate: _hasta,
+      initialDate: _hasta.isBefore(desde) ? desde : _hasta,
       firstDate: desde,
       lastDate: DateTime(2100),
     );
@@ -69,29 +79,35 @@ class _ReporteRepartosScreenState extends State<ReporteRepartosScreen> {
 
   String _fmt(DateTime d) => DateFormat('dd/MM/yyyy').format(d);
 
+  String _money(num v) => NumberFormat.currency(
+    locale: 'es_AR',
+    symbol: r'$',
+    decimalDigits: 2,
+  ).format(v);
+
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        // filtros
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _pickRango,
-                  icon: const Icon(Icons.date_range),
-                  label: Text('${_fmt(_desde)} - ${_fmt(_hasta)}'),
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _pickRango,
+                    icon: const Icon(Icons.date_range),
+                    label: Text('${_fmt(_desde)} - ${_fmt(_hasta)}'),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        Expanded(
-          child: _cuerpo(),
-        ),
-      ],
+          Expanded(child: _cuerpo()),
+        ],
+      ),
     );
   }
 
@@ -106,18 +122,21 @@ class _ReporteRepartosScreenState extends State<ReporteRepartosScreen> {
       return const Center(child: Text('No hay repartos para el rango.'));
     }
 
-    // TODO: reemplazar por DataTable o ListView tipado
     return ListView.separated(
       itemCount: _repartos.length,
       separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final r = _repartos[index];
+
         return ListTile(
-          title: const Text('Reparto X'),
-          subtitle: const Text('fecha / usuario / empresa'),
-          trailing: const Text('\$ 0,00'),
+          title: Text('Reparto #${r.idRepartoDia} — ${_fmt(r.fecha)}'),
+          subtitle: Text('Empresa ${r.idEmpresa} · Usuario ${r.idUsuario}'),
+          trailing: Text(
+            _money(r.totalRecaudado),
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
           onTap: () {
-            // TODO: navegar a detalle
+            // próximo paso: ir a detalle (clientes, recorridos, etc.)
           },
         );
       },
