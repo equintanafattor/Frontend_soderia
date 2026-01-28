@@ -35,6 +35,7 @@ class PagoScreen extends StatefulWidget {
   final double saldoAFavorActual;
   final List<LineaVenta> items;
   final double total;
+  final int? idCuenta;
 
   const PagoScreen({
     super.key,
@@ -45,6 +46,7 @@ class PagoScreen extends StatefulWidget {
     required this.saldoAFavorActual,
     required this.items,
     required this.total,
+    required this.idCuenta,
   });
 
   @override
@@ -92,16 +94,14 @@ class _PagoScreenState extends State<PagoScreen> {
   /// - No puede ser null
   /// - No puede ser negativo
   /// - Puede ser 0 solo si el cliente tiene saldo a favor
+  /// Valida el monto elegido:
+  /// - No puede ser null
+  /// - No puede ser negativo
+  /// - Puede ser 0 (queda en deuda o usa saldo a favor si existe)
   bool get _montoValido {
     final m = _montoElegido;
-
     if (m == null || m < 0) return false;
-
-    if (m == 0) {
-      return widget.saldoAFavorActual > 0;
-    }
-
-    return true;
+    return true; // 0 ahora es válido
   }
 
   int _mapMedioPagoToId(MedioPago medio) {
@@ -232,6 +232,16 @@ class _PagoScreenState extends State<PagoScreen> {
       );
       final int idRepartoDia = reparto['id_repartodia'] as int;
 
+      final idCuenta = widget.idCuenta;
+      if (idCuenta == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Seleccioná una cuenta antes de confirmar'),
+          ),
+        );
+        return;
+      }
+
       // Crear pedido
       final pedido = await _pedidoService.crearPedido(
         legajo: legajoInt,
@@ -242,7 +252,8 @@ class _PagoScreenState extends State<PagoScreen> {
         idEmpresa: 1,
         // estado: estado,
         idRepartoDia: idRepartoDia,
-        items: await _buildItemsPayload(),
+        idCuenta: idCuenta,
+        items: _buildItemsPayload(),
       );
 
       final idPedido = pedido['id_pedido'] as int;
@@ -456,7 +467,19 @@ class _PagoScreenState extends State<PagoScreen> {
                           _otroCtrl.clear();
                         });
                       },
+                    )
+                  else
+                    _MontoChip(
+                      label: 'Pagar \$0 (queda en deuda)',
+                      selected: _montoElegido == 0,
+                      onTap: () {
+                        setState(() {
+                          _montoElegido = 0;
+                          _otroCtrl.clear();
+                        });
+                      },
                     ),
+
                   for (final m in _montosRapidos)
                     _MontoChip(
                       label: _money(m),
@@ -468,6 +491,7 @@ class _PagoScreenState extends State<PagoScreen> {
                         });
                       },
                     ),
+
                   _MontoChip(
                     label: 'Otro',
                     selected: _otroActivo,
@@ -479,19 +503,18 @@ class _PagoScreenState extends State<PagoScreen> {
                     },
                     filled: _otroActivo,
                   ),
+
                   if (_otroActivo)
                     SizedBox(
                       width: 160,
                       child: TextField(
                         controller: _otroCtrl,
                         keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
+                        decoration: const InputDecoration(
                           isDense: true,
-                          labelText: widget.saldoAFavorActual > 0
-                              ? 'Importe (puede ser 0)'
-                              : 'Importe',
+                          labelText: 'Importe (puede ser 0)',
                           prefixText: '\$ ',
-                          border: const OutlineInputBorder(),
+                          border: OutlineInputBorder(),
                         ),
                         onChanged: (txt) {
                           final cleaned = txt.replaceAll(

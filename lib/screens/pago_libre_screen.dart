@@ -11,6 +11,8 @@ class PagoLibreScreen extends StatefulWidget {
   final int? idRepartoDia;
   final double deuda;
   final double saldo;
+  final int? idCuenta; // ✅
+  final List<dynamic> cuentas;
 
   const PagoLibreScreen({
     super.key,
@@ -18,6 +20,8 @@ class PagoLibreScreen extends StatefulWidget {
     required this.idEmpresa,
     required this.deuda,
     required this.saldo,
+    this.idCuenta, // ✅
+    this.cuentas = const [],
     this.idRepartoDia,
   });
 
@@ -37,12 +41,21 @@ class _PagoLibreScreenState extends State<PagoLibreScreen> {
 
   bool _loading = false;
   int? _idMedioPago;
+  int? _idCuentaSeleccionada;
   List<Map<String, dynamic>> _mediosPago = [];
 
   @override
   void initState() {
     super.initState();
     _loadMediosPago();
+
+    _idCuentaSeleccionada = widget.idCuenta;
+
+    // si no vino, auto-selección
+    if (_idCuentaSeleccionada == null && widget.cuentas.isNotEmpty) {
+      final c0 = widget.cuentas.first as Map<String, dynamic>;
+      _idCuentaSeleccionada = (c0['id_cuenta'] as num?)?.toInt();
+    }
   }
 
   Future<void> _loadMediosPago() async {
@@ -67,6 +80,7 @@ class _PagoLibreScreenState extends State<PagoLibreScreen> {
         legajo: widget.legajo,
         idEmpresa: widget.idEmpresa,
         idMedioPago: _idMedioPago!,
+        idCuenta: _idCuentaSeleccionada, // ✅
         monto: double.parse(_montoCtrl.text.replaceAll(',', '.')),
         observacion: _obsCtrl.text.trim().isEmpty ? null : _obsCtrl.text.trim(),
         idRepartoDia: widget.idRepartoDia,
@@ -201,6 +215,29 @@ class _PagoLibreScreenState extends State<PagoLibreScreen> {
               ),
 
               const SizedBox(height: 16),
+
+              if (widget.cuentas.length > 1)
+                DropdownButtonFormField<int>(
+                  value: _idCuentaSeleccionada,
+                  items: widget.cuentas
+                      .map((c0) {
+                        final c = c0 as Map<String, dynamic>;
+                        final id = (c['id_cuenta'] as num?)?.toInt();
+                        final tipo = (c['tipo_de_cuenta'] ?? 'Cuenta')
+                            .toString();
+                        return DropdownMenuItem<int>(
+                          value: id,
+                          child: Text('$tipo (id $id)'),
+                        );
+                      })
+                      .where((e) => e.value != null)
+                      .toList(),
+                  onChanged: (v) => setState(() => _idCuentaSeleccionada = v),
+                  decoration: const InputDecoration(
+                    labelText: 'Cuenta',
+                    prefixIcon: Icon(Icons.account_balance_wallet),
+                  ),
+                ),
 
               // ===== MEDIO DE PAGO =====
               if (_mediosPago.isEmpty)

@@ -294,6 +294,9 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                 ? cuentas.first as Map<String, dynamic>
                 : null;
 
+            final int? idCuentaPrincipal =
+                cuentaPrincipal?['id_cuenta'] as int?;
+
             final double deudaActual = cuentaPrincipal != null
                 ? _toDouble(cuentaPrincipal['deuda'])
                 : 0;
@@ -583,6 +586,10 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                                 'id_empresa': 1,
                                 'deuda': deudaActual,
                                 'saldo': saldoActual,
+                                'id_cuenta':
+                                    (cuentaPrincipal?['id_cuenta'] as num?)
+                                        ?.toInt(),
+                                'cuentas': cuentas, // ✅ pasar lista completa
                               },
                             );
 

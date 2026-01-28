@@ -195,13 +195,23 @@ class FrontendSoderiaApp extends StatelessWidget {
 
         // === PagoLibre ===
         '/pago': (context) {
-          final args = ModalRoute.of(context)!.settings.arguments as Map;
+          final args =
+              ModalRoute.of(context)!.settings.arguments
+                  as Map<String, dynamic>;
+
+          final int? idCuenta = (args['id_cuenta'] as num?)?.toInt();
+          final int? idRepartoDia = (args['id_repartodia'] as num?)?.toInt();
+          final List<dynamic> cuentas =
+              (args['cuentas'] as List?)?.cast<dynamic>() ?? const [];
 
           return PagoLibreScreen(
-            legajo: args['legajo'],
-            idEmpresa: args['id_empresa'],
-            deuda: args['deuda'],
-            saldo: args['saldo'],
+            legajo: args['legajo'] as int,
+            idEmpresa: args['id_empresa'] as int,
+            deuda: (args['deuda'] as num).toDouble(),
+            saldo: (args['saldo'] as num).toDouble(),
+            idRepartoDia: idRepartoDia,
+            idCuenta: idCuenta,
+            cuentas: cuentas, // 👈 si agregaste este parámetro
           );
         },
       },
@@ -237,8 +247,7 @@ AppShell _buildAppShell(String usuario) {
       CalendarioScreen(nombreUsuario: usuario), // 7
     ],
 
-    // Título dinámico: en Inicio lo dejamos vacío
-    titleBuilder: (index, dest) => index == kIndexInicio ? '' : dest.label,
+    titleBuilder: (index, dest) => index == kIndexInicio ? ' ' : dest.label,
 
     fabBuilder: (ctx, index) {
       // FAB de Inicio: bottom sheet con altas (usa AppShellActions)

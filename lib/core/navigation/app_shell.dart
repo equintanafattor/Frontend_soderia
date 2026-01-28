@@ -4,6 +4,8 @@ import 'package:frontend_soderia/core/navigation/app_shell_actions.dart';
 import 'package:frontend_soderia/core/navigation/destinations.dart';
 import 'package:frontend_soderia/core/navigation/shell_state.dart';
 import 'package:frontend_soderia/services/auth_service.dart';
+import 'package:frontend_soderia/widgets/app_header.dart';
+import 'package:frontend_soderia/core/session/session_state.dart';
 
 /// AppShell adaptativo:
 /// - Móvil  (<600): AppBar + Drawer modal
@@ -128,7 +130,7 @@ class _AppShellState extends State<AppShell> {
     if (isMobile) {
       return Scaffold(
         appBar: AppBar(
-          title: titleText.isEmpty ? null : Text(titleText),
+          title: AppHeader(sectionTitle: titleText),
           backgroundColor: cs.primary,
           foregroundColor: cs.onPrimary,
           elevation: 0,
@@ -160,7 +162,7 @@ class _AppShellState extends State<AppShell> {
     if (isRail) {
       return Scaffold(
         appBar: AppBar(
-          title: titleText.isEmpty ? null : Text(titleText),
+          title: AppHeader(sectionTitle: titleText),
           backgroundColor: cs.primary,
           foregroundColor: cs.onPrimary,
           elevation: 0,
@@ -206,7 +208,7 @@ class _AppShellState extends State<AppShell> {
           Expanded(
             child: Scaffold(
               appBar: AppBar(
-                title: titleText.isEmpty ? null : Text(titleText),
+                title: AppHeader(sectionTitle: titleText),
                 backgroundColor: cs.primary,
                 foregroundColor: cs.onPrimary,
                 elevation: 0,
@@ -265,6 +267,7 @@ class _ModalDrawer extends StatelessWidget {
               final nav = Navigator.of(context, rootNavigator: true);
               Navigator.pop(context); // cerrar drawer
               await AuthService().logout();
+              sessionState.clear(); // 👈 ACÁ
               nav.pushNamedAndRemoveUntil('/login', (route) => false);
             },
           ),
@@ -323,6 +326,7 @@ class _PersistentDrawer extends StatelessWidget {
             final nav = Navigator.of(context, rootNavigator: true);
             Navigator.pop(context); // cerrar drawer
             await AuthService().logout();
+            sessionState.clear(); // 👈 ACÁ
             nav.pushNamedAndRemoveUntil('/login', (route) => false);
           },
         ),

@@ -5,6 +5,7 @@ import 'package:frontend_soderia/core/enums/estado_visita.dart';
 import 'package:frontend_soderia/core/navigation/destinations.dart';
 import 'package:frontend_soderia/core/navigation/shell_state.dart';
 import 'package:frontend_soderia/core/state/todos_filter.dart';
+import 'package:frontend_soderia/core/session/session_state.dart';
 
 import 'package:frontend_soderia/widgets/day_filter_buttons.dart';
 import 'package:frontend_soderia/widgets/visit_card.dart';
@@ -47,6 +48,11 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
 
+    // ✅ “sube” el usuario al estado global (AppShell lo ve siempre)
+    final current = sessionState.value;
+    if (current == null || current.nombre != widget.nombreUsuario) {
+      sessionState.setUser(SessionUser(nombre: widget.nombreUsuario));
+    }
     _fechaObjetivo = DateTime.now();
     _futureAgenda = _agendaService.obtenerClientesPorFecha(
       _soloFecha(_fechaObjetivo),

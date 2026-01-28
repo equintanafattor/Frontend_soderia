@@ -212,7 +212,7 @@ class _TodosScreenState extends State<TodosScreen> {
         elevation: 0,
         toolbarHeight: 0,
       ),
-      floatingActionButton: _buildIrAHoyFab(),
+      // floatingActionButton: _buildIrAHoyFab(),
       body: Column(
         children: [
           // ======= Header =======
@@ -394,7 +394,7 @@ class _TodosScreenState extends State<TodosScreen> {
   }
 
   // Botón opcional para ir a hoy manualmente
-  Widget? _buildIrAHoyFab() {
+/*   Widget? _buildIrAHoyFab() {
     final hoy = DateTime.now();
     if (hoy.year != mesActual.year || hoy.month != mesActual.month) return null;
 
@@ -414,7 +414,7 @@ class _TodosScreenState extends State<TodosScreen> {
       icon: const Icon(Icons.today),
       label: const Text('Ir a hoy'),
     );
-  }
+  } */
 }
 
 // ===== Widgets auxiliares (estilo UI del header) =====

@@ -63,12 +63,28 @@ class _ClienteEditScreenState extends State<ClienteEditScreen> {
     final idDia = _idDiaPorCodigo[dia];
     if (idDia == null) return;
 
-    // Traer clientes del día (para "después de")
     List<Map<String, dynamic>> clientesDelDia = [];
+
     try {
-      final list = await _service.listarClientesPorIdDia(idDia);
-      clientesDelDia = List<Map<String, dynamic>>.from(list);
-    } catch (_) {}
+      final raw = await _service.listarClientesPorIdDia(idDia);
+
+      if (raw is List) {
+        clientesDelDia = raw
+            .whereType<Map>() // acepta Map<dynamic,dynamic>
+            .map((m) => Map<String, dynamic>.from(m)) // fuerza keys String
+            .toList();
+      } else {
+        debugPrint(
+          'listarClientesPorIdDia($idDia) devolvió: ${raw.runtimeType}',
+        );
+      }
+
+      debugPrint('clientesDelDia($idDia) -> ${clientesDelDia.length}');
+    } catch (e, st) {
+      debugPrint('ERROR listarClientesPorIdDia($idDia): $e');
+      debugPrint('$st');
+      clientesDelDia = [];
+    }
 
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
@@ -77,11 +93,13 @@ class _ClienteEditScreenState extends State<ClienteEditScreen> {
         idDia: idDia,
         clientesDelDia: clientesDelDia,
         onConfirm: (modo, turno, refCliente) {
-          _frecuenciaConfig[dia] = {
-            'modo': modo,
-            'turno': turno,
-            'ref': refCliente,
-          };
+          setState(() {
+            _frecuenciaConfig[dia] = {
+              'modo': modo,
+              'turno': turno,
+              'ref': refCliente,
+            };
+          });
         },
       ),
     );

@@ -8,6 +8,7 @@ import 'package:frontend_soderia/services/cliente_service.dart';
 import 'package:frontend_soderia/services/lista_precio_service.dart';
 import 'package:frontend_soderia/screens/clientes/cliente_edit_screen.dart';
 import 'package:frontend_soderia/services/visita_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class VentaScreen extends StatefulWidget {
   final int legajoCliente;
@@ -44,6 +45,25 @@ class CarritoItem {
 }
 
 class _VentaScreenState extends State<VentaScreen> {
+  // ================= CUENTAS (selección) =================
+  List<Map<String, dynamic>> _cuentas = [];
+  Map<String, dynamic>? _cuentaSeleccionada;
+
+  int? get _idCuentaSeleccionada =>
+      (_cuentaSeleccionada?['id_cuenta'] as num?)?.toInt();
+
+  double _toDouble(dynamic v) {
+    if (v == null) return 0.0;
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
+    return 0.0;
+  }
+
+  double get _deudaSel => _toDouble(_cuentaSeleccionada?['deuda']);
+  double get _saldoSel => _toDouble(_cuentaSeleccionada?['saldo']);
+
+  bool get _tieneCuentaSeleccionada => _cuentaSeleccionada != null;
+
   // Carrito actual (clave: id_producto → item)
   final Map<String, CarritoItem> _carrito = {};
 
@@ -64,6 +84,31 @@ class _VentaScreenState extends State<VentaScreen> {
     return 0.0;
   }
 
+  Future<void> _abrirEnMapsPorDireccion(String direccion) async {
+    final dir = direccion.trim();
+    if (dir.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Este cliente no tiene dirección cargada'),
+        ),
+      );
+      return;
+    }
+
+    final query = Uri.encodeComponent(dir);
+    final uri = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$query',
+    );
+
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No se pudo abrir Maps')));
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -76,6 +121,104 @@ class _VentaScreenState extends State<VentaScreen> {
   }
 
   // -------- Helpers --------
+
+  Widget _selectorCuentaWidget() {
+    // Sin cuentas
+    if (_cuentas.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
+        child: Card(
+          child: ListTile(
+            leading: Icon(Icons.warning_amber),
+            title: Text('Este cliente no tiene cuentas'),
+            subtitle: Text('Creá una cuenta para poder vender.'),
+          ),
+        ),
+      );
+    }
+
+    final tipo = (_cuentaSeleccionada?['tipo_de_cuenta'] ?? 'Cuenta')
+        .toString();
+    final estado = (_cuentaSeleccionada?['estado'] ?? '').toString();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: Card(
+        child: ListTile(
+          leading: const Icon(Icons.account_balance_wallet_outlined),
+          title: Text('Cuenta: $tipo'),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Deuda: \$ ${_deudaSel.toStringAsFixed(0)}  ·  '
+                'Saldo: \$ ${_saldoSel.toStringAsFixed(0)}',
+              ),
+              if (estado.isNotEmpty) Text('Estado: $estado'),
+              if (_cuentas.length > 1 && !_tieneCuentaSeleccionada)
+                const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Text(
+                    'Seleccioná una cuenta para continuar',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                ),
+            ],
+          ),
+          trailing: _cuentas.length <= 1
+              ? null
+              : OutlinedButton.icon(
+                  onPressed: _pickCuenta,
+                  icon: const Icon(Icons.swap_horiz),
+                  label: const Text('Cambiar'),
+                ),
+          onTap: _cuentas.length > 1 ? _pickCuenta : null,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickCuenta() async {
+    final selected = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) {
+        return SafeArea(
+          child: ListView.separated(
+            itemCount: _cuentas.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (_, i) {
+              final c = _cuentas[i];
+              final id = (c['id_cuenta'] as num?)?.toInt();
+              final tipo = (c['tipo_de_cuenta'] ?? 'Cuenta').toString();
+              final deuda = _toDouble(c['deuda']);
+              final saldo = _toDouble(c['saldo']);
+              final sel = _idCuentaSeleccionada == id;
+
+              return ListTile(
+                leading: Icon(sel ? Icons.check_circle : Icons.circle_outlined),
+                title: Text(tipo),
+                subtitle: Text(
+                  'Deuda: \$ ${deuda.toStringAsFixed(0)} · '
+                  'Saldo: \$ ${saldo.toStringAsFixed(0)}',
+                ),
+                onTap: () => Navigator.pop(context, c),
+              );
+            },
+          ),
+        );
+      },
+    );
+
+    if (selected != null && mounted) {
+      setState(() {
+        _cuentaSeleccionada = selected;
+      });
+    }
+  }
 
   bool _comboTienePrecio(Map<String, dynamic> item) {
     if (item['tipo'] != 'combo') return true;
@@ -171,7 +314,14 @@ class _VentaScreenState extends State<VentaScreen> {
     String legajo,
     double deuda,
     double saldoAFavor,
+    int? idCuenta,
   ) async {
+    if (idCuenta == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Seleccioná una cuenta para la venta')),
+      );
+      return;
+    }
     // Si por alguna razón se llegó acá sin ítems, no sigo
     if (_carrito.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -207,6 +357,7 @@ class _VentaScreenState extends State<VentaScreen> {
           saldoAFavorActual: saldoAFavor, // 👈 el que ya calculás del back
           items: items,
           total: total,
+          idCuenta: idCuenta, // ✅ NUEVO
         ),
       ),
     );
@@ -292,13 +443,15 @@ class _VentaScreenState extends State<VentaScreen> {
 
         // ---- Dirección: tomamos la primera de "direcciones" ----
         String direccion = '';
+        String direccionBase = '';
+
         final direcciones = (cli['direcciones'] as List?) ?? [];
         if (direcciones.isNotEmpty) {
           final d0 = direcciones.first as Map<String, dynamic>;
           final partes = <String>[];
 
-          final dirBase = (d0['direccion'] ?? '').toString().trim();
-          if (dirBase.isNotEmpty) partes.add(dirBase);
+          direccionBase = (d0['direccion'] ?? '').toString().trim();
+          if (direccionBase.isNotEmpty) partes.add(direccionBase);
 
           final zona = (d0['zona'] ?? '').toString().trim();
           if (zona.isNotEmpty) partes.add('Zona $zona');
@@ -306,26 +459,33 @@ class _VentaScreenState extends State<VentaScreen> {
           direccion = partes.join(' · ');
         }
 
-        // ---- Deuda / saldo a favor: primera cuenta de "cuentas" ----
-        double deuda = 0.0;
-        double saldoAFavor = 0.0;
+        // ---- Cuentas: guardamos TODAS y seleccionamos por defecto si hace falta ----
+        final cuentasRaw = (cli['cuentas'] as List?) ?? [];
+        _cuentas = cuentasRaw
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
 
-        double _toDouble(dynamic v) {
-          if (v is num) return v.toDouble();
-          if (v is String) return double.tryParse(v) ?? 0.0;
-          return 0.0;
+        // Auto-selección:
+        // - si hay 1 sola -> la seleccionamos
+        // - si hay varias y todavía no eligió -> dejamos null para obligar a elegir
+        if (_cuentas.length == 1 && _cuentaSeleccionada == null) {
+          _cuentaSeleccionada = _cuentas.first;
         }
 
-        final cuentas = (cli['cuentas'] as List?) ?? [];
-        if (cuentas.isNotEmpty) {
-          final c0 = cuentas.first as Map<String, dynamic>;
-
-          final rawDeuda = c0['deuda'] ?? 0;
-          final rawSaldo = c0['saldo'] ?? 0;
-
-          deuda = _toDouble(rawDeuda);
-          saldoAFavor = _toDouble(rawSaldo);
+        // si la seleccionada ya no existe (por refresh), la limpiamos
+        if (_cuentaSeleccionada != null) {
+          final selId = _idCuentaSeleccionada;
+          final sigue = _cuentas.any(
+            (c) => (c['id_cuenta'] as num?)?.toInt() == selId,
+          );
+          if (!sigue)
+            _cuentaSeleccionada = _cuentas.length == 1 ? _cuentas.first : null;
         }
+
+        final deuda = _deudaSel;
+        final saldoAFavor = _saldoSel;
+        final idCuenta = _idCuentaSeleccionada;
 
         // ---- Historial: viene dentro de "historicos" ----
         final historicos = (cli['historicos'] as List?) ?? [];
@@ -338,6 +498,8 @@ class _VentaScreenState extends State<VentaScreen> {
           saldoAFavor: saldoAFavor,
           historicos: historicos,
           dataCliente: cli,
+          idCuenta: idCuenta,
+          direccionBase: direccionBase,
         );
       },
     );
@@ -346,21 +508,23 @@ class _VentaScreenState extends State<VentaScreen> {
   Widget _buildScaffold({
     required String nombreCliente,
     required String direccion,
+    required String direccionBase,
     required String legajo,
     required double deuda,
     required double saldoAFavor,
     required List<dynamic> historicos,
     required Map<String, dynamic> dataCliente,
+    required int? idCuenta, // ✅ NUEVO
   }) {
     final cs = Theme.of(context).colorScheme;
     final w = MediaQuery.of(context).size.width;
     final isMobile = w < 600;
 
     final confirm = ConfirmAction(
-      enabled: _ventaValida,
+      enabled: _ventaValida && _tieneCuentaSeleccionada, // ✅
       total: _total,
       onConfirm: () =>
-          _confirmarVenta(nombreCliente, legajo, deuda, saldoAFavor),
+          _confirmarVenta(nombreCliente, legajo, deuda, saldoAFavor, idCuenta),
     );
 
     return DefaultTabController(
@@ -396,7 +560,12 @@ class _VentaScreenState extends State<VentaScreen> {
               tooltip: 'Ver ubicación',
               icon: const Icon(Icons.location_on),
               onPressed: () {
-                // TODO: abrir mapa con dirección del cliente
+                // Usamos dirección base (sin "Zona ...") si existe,
+                // si no, caemos a lo que se muestra en UI.
+                final toOpen = (direccionBase.isNotEmpty)
+                    ? direccionBase
+                    : direccion;
+                _abrirEnMapsPorDireccion(toOpen);
               },
             ),
           ],
@@ -416,6 +585,7 @@ class _VentaScreenState extends State<VentaScreen> {
         bottomNavigationBar: isMobile ? confirm : null,
         body: Column(
           children: [
+            _selectorCuentaWidget(),
             _selectorListaPrecios(),
             Expanded(
               child: Padding(

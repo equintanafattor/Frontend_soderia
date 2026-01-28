@@ -8,6 +8,7 @@ class PagoService {
     required int legajo,
     required int idEmpresa,
     required int idMedioPago,
+    int? idCuenta, // 👈 CAMBIAR
     required double monto,
     String? observacion,
     int? idRepartoDia,
@@ -20,6 +21,7 @@ class PagoService {
         'id_empresa': idEmpresa,
         'id_medio_pago': idMedioPago,
         'monto': monto,
+        if (idCuenta != null) 'id_cuenta': idCuenta, // 👈 SOLO SI VIENE
         if (observacion != null) 'observacion': observacion,
         if (idRepartoDia != null) 'id_repartodia': idRepartoDia,
       }),

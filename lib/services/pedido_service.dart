@@ -11,10 +11,12 @@ class PedidoService {
     required double montoTotal,
     required double montoAbonado,
     required int idEmpresa,
-    // required String estado,
     required List<Map<String, dynamic>> items,
     int? idRepartoDia,
     String? observacion,
+
+    // ✅ NUEVO
+    int? idCuenta,
   }) async {
     final uri = Uri.parse(baseUrl);
 
@@ -25,9 +27,9 @@ class PedidoService {
       'fecha': fecha.toIso8601String(),
       'monto_total': montoTotal,
       'monto_abonado': montoAbonado,
-      // 'estado': estado,
-      'items': items, 
+      'items': items,
       if (idRepartoDia != null) 'id_repartodia': idRepartoDia,
+      if (idCuenta != null) 'id_cuenta': idCuenta, // ✅
       if (observacion != null && observacion.trim().isNotEmpty)
         'observacion': observacion.trim(),
     };
@@ -49,7 +51,6 @@ class PedidoService {
     required int idPedido,
     required int idRepartoDia,
   }) async {
-    // Coincide con: POST /pedidos/{id_pedido}/confirmar
     final uri = Uri.parse('$baseUrl/$idPedido/confirmar');
 
     final body = jsonEncode({'id_repartodia': idRepartoDia});
