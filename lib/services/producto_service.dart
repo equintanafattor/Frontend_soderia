@@ -27,6 +27,7 @@ class ProductoService {
     double? litros,
     String? tipoDispenser,
     String? observacion,
+    bool descuentaStock = true,
   }) async {
     final uri = Uri.parse('$baseUrl/productos/');
     final body = jsonEncode({
@@ -35,6 +36,7 @@ class ProductoService {
       'litros': litros,
       'tipo_dispenser': tipoDispenser,
       'observacion': observacion,
+      'descuenta_stock': descuentaStock,
     });
 
     final resp = await http.post(
@@ -57,6 +59,7 @@ class ProductoService {
     double? litros,
     String? tipoDispenser,
     String? observacion,
+    bool? descuentaStock,
   }) async {
     final uri = Uri.parse('$baseUrl/productos/$idProducto');
     final body = <String, dynamic>{};
@@ -66,6 +69,7 @@ class ProductoService {
     if (litros != null) body['litros'] = litros;
     if (tipoDispenser != null) body['tipo_dispenser'] = tipoDispenser;
     if (observacion != null) body['observacion'] = observacion;
+    if (descuentaStock != null) body['descuenta_stock'] = descuentaStock;
 
     final resp = await http.put(
       uri,

@@ -44,17 +44,62 @@ class _PagoLibreScreenState extends State<PagoLibreScreen> {
   int? _idCuentaSeleccionada;
   List<Map<String, dynamic>> _mediosPago = [];
 
+  List<Map<String, dynamic>> _cuentas = [];
+  double _deudaSel = 0;
+  double _saldoSel = 0;
+
+  double _toDouble(dynamic v) {
+    if (v == null) return 0.0;
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
+    return 0.0;
+  }
+
+  void _syncCuentaSeleccionada(int? idCuenta) {
+    if (idCuenta == null) {
+      _deudaSel = widget.deuda;
+      _saldoSel = widget.saldo;
+      return;
+    }
+
+    final c = _cuentas.firstWhere(
+      (x) => (x['id_cuenta'] as num?)?.toInt() == idCuenta,
+      orElse: () => _cuentas.isNotEmpty ? _cuentas.first : {},
+    );
+
+    _deudaSel = _toDouble(c['deuda']);
+    _saldoSel = _toDouble(c['saldo']);
+  }
+
   @override
   void initState() {
     super.initState();
     _loadMediosPago();
 
+    // Parseo cuentas una vez
+    _cuentas = widget.cuentas
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+
     _idCuentaSeleccionada = widget.idCuenta;
 
     // si no vino, auto-selección
-    if (_idCuentaSeleccionada == null && widget.cuentas.isNotEmpty) {
-      final c0 = widget.cuentas.first as Map<String, dynamic>;
-      _idCuentaSeleccionada = (c0['id_cuenta'] as num?)?.toInt();
+    if (_idCuentaSeleccionada == null && _cuentas.isNotEmpty) {
+      _idCuentaSeleccionada = (_cuentas.first['id_cuenta'] as num?)?.toInt();
+    }
+
+    // Inicializa resumen con la cuenta seleccionada
+    if (_cuentas.isNotEmpty) {
+      final c = _cuentas.firstWhere(
+        (x) => (x['id_cuenta'] as num?)?.toInt() == _idCuentaSeleccionada,
+        orElse: () => _cuentas.first,
+      );
+      _deudaSel = _toDouble(c['deuda']);
+      _saldoSel = _toDouble(c['saldo']);
+    } else {
+      _deudaSel = widget.deuda;
+      _saldoSel = widget.saldo;
     }
   }
 
@@ -160,13 +205,11 @@ class _PagoLibreScreenState extends State<PagoLibreScreen> {
                             style: TextStyle(fontSize: 12),
                           ),
                           Text(
-                            '\$ ${widget.deuda.toStringAsFixed(2)}',
+                            '\$ ${_deudaSel.toStringAsFixed(2)}',
                             style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
-                              color: widget.deuda > 0
-                                  ? Colors.red
-                                  : Colors.green,
+                              color: _deudaSel > 0 ? Colors.red : Colors.green,
                             ),
                           ),
                         ],
@@ -179,7 +222,7 @@ class _PagoLibreScreenState extends State<PagoLibreScreen> {
                             style: TextStyle(fontSize: 12),
                           ),
                           Text(
-                            '\$ ${widget.saldo.toStringAsFixed(2)}',
+                            '\$ ${_saldoSel.toStringAsFixed(2)}',
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w600,
@@ -219,9 +262,8 @@ class _PagoLibreScreenState extends State<PagoLibreScreen> {
               if (widget.cuentas.length > 1)
                 DropdownButtonFormField<int>(
                   value: _idCuentaSeleccionada,
-                  items: widget.cuentas
-                      .map((c0) {
-                        final c = c0 as Map<String, dynamic>;
+                  items: _cuentas
+                      .map((c) {
                         final id = (c['id_cuenta'] as num?)?.toInt();
                         final tipo = (c['tipo_de_cuenta'] ?? 'Cuenta')
                             .toString();
@@ -232,7 +274,14 @@ class _PagoLibreScreenState extends State<PagoLibreScreen> {
                       })
                       .where((e) => e.value != null)
                       .toList(),
-                  onChanged: (v) => setState(() => _idCuentaSeleccionada = v),
+
+                  onChanged: (v) {
+                    setState(() {
+                      _idCuentaSeleccionada = v;
+                      _syncCuentaSeleccionada(v);
+                    });
+                  },
+
                   decoration: const InputDecoration(
                     labelText: 'Cuenta',
                     prefixIcon: Icon(Icons.account_balance_wallet),

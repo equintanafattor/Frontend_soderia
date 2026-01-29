@@ -18,7 +18,10 @@ class AuthService {
     if (kFakeAuth) {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('auth_token', 'FAKE_TOKEN_DEV');
-      await prefs.setString('username', usuario.isNotEmpty ? usuario : 'DevUser');
+      await prefs.setString(
+        'username',
+        usuario.isNotEmpty ? usuario : 'DevUser',
+      );
       await prefs.setInt('user_id', 0);
       return true;
     }
@@ -86,5 +89,13 @@ class AuthService {
     await prefs.remove('auth_token');
     await prefs.remove('username');
     await prefs.remove('user_id');
+  }
+
+  Future<void> resetPassword(String usuarioOEmail) async {
+    // llamada al backend
+    await Future.delayed(const Duration(seconds: 1));
+
+    // después acá:
+    // POST /auth/reset-password
   }
 }

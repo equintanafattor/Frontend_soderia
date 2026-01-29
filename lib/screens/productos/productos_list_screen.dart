@@ -51,9 +51,7 @@ class _ProductosListScreenState extends State<ProductosListScreen> {
     var list = _data.where((p) {
       if (q.isEmpty) return true;
       final nombre = p.nombre.toLowerCase();
-      final litros = (p.litros ?? 0).toString();
-      final tipo = (p.tipoDispenser ?? '').toLowerCase();
-      return nombre.contains(q) || litros.contains(q) || tipo.contains(q);
+      return nombre.contains(q);
     }).toList();
 
     switch (_orden) {
@@ -108,7 +106,7 @@ class _ProductosListScreenState extends State<ProductosListScreen> {
                   onChanged: (_) => setState(() {}),
                   decoration: const InputDecoration(
                     prefixIcon: Icon(Icons.search),
-                    hintText: 'Buscar por nombre, litros o tipo de producto...',
+                    hintText: 'Buscar por nombre...',
                     border: OutlineInputBorder(),
                     isDense: true,
                   ),
@@ -191,13 +189,6 @@ class _ProductosListScreenState extends State<ProductosListScreen> {
                     itemBuilder: (ctx, i) {
                       final p = _filtered[i];
 
-                      final litrosTxt = p.litros != null
-                          ? '${p.litros!.toStringAsFixed(1)} Lts'
-                          : 'Sin litros';
-                      final tipoTxt = (p.tipoDispenser ?? '').isNotEmpty
-                          ? p.tipoDispenser!
-                          : 'Sin tipo';
-
                       final estadoTxt = p.estado == null
                           ? ''
                           : (p.estado! ? 'Activo' : 'Inactivo');
@@ -214,10 +205,7 @@ class _ProductosListScreenState extends State<ProductosListScreen> {
                           ),
                         ),
                         title: Text(p.nombre),
-                        subtitle: Text(
-                          '$litrosTxt · $tipoTxt'
-                          '${estadoTxt.isNotEmpty ? ' · $estadoTxt' : ''}',
-                        ),
+                        subtitle: estadoTxt.isEmpty ? null : Text(estadoTxt),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [

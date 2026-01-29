@@ -29,6 +29,7 @@ class _ProductoAddScreenState extends State<ProductoAddScreen> {
   // final _stockCtrl = TextEditingController();
 
   bool _activo = true;
+  bool _descuentaStock = true;
   bool _saving = false;
 
   XFile? _image;
@@ -81,6 +82,7 @@ class _ProductoAddScreenState extends State<ProductoAddScreen> {
     if (p != null) {
       _nombreCtrl.text = p.nombre;
       _activo = p.estado ?? true;
+      _descuentaStock = p.descuentaStock ?? true;
     }
 
     _loadListas();
@@ -193,6 +195,15 @@ class _ProductoAddScreenState extends State<ProductoAddScreen> {
                       title: const Text('Producto activo'),
                       contentPadding: EdgeInsets.zero,
                     ),
+                    SwitchListTile.adaptive(
+                      value: _descuentaStock,
+                      onChanged: (v) => setState(() => _descuentaStock = v),
+                      title: const Text('Descuenta stock'),
+                      subtitle: const Text(
+                        'Si está apagado, este producto no modifica el stock.',
+                      ),
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ],
                 ),
               ),
@@ -267,15 +278,21 @@ class _ProductoAddScreenState extends State<ProductoAddScreen> {
     try {
       final nombre = _nombreCtrl.text.trim().toLowerCase();
       final activo = _activo;
+      final descuentaStock = _descuentaStock;
 
       if (_isEdit) {
         await _service.actualizar(
           widget.initial!.idProducto,
           nombre: nombre,
           estado: activo,
+          descuentaStock: descuentaStock,
         );
       } else {
-        await _service.crear(nombre: nombre, estado: activo);
+        await _service.crear(
+          nombre: nombre,
+          estado: activo,
+          descuentaStock: descuentaStock,
+        );
       }
 
       if (!mounted) return;
@@ -305,7 +322,6 @@ class _ProductoAddScreenState extends State<ProductoAddScreen> {
 
       // ✅ siempre avisamos que hubo cambios
       Navigator.pop(context, true);
-      
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(

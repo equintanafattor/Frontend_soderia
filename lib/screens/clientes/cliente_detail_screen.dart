@@ -9,6 +9,8 @@ import 'package:frontend_soderia/utils/estado_cuenta_pdf.dart';
 import 'package:frontend_soderia/screens/clientes/cuenta/cliente_cuenta_add_screen.dart';
 import 'package:frontend_soderia/services/documento_service.dart';
 import 'package:frontend_soderia/utils/open_pdf.dart';
+import 'package:frontend_soderia/utils/share_pdf.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ClienteDetailScreen extends StatefulWidget {
   final int legajo;
@@ -481,14 +483,28 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                                 bidones: c['numero_bidones'],
                                 estado: c['estado'],
                                 onPdf: () async {
+                                  final ultimos = pedidos
+                                      .map<Map<String, dynamic>>((p0) {
+                                        final p = Map<String, dynamic>.from(
+                                          p0 as Map,
+                                        );
+                                        return {
+                                          'fecha': p['fecha'],
+                                          'id_pedido': p['id_pedido'],
+                                          'total': _toDouble(
+                                            p['total'],
+                                          ), // ya lo convertís
+                                        };
+                                      })
+                                      .toList();
+
                                   final pdfBytes = await generarEstadoCuentaPDF(
                                     nombreCliente: nombre,
                                     legajo: widget.legajo.toString(),
                                     fecha: DateTime.now(),
                                     deuda: _toDouble(c['deuda']),
                                     saldoAFavor: _toDouble(c['saldo']),
-                                    ultimosPedidos: pedidos
-                                        .cast<Map<String, dynamic>>(),
+                                    ultimosPedidos: ultimos,
                                   );
 
                                   await Printing.layoutPdf(
@@ -908,18 +924,32 @@ class _ComprobantesClienteSectionState
                       return;
                     }
 
-                    await shareWhatsApp(
-                      phone: phone,
-                      message:
-                          'Hola 👋\nTe comparto el comprobante de pago:\n\n$url',
-                    );
+                    // ✅ WEB: solo link
+                    if (kIsWeb) {
+                      await shareWhatsApp(
+                        phone: phone,
+                        message:
+                            'Hola! \nTe comparto el comprobante de pago:\n\n$url',
+                      );
+                      return;
+                    }
+
+                    // ✅ MOBILE: acá iría adjunto (cuando lo pruebes en Android/iOS)
+                    // await sharePdfFromUrlPrinting(url: url, filename: d['nombre_archivo']);
                   }
                 },
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'ver', child: Text('Ver comprobante')),
+                itemBuilder: (_) => [
+                  const PopupMenuItem(
+                    value: 'ver',
+                    child: Text('Ver comprobante'),
+                  ),
                   PopupMenuItem(
                     value: 'whatsapp',
-                    child: Text('Compartir por WhatsApp'),
+                    child: Text(
+                      kIsWeb
+                          ? 'Compartir link por WhatsApp'
+                          : 'Compartir PDF por WhatsApp',
+                    ),
                   ),
                 ],
               ),

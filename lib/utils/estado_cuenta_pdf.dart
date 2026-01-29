@@ -13,7 +13,17 @@ Future<Uint8List> generarEstadoCuentaPDF({
 }) async {
   final pdf = pw.Document();
 
-  String _money(num v) => '\$${v.toStringAsFixed(0)}';
+  num _toNum(dynamic v) {
+    if (v == null) return 0;
+    if (v is num) return v;
+    if (v is String) return num.tryParse(v.replaceAll(',', '.')) ?? 0;
+    return 0;
+  }
+
+  String _money(dynamic v) {
+    final n = _toNum(v);
+    return '\$${n.toStringAsFixed(0)}';
+  }
 
   pdf.addPage(
     pw.Page(
@@ -23,15 +33,9 @@ Future<Uint8List> generarEstadoCuentaPDF({
           children: [
             pw.Text(
               'SODERÍA SAN MIGUEL',
-              style: pw.TextStyle(
-                fontSize: 18,
-                fontWeight: pw.FontWeight.bold,
-              ),
+              style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
             ),
-            pw.Text(
-              'Estado de cuenta',
-              style: pw.TextStyle(fontSize: 14),
-            ),
+            pw.Text('Estado de cuenta', style: pw.TextStyle(fontSize: 14)),
 
             pw.SizedBox(height: 16),
 
@@ -43,10 +47,7 @@ Future<Uint8List> generarEstadoCuentaPDF({
 
             pw.Text(
               'Resumen',
-              style: pw.TextStyle(
-                fontSize: 14,
-                fontWeight: pw.FontWeight.bold,
-              ),
+              style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
             ),
             pw.Divider(),
 

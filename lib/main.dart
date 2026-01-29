@@ -36,8 +36,8 @@ import 'package:frontend_soderia/screens/clientes/cliente_detail_screen.dart';
 import 'package:frontend_soderia/screens/clientes/cliente_edit_screen.dart';
 import 'package:frontend_soderia/screens/listas_precios/listas_precios_list_screen.dart';
 import 'package:frontend_soderia/screens/listas_precios/lista_precio_form_screen.dart';
-
-// 👇 NUEVO: listado de productos
+import 'package:frontend_soderia/models/producto.dart';
+import 'package:frontend_soderia/screens/productos/producto_add_screen.dart';
 import 'package:frontend_soderia/screens/productos/productos_list_screen.dart';
 
 Future<void> main() async {
@@ -58,6 +58,20 @@ class FrontendSoderiaApp extends StatelessWidget {
       theme: soderiaTheme,
 
       routes: {
+        // === Productos ===
+        // ✅ EDIT PRODUCTO
+        '/producto/edit': (ctx) {
+          final args = ModalRoute.of(ctx)!.settings.arguments;
+
+          if (args is Producto) {
+            return ProductoAddScreen(initial: args);
+          }
+
+          return const Scaffold(
+            body: Center(child: Text('Faltan datos para editar el producto')),
+          );
+        },
+
         // === Auth / navegación principal ===
         '/login': (_) => const LoginScreen(),
 
