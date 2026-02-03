@@ -22,6 +22,7 @@ import 'package:frontend_soderia/screens/todos_screen.dart';
 import 'package:frontend_soderia/screens/calendario_screen.dart';
 import 'package:frontend_soderia/screens/venta_screen.dart';
 import 'package:frontend_soderia/screens/stock/stock_list_screen.dart';
+import 'package:frontend_soderia/screens/listas_precios/listas_precios_edit_screen.dart';
 
 // Altas
 import 'package:frontend_soderia/screens/clientes/cliente_add_screen.dart';
@@ -144,6 +145,18 @@ class FrontendSoderiaApp extends StatelessWidget {
         '/listas-precios': (_) => const ListasPreciosListScreen(),
 
         '/listas-precios/new': (_) => const ListaPrecioFormScreen(),
+
+        '/listas-precios/edit': (ctx) {
+          final args = ModalRoute.of(ctx)!.settings.arguments;
+
+          if (args is int) {
+            return ListaPrecioEditScreen(idLista: args);
+          }
+
+          return const Scaffold(
+            body: Center(child: Text('Falta id de la lista para editar')),
+          );
+        },
 
         '/listas-precios/detail': (ctx) {
           final args = ModalRoute.of(ctx)!.settings.arguments;

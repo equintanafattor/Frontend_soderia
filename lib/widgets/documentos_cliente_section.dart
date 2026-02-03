@@ -28,7 +28,11 @@ class DocumentosClienteSection extends StatelessWidget {
         final docs = snap.data ?? [];
 
         final comprobantes = docs
-            .where((d) => d['tipo_archivo'] == 'COMPROBANTE_PAGO')
+            .where(
+              (d) =>
+                  d['tipo_archivo'] == 'COMPROBANTE_PAGO' ||
+                  d['tipo_archivo'] == 'COMPROBANTE_PEDIDO',
+            )
             .toList();
 
         if (comprobantes.isEmpty) {

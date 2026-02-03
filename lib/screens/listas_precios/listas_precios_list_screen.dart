@@ -28,13 +28,9 @@ class _ListasPreciosListScreenState extends State<ListasPreciosListScreen> {
     setState(() => _cargando = true);
     try {
       final list = await _service.listarListas();
-      if (mounted) {
-        setState(() => _data = list);
-      }
+      if (mounted) setState(() => _data = list);
     } finally {
-      if (mounted) {
-        setState(() => _cargando = false);
-      }
+      if (mounted) setState(() => _cargando = false);
     }
   }
 
@@ -66,10 +62,8 @@ class _ListasPreciosListScreenState extends State<ListasPreciosListScreen> {
           route: '/listas-precios/new',
           onRefresh: _load,
         ),
-
         child: const Icon(Icons.add),
       ),
-
       body: Column(
         children: [
           Padding(
@@ -95,24 +89,38 @@ class _ListasPreciosListScreenState extends State<ListasPreciosListScreen> {
                       final l = _data[i];
 
                       final nombre = (l['nombre'] ?? '').toString();
-                      final visible = nombre.toLowerCase().contains(filtro);
-
-                      if (!visible) {
+                      if (!nombre.toLowerCase().contains(filtro)) {
                         return const SizedBox.shrink();
                       }
 
-                      final estado = l['estado'] ?? '';
+                      final estadoRaw = (l['estado'] ?? '').toString();
+                      final estado = estadoRaw.toLowerCase().trim();
+                      final inactiva = estado != 'activo';
+
+                      final chipText = inactiva ? 'inactivo' : 'activo';
+                      final chipColor = inactiva
+                          ? Colors.grey.shade300
+                          : Colors.green.shade100;
 
                       return ListTile(
-                        title: Text(nombre),
+                        title: Text(
+                          nombre,
+                          style: TextStyle(
+                            color: inactiva ? Colors.grey : null,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                         subtitle: l['fecha_creacion'] != null
-                            ? Text('Creada: ${l['fecha_creacion']}')
+                            ? Text(
+                                'Creada: ${l['fecha_creacion']}',
+                                style: TextStyle(
+                                  color: inactiva ? Colors.grey : null,
+                                ),
+                              )
                             : null,
                         trailing: Chip(
-                          label: Text(estado),
-                          backgroundColor: estado == 'ACTIVA'
-                              ? Colors.green.shade100
-                              : Colors.grey.shade300,
+                          label: Text(chipText),
+                          backgroundColor: chipColor,
                         ),
                         onTap: () async {
                           final changed = await AppShellActions.push(
@@ -121,9 +129,7 @@ class _ListasPreciosListScreenState extends State<ListasPreciosListScreen> {
                             arguments: {'id': l['id_lista'], 'nombre': nombre},
                           );
 
-                          if (changed == true && mounted) {
-                            _load();
-                          }
+                          if (changed == true && mounted) _load();
                         },
                       );
                     },

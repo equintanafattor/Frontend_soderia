@@ -4,6 +4,46 @@ import 'package:http/http.dart' as http;
 class ListaPrecioService {
   static const String baseUrl = 'http://localhost:8500';
 
+  Future<Map<String, dynamic>> obtenerLista(int idLista) async {
+    final uri = Uri.parse('$baseUrl/listas-precios/$idLista');
+    final res = await http.get(uri);
+
+    if (res.statusCode != 200) {
+      throw Exception('Error obteniendo lista: ${res.statusCode} ${res.body}');
+    }
+    return jsonDecode(res.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> actualizarLista({
+    required int idLista,
+    required String nombre,
+    required String estado, // "activo" | "inactivo"
+  }) async {
+    final uri = Uri.parse('$baseUrl/listas-precios/$idLista');
+
+    final res = await http.put(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'nombre': nombre, 'estado': estado}),
+    );
+
+    if (res.statusCode != 200) {
+      throw Exception(
+        'Error actualizando lista: ${res.statusCode} ${res.body}',
+      );
+    }
+    return jsonDecode(res.body) as Map<String, dynamic>;
+  }
+
+  Future<void> eliminarLista(int idLista) async {
+    final uri = Uri.parse('$baseUrl/listas-precios/$idLista');
+    final res = await http.delete(uri);
+
+    if (res.statusCode != 200) {
+      throw Exception('Error eliminando lista: ${res.statusCode} ${res.body}');
+    }
+  }
+
   // =========================
   // Listas
   // =========================

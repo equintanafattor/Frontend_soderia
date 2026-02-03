@@ -1,11 +1,20 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/services/lista_precio_service.dart';
+import 'package:frontend_soderia/services/combo_service.dart';
 
 class PrecioComboModal extends StatefulWidget {
   final int idLista;
   final Map<String, dynamic>? comboInicial;
+  final List<int> idsYaEnLista; // ✅ NUEVO
 
-  const PrecioComboModal({super.key, required this.idLista, this.comboInicial});
+  const PrecioComboModal({
+    super.key,
+    required this.idLista,
+    this.comboInicial,
+    this.idsYaEnLista = const [], // ✅ default
+  });
 
   @override
   State<PrecioComboModal> createState() => _PrecioComboModalState();
@@ -13,15 +22,25 @@ class PrecioComboModal extends StatefulWidget {
 
 class _PrecioComboModalState extends State<PrecioComboModal> {
   final _service = ListaPrecioService();
-  final _precioCtrl = TextEditingController();
+  final _comboService = ComboService();
 
+  final _precioCtrl = TextEditingController();
+  int? _idCombo;
   bool _saving = false;
+
+  bool get _esEdicion => widget.comboInicial != null;
+
+  late final Future<List<dynamic>> _combosFuture;
 
   @override
   void initState() {
     super.initState();
-    if (widget.comboInicial != null && widget.comboInicial!['precio'] != null) {
-      _precioCtrl.text = widget.comboInicial!['precio'].toString();
+    _combosFuture = _comboService.listar();
+
+    if (_esEdicion) {
+      final c = widget.comboInicial!;
+      _idCombo = c['id_combo'] as int?;
+      if (c['precio'] != null) _precioCtrl.text = c['precio'].toString();
     }
   }
 
@@ -35,6 +54,13 @@ class _PrecioComboModalState extends State<PrecioComboModal> {
     final txt = _precioCtrl.text.replaceAll(',', '.');
     final precio = double.tryParse(txt);
 
+    if (_idCombo == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Seleccioná un combo')));
+      return;
+    }
+
     if (precio == null || precio <= 0) {
       ScaffoldMessenger.of(
         context,
@@ -46,7 +72,7 @@ class _PrecioComboModalState extends State<PrecioComboModal> {
     try {
       await _service.upsertPrecioCombo(
         idLista: widget.idLista,
-        idCombo: widget.comboInicial!['id_item'],
+        idCombo: _idCombo!,
         precio: precio,
       );
 
@@ -66,28 +92,82 @@ class _PrecioComboModalState extends State<PrecioComboModal> {
     final combo = widget.comboInicial;
 
     return AlertDialog(
-      title: const Text('Precio del combo'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (combo != null) ...[
-            Text(
-              '📦 ${combo['nombre']}',
-              style: Theme.of(context).textTheme.titleMedium,
+      title: Text(_esEdicion ? 'Editar precio del combo' : 'Agregar combo'),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (_esEdicion && combo != null) ...[
+              Text(
+                '📦 ${combo['nombre']}',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            if (!_esEdicion) ...[
+              FutureBuilder<List<dynamic>>(
+                future: _combosFuture,
+                builder: (ctx, snap) {
+                  if (snap.connectionState == ConnectionState.waiting) {
+                    return const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: CircularProgressIndicator(),
+                    );
+                  }
+                  if (!snap.hasData || snap.data!.isEmpty) {
+                    return const Text('No hay combos disponibles');
+                  }
+
+                  final combos = snap.data!;
+
+                  // ✅ si es alta: saco los que ya están en la lista
+                  final disponibles = combos.where((c) {
+                    final id = c['id_combo'] as int;
+                    return !widget.idsYaEnLista.contains(id);
+                  }).toList();
+
+                  if (disponibles.isEmpty) {
+                    return const Text(
+                      'Ya agregaste todos los combos a esta lista',
+                    );
+                  }
+
+                  return DropdownButtonFormField<int>(
+                    value: _idCombo,
+                    decoration: const InputDecoration(
+                      labelText: 'Combo',
+                      border: OutlineInputBorder(),
+                    ),
+                    hint: const Text('Seleccioná un combo'),
+                    items: disponibles.map((c) {
+                      return DropdownMenuItem<int>(
+                        value: c['id_combo'] as int,
+                        child: Text(c['nombre'] as String),
+                      );
+                    }).toList(),
+                    onChanged: (v) => setState(() => _idCombo = v),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            TextField(
+              controller: _precioCtrl,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(
+                labelText: 'Precio',
+                prefixText: '\$ ',
+                border: OutlineInputBorder(),
+              ),
             ),
-            const SizedBox(height: 12),
           ],
-          TextField(
-            controller: _precioCtrl,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Precio',
-              prefixText: '\$ ',
-              border: OutlineInputBorder(),
-            ),
-          ),
-        ],
+        ),
       ),
       actions: [
         TextButton(

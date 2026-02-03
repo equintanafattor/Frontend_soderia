@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:frontend_soderia/core/navigation/app_shell_actions.dart';
 import 'package:frontend_soderia/core/navigation/push_and_refresh.dart';
 import 'package:frontend_soderia/services/lista_precio_service.dart';
 import 'package:frontend_soderia/screens/productos/precio_producto_modal.dart';
@@ -62,6 +61,10 @@ class _ListaPrecioDetailScreenState extends State<ListaPrecioDetailScreen> {
   }
 }
 
+// =======================
+// TAB PRODUCTOS
+// =======================
+
 class _ProductosTab extends StatefulWidget {
   final int idLista;
   const _ProductosTab({required this.idLista});
@@ -85,13 +88,9 @@ class _ProductosTabState extends State<_ProductosTab> {
     setState(() => _loading = true);
     try {
       final data = await _service.listarProductosConPrecio(widget.idLista);
-      if (mounted) {
-        setState(() => _productos = data);
-      }
+      if (mounted) setState(() => _productos = data);
     } finally {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -100,7 +99,7 @@ class _ProductosTabState extends State<_ProductosTab> {
       context: context,
       builder: (_) => PrecioProductoModal(
         idLista: widget.idLista,
-        productoInicial: producto,
+        productoInicial: producto, // null => alta
       ),
     );
 
@@ -113,7 +112,7 @@ class _ProductosTabState extends State<_ProductosTab> {
       floatingActionButton: FloatingActionButton.extended(
         icon: const Icon(Icons.add),
         label: const Text('Agregar producto'),
-        onPressed: () => _openModal(),
+        onPressed: () => _openModal(), // ✅ alta
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -135,7 +134,7 @@ class _ProductosTabState extends State<_ProductosTab> {
                   trailing: IconButton(
                     icon: const Icon(Icons.edit),
                     tooltip: 'Editar precio',
-                    onPressed: () => _openModal(producto: p),
+                    onPressed: () => _openModal(producto: p), // ✅ edición
                   ),
                 );
               },
@@ -143,6 +142,10 @@ class _ProductosTabState extends State<_ProductosTab> {
     );
   }
 }
+
+// =======================
+// TAB COMBOS
+// =======================
 
 class _CombosTab extends StatefulWidget {
   final int idLista;
@@ -156,6 +159,8 @@ class _CombosTabState extends State<_CombosTab> {
   final _service = ListaPrecioService();
   bool _loading = false;
   List<dynamic> _combos = [];
+  List<int> get _idsCombosYaCargados =>
+      _combos.map((c) => c['id_combo'] as int).toList();
 
   @override
   void initState() {
@@ -167,21 +172,20 @@ class _CombosTabState extends State<_CombosTab> {
     setState(() => _loading = true);
     try {
       final data = await _service.listarCombosConPrecio(widget.idLista);
-      if (mounted) {
-        setState(() => _combos = data);
-      }
+      if (mounted) setState(() => _combos = data);
     } finally {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
+      if (mounted) setState(() => _loading = false);
     }
   }
 
-  Future<void> _openModal(Map<String, dynamic> combo) async {
+  Future<void> _openModal({Map<String, dynamic>? combo}) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) =>
-          PrecioComboModal(idLista: widget.idLista, comboInicial: combo),
+      builder: (_) => PrecioComboModal(
+        idLista: widget.idLista,
+        comboInicial: combo, // null => alta
+        idsYaEnLista: _idsCombosYaCargados, // ✅ NUEVO
+      ),
     );
 
     if (ok == true) _load();
@@ -190,6 +194,11 @@ class _CombosTabState extends State<_CombosTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        icon: const Icon(Icons.add),
+        label: const Text('Agregar combo'),
+        onPressed: () => _openModal(), // ✅ alta
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _combos.isEmpty
@@ -214,7 +223,7 @@ class _CombosTabState extends State<_CombosTab> {
                   trailing: IconButton(
                     icon: const Icon(Icons.edit),
                     tooltip: 'Editar precio',
-                    onPressed: () => _openModal(c),
+                    onPressed: () => _openModal(combo: c), // ✅ edición
                   ),
                 );
               },

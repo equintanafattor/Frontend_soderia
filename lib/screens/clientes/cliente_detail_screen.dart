@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/navigation/app_shell_actions.dart';
 import 'package:frontend_soderia/services/cliente_service.dart';
+import 'package:frontend_soderia/utils/pedido_pdf.dart';
 import 'package:frontend_soderia/utils/share_whatsapp.dart';
 import 'package:printing/printing.dart';
 import 'package:frontend_soderia/utils/estado_cuenta_pdf.dart';
@@ -11,6 +12,8 @@ import 'package:frontend_soderia/services/documento_service.dart';
 import 'package:frontend_soderia/utils/open_pdf.dart';
 import 'package:frontend_soderia/utils/share_pdf.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:frontend_soderia/services/servicios_service.dart';
+import '../../core/net/api_client.dart';
 
 class ClienteDetailScreen extends StatefulWidget {
   final int legajo;
@@ -24,11 +27,15 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
   final _service = ClienteService();
   late Future<_ClienteFullData> _future;
   bool _changed = false;
+  final _serviciosService = ServiciosService();
+  late Future<List<ClienteServicioPeriodoDto>> _pendientesFuture;
+  final _docService = DocumentoService();
 
   @override
   void initState() {
     super.initState();
     _future = _loadData();
+    _pendientesFuture = _serviciosService.getPendientes(widget.legajo);
   }
 
   Future<_ClienteFullData> _loadData() async {
@@ -52,7 +59,218 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
     _changed = true;
     setState(() {
       _future = _loadData();
+      _pendientesFuture = _serviciosService.getPendientes(widget.legajo);
     });
+  }
+
+  // Todo esto es para el servicio del dispenser
+
+  Widget _bannerServicios(List<ClienteServicioPeriodoDto> periodos) {
+    if (periodos.isEmpty) return const SizedBox.shrink();
+
+    final total = periodos.fold<double>(0, (a, p) => a + p.monto);
+    final vencidos = periodos.where((p) => p.estado == 'VENCIDO').length;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: vencidos > 0 ? const Color(0xFFFFE5E5) : const Color(0xFFFFF3CD),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: vencidos > 0
+              ? const Color(0xFFEE7777)
+              : const Color(0xFFE6C200),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.water_drop_outlined,
+            color: vencidos > 0 ? const Color(0xFFCC0000) : null,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Alquiler dispenser: ${periodos.length} pendiente(s)',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Total a cobrar: \$${total.toStringAsFixed(2)}'
+                  '${vencidos > 0 ? ' • $vencidos vencido(s)' : ''}',
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () => _openServiciosSheet(periodos),
+            child: const Text('Ver / Cobrar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openServiciosSheet(List<ClienteServicioPeriodoDto> periodos) {
+    final items = [...periodos];
+
+    // VENCIDO primero, luego por periodo desc
+    items.sort((a, b) {
+      final av = a.estado == 'VENCIDO' ? 0 : 1;
+      final bv = b.estado == 'VENCIDO' ? 0 : 1;
+      if (av != bv) return av.compareTo(bv);
+      return b.periodo.compareTo(a.periodo);
+    });
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Servicios pendientes',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 12),
+                ...items.map((p) {
+                  final y = p.periodo.year;
+                  final m = p.periodo.month.toString().padLeft(2, '0');
+                  final vence = p.fechaVencimiento
+                      .toIso8601String()
+                      .split('T')
+                      .first;
+
+                  return Card(
+                    elevation: 0.5,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: ListTile(
+                      leading: Icon(
+                        p.estado == 'VENCIDO'
+                            ? Icons.error_outline
+                            : Icons.schedule,
+                        color: p.estado == 'VENCIDO'
+                            ? const Color(0xFFCC0000)
+                            : null,
+                      ),
+                      title: Text('Período $y-$m'),
+                      subtitle: Text('Vence: $vence • Estado: ${p.estado}'),
+                      trailing: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            '\$${p.monto.toStringAsFixed(2)}',
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 6),
+                          ElevatedButton(
+                            onPressed: () => _cobrarPeriodo(p),
+                            child: const Text('Cobrar'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _cobrarPeriodo(ClienteServicioPeriodoDto p) async {
+    int? medioPago; // id_medio_pago
+    String obs = '';
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Cobrar alquiler dispenser'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Monto: \$${p.monto.toStringAsFixed(2)}'),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<int>(
+              decoration: const InputDecoration(labelText: 'Medio de pago'),
+              items: const [
+                DropdownMenuItem(value: 1, child: Text('Efectivo')),
+                DropdownMenuItem(value: 2, child: Text('Transferencia')),
+                DropdownMenuItem(value: 3, child: Text('Otro')),
+                DropdownMenuItem(value: 4, child: Text('Mixto (reparto)')),
+              ],
+              onChanged: (v) => medioPago = v,
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              decoration: const InputDecoration(
+                labelText: 'Observación (opcional)',
+              ),
+              onChanged: (v) => obs = v,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (medioPago == null) return;
+              Navigator.pop(context, true);
+            },
+            child: const Text('Cobrar'),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true) return;
+
+    try {
+      await _serviciosService.pagarPeriodo(
+        idPeriodo: p.idPeriodo,
+        legajo: widget.legajo,
+        idMedioPago: medioPago!,
+        observacion: obs.isEmpty ? null : obs,
+      );
+
+      if (!mounted) return;
+
+      // refresca pendientes
+      setState(() {
+        _pendientesFuture = _serviciosService.getPendientes(widget.legajo);
+      });
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Servicio cobrado ✅')));
+
+      if (mounted) {
+        Navigator.of(context).maybePop();
+      }
+
+      // Cierra el dialogo? (ya cerró) — si querés cerrar el bottomsheet también:
+      // Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error cobrando servicio: $e')));
+    }
   }
 
   Future<void> _eliminar() async {
@@ -309,8 +527,8 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
 
             final direcciones = (data['direcciones'] as List?) ?? const [];
             final telefonos = (data['telefonos'] as List?) ?? const [];
-
             final pedidos = full.pedidos;
+            final phone = _telefonoParaWhatsappFrom(telefonos);
             final historicos = full.historicos;
 
             String _iniciales() {
@@ -328,7 +546,21 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
               color: cs.surfaceVariant.withOpacity(0.2),
               child: ListView(
                 padding: const EdgeInsets.all(16),
+
                 children: [
+                  FutureBuilder<List<ClienteServicioPeriodoDto>>(
+                    future: _pendientesFuture,
+                    builder: (context, snapSrv) {
+                      if (snapSrv.connectionState == ConnectionState.waiting) {
+                        return const SizedBox.shrink();
+                      }
+                      if (snapSrv.hasError) {
+                        return const SizedBox.shrink();
+                      }
+                      return _bannerServicios(snapSrv.data ?? const []);
+                    },
+                  ),
+
                   // HEADER CARD
                   Card(
                     shape: RoundedRectangleBorder(
@@ -524,23 +756,79 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                         : Column(
                             children: pedidos.map((p0) {
                               final p = p0 as Map;
+                              final id = (p['id_pedido'] as num?)?.toInt();
+                              final fecha = (p['fecha'] ?? '').toString();
+
                               return ListTile(
                                 contentPadding: EdgeInsets.zero,
                                 leading: const Icon(
                                   Icons.shopping_bag_outlined,
                                 ),
                                 title: Text(
-                                  'Pedido #${p['id_pedido'] ?? ''}',
+                                  id == null ? 'Pedido' : 'Pedido #$id',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
-                                subtitle: Text('${p['fecha'] ?? ''}'),
-                                trailing: Text(
-                                  '${p['total'] ?? ''}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                subtitle: Text(fecha),
+                                trailing: PopupMenuButton<String>(
+                                  onSelected: (v) async {
+                                    if (id == null) return;
+
+                                    try {
+                                      // genera (o devuelve existente)
+                                      final doc = await _docService
+                                          .generarComprobantePedido(id);
+                                      final url =
+                                          '${ApiClient.dio.options.baseUrl}${doc['url']}';
+
+                                      if (v == 'ver') {
+                                        await openPdf(url);
+                                        return;
+                                      }
+
+                                      if (v == 'whatsapp') {
+                                        if (phone == null) {
+                                          if (!mounted) return;
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'El cliente no tiene teléfono cargado',
+                                              ),
+                                            ),
+                                          );
+                                          return;
+                                        }
+
+                                        await shareWhatsApp(
+                                          phone: phone,
+                                          message:
+                                              'Hola!\nTe comparto el comprobante del pedido #$id:\n\n$url',
+                                        );
+                                      }
+                                    } catch (e) {
+                                      if (!mounted) return;
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(content: Text('Error: $e')),
+                                      );
+                                    }
+                                  },
+                                  itemBuilder: (_) => const [
+                                    PopupMenuItem(
+                                      value: 'ver',
+                                      child: Text('Ver comprobante'),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'whatsapp',
+                                      child: Text(
+                                        'Compartir link por WhatsApp',
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               );
                             }).toList(),
@@ -898,7 +1186,7 @@ class _ComprobantesClienteSectionState
         return Column(
           children: comprobantes.map((d) {
             final fecha = d['fecha']?.toString().split('T').first ?? '';
-            final url = 'http://localhost:8500${d['url']}';
+            final url = '${ApiClient.dio.options.baseUrl}${d['url']}';
 
             return ListTile(
               dense: true,
@@ -962,6 +1250,33 @@ class _ComprobantesClienteSectionState
 }
 
 // HELPERS
+
+// helper local (ponelo cerca de _toDouble o arriba del build)
+String? _telefonoParaWhatsappFrom(List telefonos) {
+  if (telefonos.isEmpty) return null;
+
+  final principal = telefonos.firstWhere(
+    (t) => (t as Map)['principal'] == true,
+    orElse: () => {},
+  );
+
+  final raw =
+      ((principal is Map && principal.isNotEmpty)
+              ? principal['nro_telefono']
+              : (telefonos.first as Map)['nro_telefono'])
+          ?.toString();
+
+  if (raw == null || raw.trim().isEmpty) return null;
+
+  final digits = raw.replaceAll(RegExp(r'\D'), '');
+  if (digits.startsWith('549')) return digits;
+  if (digits.startsWith('54')) return '549${digits.substring(2)}';
+
+  var d = digits;
+  if (d.startsWith('0')) d = d.substring(1);
+  if (d.startsWith('15')) d = d.substring(2);
+  return '549$d';
+}
 
 double _toDouble(dynamic v) {
   if (v == null) return 0;

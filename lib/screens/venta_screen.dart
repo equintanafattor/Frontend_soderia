@@ -70,7 +70,7 @@ class _VentaScreenState extends State<VentaScreen> {
   // Futuros para cliente (detalle) y productos
   late Future<Map<String, dynamic>> _futureClienteDetalle;
   int? _idListaSeleccionada;
-  late Future<List<dynamic>> _futureItems;
+  Future<List<dynamic>> _futureItems = Future.value(const []);
   late Future<List<dynamic>> _futureListasPrecios;
   String _key(TipoItemVenta tipo, int id) => '${tipo.name}-$id';
 
@@ -116,8 +116,9 @@ class _VentaScreenState extends State<VentaScreen> {
     _futureClienteDetalle = _clienteService.obtenerDetalleCliente(
       widget.legajoCliente,
     );
-
     _futureListasPrecios = _listaPrecioService.listarListas();
+
+    _idListaSeleccionada = widget.idListaPrecios;
   }
 
   // -------- Helpers --------
@@ -623,8 +624,14 @@ class _VentaScreenState extends State<VentaScreen> {
           );
         }
 
-        final activas = snap.data!
-            .where((l) => l['estado'] == 'ACTIVA')
+        final listas = snap.data!;
+
+        final activas = listas
+            .where(
+              (l) =>
+                  (l['estado'] ?? '').toString().toLowerCase().trim() ==
+                  'activo',
+            )
             .toList();
 
         if (activas.isEmpty) {
@@ -634,13 +641,21 @@ class _VentaScreenState extends State<VentaScreen> {
           );
         }
 
-        // ✅ Auto–selección segura
-        if (_idListaSeleccionada == null ||
-            !activas.any((l) => l['id_lista'] == _idListaSeleccionada)) {
-          _idListaSeleccionada = activas.first['id_lista'];
-          _futureItems = _listaPrecioService.listarItemsDeLista(
-            _idListaSeleccionada!,
-          );
+        // si la seleccionada no existe o está inactiva, caigo a la primera activa
+        final existeYActiva =
+            _idListaSeleccionada != null &&
+            activas.any((l) => l['id_lista'] == _idListaSeleccionada);
+
+        if (!existeYActiva) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            setState(() {
+              _idListaSeleccionada = activas.first['id_lista'] as int;
+              _futureItems = _listaPrecioService.listarItemsDeLista(
+                _idListaSeleccionada!,
+              );
+            });
+          });
         }
 
         return Padding(
@@ -775,18 +790,29 @@ class _VentaScreenState extends State<VentaScreen> {
     }
 
     return FutureBuilder<List<dynamic>>(
-      future: _futureItems,
+      future: _futureItems, // ✅ el del State (NO redeclarar acá)
       builder: (context, snap) {
-        if (!snap.hasData) {
+        if (snap.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final items = snap.data!;
+        if (snap.hasError) {
+          return Center(child: Text('Error cargando ítems: ${snap.error}'));
+        }
+
+        final items = (snap.data ?? const []);
+
+        if (items.isEmpty) {
+          return const Center(
+            child: Text('Esta lista no tiene ítems con precio'),
+          );
+        }
+
         return ListView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: items.length,
           itemBuilder: (_, i) {
-            final it = items[i];
+            final it = items[i] as Map<String, dynamic>;
 
             final tipo = it['tipo'] == 'combo'
                 ? TipoItemVenta.combo
@@ -815,7 +841,7 @@ class _VentaScreenState extends State<VentaScreen> {
                 enabled: puedeVender,
                 leading: Icon(icon, color: puedeVender ? null : Colors.grey),
                 title: Text(
-                  it['nombre'],
+                  (it['nombre'] ?? '').toString(),
                   style: TextStyle(
                     color: puedeVender ? null : Colors.grey,
                     fontWeight: FontWeight.w600,
@@ -836,8 +862,8 @@ class _VentaScreenState extends State<VentaScreen> {
                   onPressed: puedeVender
                       ? () => _agregarItem(
                           tipo,
-                          it['id_item'],
-                          it['nombre'],
+                          (it['id_item'] as num).toInt(),
+                          (it['nombre'] ?? '').toString(),
                           precio,
                         )
                       : null,

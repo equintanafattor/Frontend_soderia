@@ -3,7 +3,7 @@
 import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
 
-import 'package:frontend_soderia/core/net/api_client.dart';
+import '../../core/net/api_client.dart';
 import 'package:frontend_soderia/models/clientes_por_dia.dart';
 
 class AgendaVisitasService {

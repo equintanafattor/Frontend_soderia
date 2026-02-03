@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
 
-import 'package:frontend_soderia/core/net/api_client.dart';
+import '../../core/net/api_client.dart';
 import 'package:frontend_soderia/models/direccion_cliente.dart';
 
 class DireccionClienteService {

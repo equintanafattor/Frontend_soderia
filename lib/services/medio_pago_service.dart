@@ -1,14 +1,18 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
+import '../../core/net/api_client.dart';
+
 
 class MedioPagoService {
-  final String baseUrl = 'http://localhost:8500/medios-pago';
+  final Dio _dio = ApiClient.dio;
 
   Future<List<Map<String, dynamic>>> listar() async {
-    final res = await http.get(Uri.parse(baseUrl));
-    if (res.statusCode != 200) {
-      throw Exception('Error cargando medios de pago');
+    final res = await _dio.get('/medios-pago/');
+    final data = res.data;
+
+    if (data is! List) {
+      throw Exception('Respuesta inválida medios-pago: ${res.data}');
     }
-    return List<Map<String, dynamic>>.from(jsonDecode(res.body));
+
+    return data.map((e) => Map<String, dynamic>.from(e)).toList();
   }
 }

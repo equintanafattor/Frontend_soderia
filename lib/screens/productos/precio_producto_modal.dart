@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/services/lista_precio_service.dart';
 import 'package:frontend_soderia/services/producto_service.dart';
@@ -21,6 +23,7 @@ class _PrecioProductoModalState extends State<PrecioProductoModal> {
   final _precioCtrl = TextEditingController();
   int? _idProducto;
   bool _loading = false;
+  late final Future<List<Producto>> _productosFuture;
 
   final _listaPrecioService = ListaPrecioService();
   final _productoService = ProductoService();
@@ -30,6 +33,8 @@ class _PrecioProductoModalState extends State<PrecioProductoModal> {
   @override
   void initState() {
     super.initState();
+    _productosFuture = _productoService.listar();
+
     if (_esEdicion) {
       _idProducto = widget.productoInicial!['id_producto'];
       _precioCtrl.text = widget.productoInicial!['precio'].toString();
@@ -85,7 +90,7 @@ class _PrecioProductoModalState extends State<PrecioProductoModal> {
           children: [
             if (!_esEdicion)
               FutureBuilder<List<Producto>>(
-                future: _productoService.listar(),
+                future: _productosFuture,
                 builder: (ctx, snap) {
                   if (snap.connectionState == ConnectionState.waiting) {
                     return const Padding(
@@ -99,10 +104,12 @@ class _PrecioProductoModalState extends State<PrecioProductoModal> {
                   }
 
                   return DropdownButtonFormField<int>(
+                    value: _idProducto,
                     decoration: const InputDecoration(
                       labelText: 'Producto',
                       border: OutlineInputBorder(),
                     ),
+                    hint: const Text('Seleccioná un producto'),
                     items: snap.data!
                         .map(
                           (p) => DropdownMenuItem<int>(
