@@ -1,34 +1,29 @@
-import 'dart:convert';
-
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
+import 'package:frontend_soderia/core/net/api_client.dart';
 
 class VisitaService {
-  final String _baseUrl = dotenv.env['API_URL'] ?? 'http://localhost:8500';
+  final Dio _dio = ApiClient.dio;
 
   Future<Map<String, dynamic>> crearVisita({
     required int legajo,
     required String estado,
     DateTime? fecha,
   }) async {
-    final uri = Uri.parse('$_baseUrl/visitas/$legajo');
+    try {
+      final res = await _dio.post(
+        '/visitas/$legajo',
+        data: {
+          'estado': estado,
+          if (fecha != null) 'fecha': fecha.toIso8601String(),
+        },
+      );
 
-    final body = <String, dynamic>{
-      'estado': estado,
-      if (fecha != null) 'fecha': fecha.toIso8601String(),
-    };
-
-    final res = await http.post(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(body),
-    );
-
-    if (res.statusCode != 201) {
-      throw Exception('Error ${res.statusCode} al crear visita: ${res.body}');
+      return Map<String, dynamic>.from(res.data as Map);
+    } on DioException catch (e) {
+      throw Exception(
+        'Error ${e.response?.statusCode} al crear visita: ${e.response?.data ?? e.message}',
+      );
     }
-
-    return jsonDecode(res.body) as Map<String, dynamic>;
   }
 }
 

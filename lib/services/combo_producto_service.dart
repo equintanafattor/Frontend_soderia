@@ -1,18 +1,20 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
+import 'package:frontend_soderia/core/net/api_client.dart';
 
 class ComboProductoService {
-  static const String baseUrl = 'http://localhost:8500/combos';
+  final Dio _dio = ApiClient.dio;
 
   Future<List<dynamic>> listar(int idCombo) async {
-    final res = await http.get(Uri.parse('$baseUrl/$idCombo'));
+    try {
+      final res = await _dio.get('/combos/$idCombo');
 
-    if (res.statusCode != 200) {
-      throw Exception('Error cargando productos del combo');
+      final data = Map<String, dynamic>.from(res.data as Map);
+      return (data['productos'] ?? []) as List<dynamic>;
+    } on DioException catch (e) {
+      throw Exception(
+        'Error cargando productos del combo: ${e.response?.data ?? e.message}',
+      );
     }
-
-    final data = jsonDecode(res.body) as Map<String, dynamic>;
-    return (data['productos'] ?? []) as List<dynamic>;
   }
 
   Future<void> agregar({
@@ -20,14 +22,16 @@ class ComboProductoService {
     required int idProducto,
     required int cantidad,
   }) async {
-    final res = await http.post(
-      Uri.parse('$baseUrl/$idCombo/productos'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'id_producto': idProducto, 'cantidad': cantidad}),
-    );
-
-    if (res.statusCode != 201) {
-      throw Exception('Error agregando producto al combo');
+    try {
+      await _dio.post(
+        '/combos/$idCombo/productos',
+        data: {'id_producto': idProducto, 'cantidad': cantidad},
+      );
+      // si el back devuelve 201, Dio igual lo toma como success
+    } on DioException catch (e) {
+      throw Exception(
+        'Error agregando producto al combo: ${e.response?.data ?? e.message}',
+      );
     }
   }
 
@@ -36,47 +40,50 @@ class ComboProductoService {
     required int idProducto,
     required int cantidad,
   }) async {
-    final res = await http.put(
-      Uri.parse('$baseUrl/$idCombo/productos/$idProducto'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'cantidad': cantidad}),
-    );
-
-    if (res.statusCode != 200) {
-      throw Exception('Error actualizando cantidad');
+    try {
+      await _dio.put(
+        '/combos/$idCombo/productos/$idProducto',
+        data: {'cantidad': cantidad},
+      );
+    } on DioException catch (e) {
+      throw Exception(
+        'Error actualizando cantidad: ${e.response?.data ?? e.message}',
+      );
     }
   }
 
   Future<void> eliminar({required int idCombo, required int idProducto}) async {
-    final res = await http.delete(
-      Uri.parse('$baseUrl/$idCombo/productos/$idProducto'),
-    );
-
-    if (res.statusCode != 204) {
-      throw Exception('Error eliminando producto del combo');
+    try {
+      await _dio.delete('/combos/$idCombo/productos/$idProducto');
+      // 204 también cuenta como success
+    } on DioException catch (e) {
+      throw Exception(
+        'Error eliminando producto del combo: ${e.response?.data ?? e.message}',
+      );
     }
   }
 
   Future<Map<String, dynamic>> obtener(int idCombo) async {
-    final res = await http.get(Uri.parse('$baseUrl/$idCombo'));
-    if (res.statusCode != 200) {
-      throw Exception('Error obteniendo combo');
+    try {
+      final res = await _dio.get('/combos/$idCombo');
+      return Map<String, dynamic>.from(res.data as Map);
+    } on DioException catch (e) {
+      throw Exception(
+        'Error obteniendo combo: ${e.response?.data ?? e.message}',
+      );
     }
-    return jsonDecode(res.body);
   }
 
   Future<void> actualizarProductos({
     required int idCombo,
     required List<Map<String, dynamic>> productos,
   }) async {
-    final res = await http.put(
-      Uri.parse('$baseUrl/$idCombo/productos'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(productos),
-    );
-
-    if (res.statusCode != 200) {
-      throw Exception('Error actualizando productos del combo');
+    try {
+      await _dio.put('/combos/$idCombo/productos', data: productos);
+    } on DioException catch (e) {
+      throw Exception(
+        'Error actualizando productos del combo: ${e.response?.data ?? e.message}',
+      );
     }
   }
 }

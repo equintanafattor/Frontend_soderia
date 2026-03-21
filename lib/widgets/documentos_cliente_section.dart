@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/services/documento_service.dart';
 import 'package:frontend_soderia/utils/open_pdf.dart';
+import 'package:frontend_soderia/core/net/api_client.dart';
 
 class DocumentosClienteSection extends StatelessWidget {
   final int legajo;
@@ -49,7 +50,8 @@ class DocumentosClienteSection extends StatelessWidget {
               subtitle: Text(fecha),
               trailing: const Icon(Icons.open_in_new),
               onTap: () async {
-                final url = 'http://localhost:8500${d['url']}';
+                final base = ApiClient.dio.options.baseUrl;
+                final url = '$base${d['url']}';
 
                 try {
                   await openPdf(url);

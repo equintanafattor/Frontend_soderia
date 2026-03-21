@@ -1,17 +1,18 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
+import 'package:frontend_soderia/core/net/api_client.dart';
 
 class ListaPrecioService {
-  static const String baseUrl = 'http://localhost:8500';
+  final Dio _dio = ApiClient.dio;
 
   Future<Map<String, dynamic>> obtenerLista(int idLista) async {
-    final uri = Uri.parse('$baseUrl/listas-precios/$idLista');
-    final res = await http.get(uri);
-
-    if (res.statusCode != 200) {
-      throw Exception('Error obteniendo lista: ${res.statusCode} ${res.body}');
+    try {
+      final res = await _dio.get('/listas-precios/$idLista');
+      return Map<String, dynamic>.from(res.data as Map);
+    } on DioException catch (e) {
+      throw Exception(
+        'Error obteniendo lista: ${e.response?.statusCode} ${e.response?.data ?? e.message}',
+      );
     }
-    return jsonDecode(res.body) as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> actualizarLista({
@@ -19,28 +20,26 @@ class ListaPrecioService {
     required String nombre,
     required String estado, // "activo" | "inactivo"
   }) async {
-    final uri = Uri.parse('$baseUrl/listas-precios/$idLista');
-
-    final res = await http.put(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'nombre': nombre, 'estado': estado}),
-    );
-
-    if (res.statusCode != 200) {
+    try {
+      final res = await _dio.put(
+        '/listas-precios/$idLista',
+        data: {'nombre': nombre, 'estado': estado},
+      );
+      return Map<String, dynamic>.from(res.data as Map);
+    } on DioException catch (e) {
       throw Exception(
-        'Error actualizando lista: ${res.statusCode} ${res.body}',
+        'Error actualizando lista: ${e.response?.statusCode} ${e.response?.data ?? e.message}',
       );
     }
-    return jsonDecode(res.body) as Map<String, dynamic>;
   }
 
   Future<void> eliminarLista(int idLista) async {
-    final uri = Uri.parse('$baseUrl/listas-precios/$idLista');
-    final res = await http.delete(uri);
-
-    if (res.statusCode != 200) {
-      throw Exception('Error eliminando lista: ${res.statusCode} ${res.body}');
+    try {
+      await _dio.delete('/listas-precios/$idLista');
+    } on DioException catch (e) {
+      throw Exception(
+        'Error eliminando lista: ${e.response?.statusCode} ${e.response?.data ?? e.message}',
+      );
     }
   }
 
@@ -49,147 +48,157 @@ class ListaPrecioService {
   // =========================
 
   Future<List<dynamic>> listarListas({int limit = 50, int offset = 0}) async {
-    final uri = Uri.parse(
-      '$baseUrl/listas-precios?limit=$limit&offset=$offset',
-    );
-    final res = await http.get(uri);
-
-    if (res.statusCode != 200) {
-      throw Exception('Error al listar listas: ${res.statusCode}');
+    try {
+      final res = await _dio.get(
+        '/listas-precios',
+        queryParameters: {'limit': limit, 'offset': offset},
+      );
+      return (res.data as List).cast<dynamic>();
+    } on DioException catch (e) {
+      throw Exception(
+        'Error al listar listas: ${e.response?.statusCode} ${e.response?.data ?? e.message}',
+      );
     }
-
-    return jsonDecode(res.body) as List<dynamic>;
   }
 
   Future<Map<String, dynamic>> crearLista({
     required String nombre,
     required String estado,
   }) async {
-    final uri = Uri.parse('$baseUrl/listas-precios/');
-    final body = jsonEncode({'nombre': nombre, 'estado': estado});
-
-    final res = await http.post(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: body,
-    );
-
-    if (res.statusCode != 201) {
-      throw Exception('Error al crear lista: ${res.statusCode}');
+    try {
+      final res = await _dio.post(
+        '/listas-precios/',
+        data: {'nombre': nombre, 'estado': estado},
+      );
+      return Map<String, dynamic>.from(res.data as Map);
+    } on DioException catch (e) {
+      throw Exception(
+        'Error al crear lista: ${e.response?.statusCode} ${e.response?.data ?? e.message}',
+      );
     }
-
-    return jsonDecode(res.body) as Map<String, dynamic>;
   }
 
   // =========================
   // Productos con precio
   // =========================
 
-  /// Devuelve productos con precio para una lista
   Future<List<dynamic>> listarProductosConPrecio(int idLista) async {
-    final uri = Uri.parse('$baseUrl/listas-precios/$idLista/productos');
-    final res = await http.get(uri);
-
-    if (res.statusCode != 200) {
+    try {
+      final res = await _dio.get('/listas-precios/$idLista/productos');
+      return (res.data as List).cast<dynamic>();
+    } on DioException catch (e) {
       throw Exception(
-        'Error al listar productos de la lista: ${res.statusCode}',
+        'Error al listar productos de la lista: ${e.response?.statusCode} ${e.response?.data ?? e.message}',
       );
     }
-
-    return jsonDecode(res.body) as List<dynamic>;
   }
 
-  /// Upsert de precio (crear o actualizar)
   Future<void> upsertPrecio({
     required int idLista,
     required int idProducto,
     required double precio,
   }) async {
-    final uri = Uri.parse(
-      '$baseUrl/listas-precios/$idLista/precios/$idProducto',
-    );
-
-    final body = jsonEncode({
-      'id_lista': idLista,
-      'id_producto': idProducto,
-      'precio': precio,
-    });
-
-    final res = await http.put(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: body,
-    );
-
-    if (res.statusCode != 200) {
-      throw Exception('Error al guardar precio: ${res.statusCode} ${res.body}');
+    try {
+      await _dio.put(
+        '/listas-precios/$idLista/precios/$idProducto',
+        data: {
+          'id_lista': idLista,
+          'id_producto': idProducto,
+          'precio': precio,
+        },
+      );
+    } on DioException catch (e) {
+      throw Exception(
+        'Error al guardar precio: ${e.response?.statusCode} ${e.response?.data ?? e.message}',
+      );
     }
   }
 
-  /// Lista_precio_producto “crudo” (si lo necesitás después)
   Future<List<dynamic>> listarPreciosDeLista(int idLista) async {
-    final uri = Uri.parse('$baseUrl/listas-precios/$idLista/precios');
-    final res = await http.get(uri);
-
-    if (res.statusCode != 200) {
-      throw Exception('Error al listar precios de lista: ${res.statusCode}');
+    try {
+      final res = await _dio.get('/listas-precios/$idLista/precios');
+      return (res.data as List).cast<dynamic>();
+    } on DioException catch (e) {
+      throw Exception(
+        'Error al listar precios de lista: ${e.response?.statusCode} ${e.response?.data ?? e.message}',
+      );
     }
-
-    return jsonDecode(res.body) as List<dynamic>;
   }
 
   // =========================
   // Ítems con precio (productos + combos)
   // =========================
 
-  /// Devuelve productos y combos con precio para una lista
   Future<List<dynamic>> listarItemsDeLista(int idLista) async {
-    final uri = Uri.parse('$baseUrl/listas-precios/$idLista/items');
-    final res = await http.get(uri);
-
-    if (res.statusCode != 200) {
+    try {
+      final res = await _dio.get('/listas-precios/$idLista/items');
+      return (res.data as List).cast<dynamic>();
+    } on DioException catch (e) {
       throw Exception(
-        'Error al listar ítems de la lista: ${res.statusCode} ${res.body}',
+        'Error al listar ítems de la lista: ${e.response?.statusCode} ${e.response?.data ?? e.message}',
       );
     }
-
-    return jsonDecode(res.body) as List<dynamic>;
   }
 
   Future<List<dynamic>> listarCombosConPrecio(int idLista) async {
-    final uri = Uri.parse('$baseUrl/listas-precios/$idLista/combos');
-    final res = await http.get(uri);
-
-    if (res.statusCode != 200) {
-      throw Exception('Error al listar combos de la lista: ${res.statusCode}');
+    try {
+      final res = await _dio.get('/listas-precios/$idLista/combos');
+      return (res.data as List).cast<dynamic>();
+    } on DioException catch (e) {
+      throw Exception(
+        'Error al listar combos de la lista: ${e.response?.statusCode} ${e.response?.data ?? e.message}',
+      );
     }
-
-    return jsonDecode(res.body) as List<dynamic>;
   }
 
-  /// Upsert de precio de combo en lista
   Future<void> upsertPrecioCombo({
     required int idLista,
     required int idCombo,
     required double precio,
   }) async {
-    final uri = Uri.parse(
-      '$baseUrl/listas-precios/$idLista/precios-combos/$idCombo',
-    );
-
-    final body = jsonEncode({
-      'precio': precio, // id_lista e id_combo los setea el backend
-    });
-
-    final res = await http.put(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: body,
-    );
-
-    if (res.statusCode != 200) {
+    try {
+      await _dio.put(
+        '/listas-precios/$idLista/precios-combos/$idCombo',
+        data: {'precio': precio},
+      );
+    } on DioException catch (e) {
       throw Exception(
-        'Error al guardar precio de combo: ${res.statusCode} ${res.body}',
+        'Error al guardar precio de combo: ${e.response?.statusCode} ${e.response?.data ?? e.message}',
+      );
+    }
+  }
+
+  // =========================
+  // Servicios
+  // =========================
+
+  Future<List<dynamic>> listarServiciosConPrecio(int idLista) async {
+    try {
+      final res = await _dio.get(
+        '/listas-precios/$idLista/precios-servicios',
+        queryParameters: {'include_tipo': true},
+      );
+      return (res.data as List).cast<dynamic>();
+    } on DioException catch (e) {
+      throw Exception(
+        'Error al listar servicios de la lista: ${e.response?.statusCode} ${e.response?.data ?? e.message}',
+      );
+    }
+  }
+
+  Future<void> upsertPrecioServicio({
+    required int idLista,
+    required int idClienteServicio,
+    required double precio,
+  }) async {
+    try {
+      await _dio.put(
+        '/listas-precios/$idLista/precios-servicios/$idClienteServicio',
+        data: {'precio': precio},
+      );
+    } on DioException catch (e) {
+      throw Exception(
+        'Error al guardar precio de servicio: ${e.response?.statusCode} ${e.response?.data ?? e.message}',
       );
     }
   }

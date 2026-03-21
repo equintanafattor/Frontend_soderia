@@ -1,36 +1,37 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
+import 'package:frontend_soderia/core/net/api_client.dart';
 
 class PagoService {
-  static const String baseUrl = 'http://localhost:8500/pagos';
+  final Dio _dio = ApiClient.dio;
 
   Future<Map<String, dynamic>> crearPagoLibre({
     required int legajo,
     required int idEmpresa,
     required int idMedioPago,
-    int? idCuenta, // 👈 CAMBIAR
+    int? idCuenta,
     required double monto,
     String? observacion,
     int? idRepartoDia,
   }) async {
-    final res = await http.post(
-      Uri.parse('$baseUrl/libre'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'legajo': legajo,
-        'id_empresa': idEmpresa,
-        'id_medio_pago': idMedioPago,
-        'monto': monto,
-        if (idCuenta != null) 'id_cuenta': idCuenta, // 👈 SOLO SI VIENE
-        if (observacion != null) 'observacion': observacion,
-        if (idRepartoDia != null) 'id_repartodia': idRepartoDia,
-      }),
-    );
+    try {
+      final res = await _dio.post(
+        '/pagos/libre',
+        data: {
+          'legajo': legajo,
+          'id_empresa': idEmpresa,
+          'id_medio_pago': idMedioPago,
+          'monto': monto,
+          if (idCuenta != null) 'id_cuenta': idCuenta,
+          if (observacion != null) 'observacion': observacion,
+          if (idRepartoDia != null) 'id_repartodia': idRepartoDia,
+        },
+      );
 
-    if (res.statusCode == 200 || res.statusCode == 201) {
-      return jsonDecode(res.body);
+      return Map<String, dynamic>.from(res.data as Map);
+    } on DioException catch (e) {
+      throw Exception(
+        'Error registrando pago: ${e.response?.data ?? e.message}',
+      );
     }
-
-    throw Exception('Error registrando pago: ${res.body}');
   }
 }

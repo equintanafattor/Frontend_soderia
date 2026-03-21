@@ -1,40 +1,44 @@
-import 'package:frontend_soderia/models/combo_producto_draft.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
+import 'package:frontend_soderia/core/net/api_client.dart';
 
 class ComboService {
-  static const String baseUrl = 'http://localhost:8500/combos';
+  final Dio _dio = ApiClient.dio;
 
   Future<List<dynamic>> listar() async {
-    final res = await http.get(Uri.parse(baseUrl));
-    if (res.statusCode != 200) {
-      throw Exception('Error listando combos');
+    try {
+      final res = await _dio.get('/combos');
+      return (res.data as List).cast<dynamic>();
+    } on DioException catch (e) {
+      throw Exception(
+        'Error listando combos: ${e.response?.data ?? e.message}',
+      );
     }
-    return jsonDecode(res.body) as List<dynamic>;
   }
 
   Future<Map<String, dynamic>> obtener(int idCombo) async {
-    final res = await http.get(Uri.parse('$baseUrl/$idCombo'));
-    if (res.statusCode != 200) {
-      throw Exception('Error obteniendo combo');
+    try {
+      final res = await _dio.get('/combos/$idCombo');
+      return Map<String, dynamic>.from(res.data as Map);
+    } on DioException catch (e) {
+      throw Exception(
+        'Error obteniendo combo: ${e.response?.data ?? e.message}',
+      );
     }
-    return jsonDecode(res.body) as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> crear({
     required String nombre,
     required bool estado,
   }) async {
-    final res = await http.post(
-      Uri.parse(baseUrl),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'nombre': nombre, 'estado': estado, 'id_empresa': 1}),
-    );
-
-    if (res.statusCode != 201) {
-      throw Exception('Error creando combo');
+    try {
+      final res = await _dio.post(
+        '/combos',
+        data: {'nombre': nombre, 'estado': estado, 'id_empresa': 1},
+      );
+      return Map<String, dynamic>.from(res.data as Map);
+    } on DioException catch (e) {
+      throw Exception('Error creando combo: ${e.response?.data ?? e.message}');
     }
-    return jsonDecode(res.body);
   }
 
   Future<Map<String, dynamic>> actualizar({
@@ -44,22 +48,18 @@ class ComboService {
     List<Map<String, dynamic>>? productos,
   }) async {
     final body = <String, dynamic>{};
-
     if (nombre != null) body['nombre'] = nombre;
     if (estado != null) body['estado'] = estado;
     if (productos != null) body['productos'] = productos;
 
-    final res = await http.put(
-      Uri.parse('$baseUrl/$idCombo'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(body),
-    );
-
-    if (res.statusCode != 200) {
-      throw Exception('Error actualizando combo');
+    try {
+      final res = await _dio.put('/combos/$idCombo', data: body);
+      return Map<String, dynamic>.from(res.data as Map);
+    } on DioException catch (e) {
+      throw Exception(
+        'Error actualizando combo: ${e.response?.data ?? e.message}',
+      );
     }
-
-    return jsonDecode(res.body);
   }
 
   Future<void> agregarProducto({
@@ -67,14 +67,16 @@ class ComboService {
     required int idProducto,
     required int cantidad,
   }) async {
-    final res = await http.post(
-      Uri.parse('$baseUrl/combos/$idCombo/productos'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'id_producto': idProducto, 'cantidad': cantidad}),
-    );
-
-    if (res.statusCode >= 400) {
-      throw Exception('Error al agregar producto al combo');
+    try {
+      // ✅ ruta correcta (sin duplicar /combos)
+      await _dio.post(
+        '/combos/$idCombo/productos',
+        data: {'id_producto': idProducto, 'cantidad': cantidad},
+      );
+    } on DioException catch (e) {
+      throw Exception(
+        'Error al agregar producto al combo: ${e.response?.data ?? e.message}',
+      );
     }
   }
 }

@@ -5,7 +5,7 @@ import 'package:frontend_soderia/models/usuario.dart';
 
 // Si tenés una clase Env o similar, reemplazá por eso
 class UsuarioService {
-  static const String _baseUrl = 'http://localhost:8500'; // adapta
+  static const String _baseUrl = 'http://localhost:8719'; // adapta
 
   Future<List<Usuario>> obtenerUsuarios() async {
     final uri = Uri.parse('$_baseUrl/usuarios');

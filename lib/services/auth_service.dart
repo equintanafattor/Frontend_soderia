@@ -1,20 +1,14 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/net/api_client.dart';
 
-// 🔧 mientras uses el backend real, poné esto en false
 const bool kFakeAuth = false;
 
 class AuthService {
-  final Dio _dio = Dio(
-    BaseOptions(
-      baseUrl: 'http://localhost:8500', // mismo host/puerto que el back
-      connectTimeout: const Duration(seconds: 5),
-      receiveTimeout: const Duration(seconds: 5),
-    ),
-  );
+  final Dio _dio = ApiClient.dio;
 
   Future<bool> login(String usuario, String password) async {
-    // === MODO FAKE (si querés seguir sin backend) ===
     if (kFakeAuth) {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('auth_token', 'FAKE_TOKEN_DEV');
@@ -26,64 +20,48 @@ class AuthService {
       return true;
     }
 
-    // === MODO REAL: usa tu endpoint /auth/login de FastAPI ===
     try {
       final response = await _dio.post(
         '/auth/login',
-        data: {
-          // OJO: estos nombres deben coincidir con LoginRequest
-          'nombre_usuario': usuario,
-          'contrasena': password,
-        },
+        data: {'nombre_usuario': usuario, 'contrasena': password},
+        options: Options(headers: {'Content-Type': 'application/json'}),
       );
 
-      if (response.statusCode == 200) {
-        final data = response.data;
+      if (response.statusCode != 200) return false;
 
-        // nombres que devuelve tu LoginResponse de FastAPI
-        final token = data['access_token'] as String?;
-        final nombreBackend = data['nombre_usuario'] as String?;
-        final idUsuario = data['id_usuario'];
-
-        if (token == null) return false;
-
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('auth_token', token);
-        await prefs.setString('username', nombreBackend ?? usuario);
-        if (idUsuario is int) {
-          await prefs.setInt('user_id', idUsuario);
-        }
-
-        return true;
+      dynamic body = response.data;
+      if (body is String) body = jsonDecode(body);
+      if (body is! Map) {
+        print('Login: respuesta inesperada: ${response.data}');
+        return false;
       }
 
+      final token = body['access_token'] as String?;
+      final nombreBackend = body['nombre_usuario'] as String?;
+      final idUsuario = body['id_usuario'];
+
+      if (token == null || token.isEmpty) return false;
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('auth_token', token);
+      await prefs.setString('username', nombreBackend ?? usuario);
+      if (idUsuario is int) await prefs.setInt('user_id', idUsuario);
+
+      print('Login OK. Token guardado (len=${token.length}).');
+      return true;
+    } on DioException catch (e) {
+      print('Login DioException: ${e.response?.statusCode}');
+      print('REQ: ${e.requestOptions.method} ${e.requestOptions.uri}');
+      print('SENT: ${e.requestOptions.data}');
+      print('DATA: ${e.response?.data}');
       return false;
     } catch (e) {
-      // Podés loguear esto en consola
       print('Error en login: $e');
       return false;
     }
   }
 
-  Future<String?> getToken() async {
-    if (kFakeAuth) return 'FAKE_TOKEN_DEV';
-
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('auth_token');
-  }
-
-  Future<String?> getSavedUsuario() async {
-    if (kFakeAuth) return 'DevUser';
-
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('username');
-  }
-
-  Future<int?> getUserId() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt('user_id');
-  }
-
+  // ✅ AGREGAR ESTO
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
@@ -91,11 +69,21 @@ class AuthService {
     await prefs.remove('user_id');
   }
 
-  Future<void> resetPassword(String usuarioOEmail) async {
-    // llamada al backend
-    await Future.delayed(const Duration(seconds: 1));
+  // ✅ ÚTILES (por si en algún lado los usás)
+  Future<String?> getToken() async {
+    if (kFakeAuth) return 'FAKE_TOKEN_DEV';
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('auth_token');
+  }
 
-    // después acá:
-    // POST /auth/reset-password
+  Future<String?> getSavedUsuario() async {
+    if (kFakeAuth) return 'DevUser';
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('username');
+  }
+
+  Future<int?> getUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt('user_id');
   }
 }

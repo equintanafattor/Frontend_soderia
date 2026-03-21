@@ -1,7 +1,9 @@
 // ignore_for_file: deprecated_member_use
 
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:frontend_soderia/core/navigation/app_shell_actions.dart';
+import 'package:frontend_soderia/models/cuenta.dart';
 import 'package:frontend_soderia/services/cliente_service.dart';
 import 'package:frontend_soderia/utils/pedido_pdf.dart';
 import 'package:frontend_soderia/utils/share_whatsapp.dart';
@@ -14,6 +16,8 @@ import 'package:frontend_soderia/utils/share_pdf.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:frontend_soderia/services/servicios_service.dart';
 import '../../core/net/api_client.dart';
+import 'package:frontend_soderia/services/medio_pago_service.dart';
+import 'package:frontend_soderia/widgets/cliente/cliente_servicios_pendientes.dart';
 
 class ClienteDetailScreen extends StatefulWidget {
   final int legajo;
@@ -28,14 +32,13 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
   late Future<_ClienteFullData> _future;
   bool _changed = false;
   final _serviciosService = ServiciosService();
-  late Future<List<ClienteServicioPeriodoDto>> _pendientesFuture;
   final _docService = DocumentoService();
+  final _medioPagoService = MedioPagoService();
 
   @override
   void initState() {
     super.initState();
     _future = _loadData();
-    _pendientesFuture = _serviciosService.getPendientes(widget.legajo);
   }
 
   Future<_ClienteFullData> _loadData() async {
@@ -48,10 +51,15 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
       widget.legajo,
       limit: 10,
     );
+    final servicios = await _serviciosService.listarServiciosCliente(
+      widget.legajo,
+    );
+
     return _ClienteFullData(
       detalle: detalle,
       pedidos: pedidos,
       historicos: historicos,
+      servicios: servicios,
     );
   }
 
@@ -59,218 +67,258 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
     _changed = true;
     setState(() {
       _future = _loadData();
-      _pendientesFuture = _serviciosService.getPendientes(widget.legajo);
     });
   }
 
-  // Todo esto es para el servicio del dispenser
-
-  Widget _bannerServicios(List<ClienteServicioPeriodoDto> periodos) {
-    if (periodos.isEmpty) return const SizedBox.shrink();
-
-    final total = periodos.fold<double>(0, (a, p) => a + p.monto);
-    final vencidos = periodos.where((p) => p.estado == 'VENCIDO').length;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: vencidos > 0 ? const Color(0xFFFFE5E5) : const Color(0xFFFFF3CD),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: vencidos > 0
-              ? const Color(0xFFEE7777)
-              : const Color(0xFFE6C200),
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.water_drop_outlined,
-            color: vencidos > 0 ? const Color(0xFFCC0000) : null,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Alquiler dispenser: ${periodos.length} pendiente(s)',
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Total a cobrar: \$${total.toStringAsFixed(2)}'
-                  '${vencidos > 0 ? ' • $vencidos vencido(s)' : ''}',
-                ),
-              ],
-            ),
-          ),
-          TextButton(
-            onPressed: () => _openServiciosSheet(periodos),
-            child: const Text('Ver / Cobrar'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _openServiciosSheet(List<ClienteServicioPeriodoDto> periodos) {
-    final items = [...periodos];
-
-    // VENCIDO primero, luego por periodo desc
-    items.sort((a, b) {
-      final av = a.estado == 'VENCIDO' ? 0 : 1;
-      final bv = b.estado == 'VENCIDO' ? 0 : 1;
-      if (av != bv) return av.compareTo(bv);
-      return b.periodo.compareTo(a.periodo);
-    });
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'Servicios pendientes',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 12),
-                ...items.map((p) {
-                  final y = p.periodo.year;
-                  final m = p.periodo.month.toString().padLeft(2, '0');
-                  final vence = p.fechaVencimiento
-                      .toIso8601String()
-                      .split('T')
-                      .first;
-
-                  return Card(
-                    elevation: 0.5,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: ListTile(
-                      leading: Icon(
-                        p.estado == 'VENCIDO'
-                            ? Icons.error_outline
-                            : Icons.schedule,
-                        color: p.estado == 'VENCIDO'
-                            ? const Color(0xFFCC0000)
-                            : null,
-                      ),
-                      title: Text('Período $y-$m'),
-                      subtitle: Text('Vence: $vence • Estado: ${p.estado}'),
-                      trailing: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            '\$${p.monto.toStringAsFixed(2)}',
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          const SizedBox(height: 6),
-                          ElevatedButton(
-                            onPressed: () => _cobrarPeriodo(p),
-                            child: const Text('Cobrar'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _cobrarPeriodo(ClienteServicioPeriodoDto p) async {
-    int? medioPago; // id_medio_pago
-    String obs = '';
+  Future<void> _crearServicioDispenser() async {
+    final montoCtrl = TextEditingController();
+    bool loading = false;
 
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Cobrar alquiler dispenser'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Monto: \$${p.monto.toStringAsFixed(2)}'),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<int>(
-              decoration: const InputDecoration(labelText: 'Medio de pago'),
-              items: const [
-                DropdownMenuItem(value: 1, child: Text('Efectivo')),
-                DropdownMenuItem(value: 2, child: Text('Transferencia')),
-                DropdownMenuItem(value: 3, child: Text('Otro')),
-                DropdownMenuItem(value: 4, child: Text('Mixto (reparto)')),
-              ],
-              onChanged: (v) => medioPago = v,
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              decoration: const InputDecoration(
-                labelText: 'Observación (opcional)',
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setStateDialog) {
+            return AlertDialog(
+              title: const Text('Crear alquiler de dispenser'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: montoCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Monto mensual',
+                      hintText: 'Ej: 10000',
+                    ),
+                    enabled: !loading,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'El servicio se creará con el período actual pendiente. El cobro se realiza después desde servicios pendientes.',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                ],
               ),
-              onChanged: (v) => obs = v,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (medioPago == null) return;
-              Navigator.pop(context, true);
-            },
-            child: const Text('Cobrar'),
-          ),
-        ],
-      ),
+              actions: [
+                TextButton(
+                  onPressed: loading
+                      ? null
+                      : () => Navigator.of(dialogCtx).pop(false),
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton(
+                  onPressed: loading
+                      ? null
+                      : () async {
+                          final montoText = montoCtrl.text.trim().replaceAll(
+                            ',',
+                            '.',
+                          );
+                          final monto = double.tryParse(montoText);
+
+                          if (monto == null || monto <= 0) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Ingresá un monto válido'),
+                              ),
+                            );
+                            return;
+                          }
+
+                          setStateDialog(() => loading = true);
+
+                          try {
+                            await _serviciosService.crearAlquilerDispenser(
+                              legajo: widget.legajo,
+                              montoMensual: monto,
+                            );
+
+                            if (!mounted) return;
+
+                            Navigator.of(dialogCtx).pop(true);
+
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Servicio creado correctamente ✅',
+                                ),
+                              ),
+                            );
+
+                            _reload();
+                          } on DioException catch (e) {
+                            setStateDialog(() => loading = false);
+
+                            if (!mounted) return;
+
+                            String msg = 'No se pudo crear el servicio';
+
+                            final data = e.response?.data;
+                            if (data is Map && data['detail'] != null) {
+                              msg = data['detail'].toString();
+                            }
+
+                            ScaffoldMessenger.of(
+                              context,
+                            ).showSnackBar(SnackBar(content: Text(msg)));
+                          } catch (e) {
+                            setStateDialog(() => loading = false);
+
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Error creando servicio: $e'),
+                              ),
+                            );
+                          }
+                        },
+                  child: loading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Crear servicio'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
 
     if (ok != true) return;
+  }
 
-    try {
-      await _serviciosService.pagarPeriodo(
-        idPeriodo: p.idPeriodo,
-        legajo: widget.legajo,
-        idMedioPago: medioPago!,
-        observacion: obs.isEmpty ? null : obs,
-      );
+  Future<void> _editarMontoServicio(ClienteServicioDto servicio) async {
+    final montoCtrl = TextEditingController(
+      text: servicio.montoMensual.toStringAsFixed(2),
+    );
+    bool actualizarPeriodos = true;
+    bool loading = false;
 
-      if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setStateDialog) {
+            return AlertDialog(
+              title: const Text('Actualizar monto del servicio'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: montoCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: 'Nuevo monto mensual',
+                      ),
+                      enabled: !loading,
+                    ),
+                    const SizedBox(height: 12),
+                    CheckboxListTile(
+                      value: actualizarPeriodos,
+                      onChanged: loading
+                          ? null
+                          : (v) => setStateDialog(
+                              () => actualizarPeriodos = v ?? true,
+                            ),
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      title: const Text('Actualizar períodos no pagados'),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: loading
+                      ? null
+                      : () => Navigator.of(dialogCtx).pop(),
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton(
+                  onPressed: loading
+                      ? null
+                      : () async {
+                          final monto = double.tryParse(
+                            montoCtrl.text.trim().replaceAll(',', '.'),
+                          );
 
-      // refresca pendientes
-      setState(() {
-        _pendientesFuture = _serviciosService.getPendientes(widget.legajo);
-      });
+                          if (monto == null || monto <= 0) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Ingresá un monto válido'),
+                              ),
+                            );
+                            return;
+                          }
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Servicio cobrado ✅')));
+                          setStateDialog(() => loading = true);
 
-      if (mounted) {
-        Navigator.of(context).maybePop();
-      }
+                          try {
+                            await _serviciosService.actualizarMontoServicio(
+                              idClienteServicio: servicio.idClienteServicio,
+                              montoMensual: monto,
+                              actualizarPeriodosNoPagados: actualizarPeriodos,
+                            );
 
-      // Cierra el dialogo? (ya cerró) — si querés cerrar el bottomsheet también:
-      // Navigator.pop(context);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error cobrando servicio: $e')));
-    }
+                            if (!mounted) return;
+
+                            Navigator.of(dialogCtx).pop();
+
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Monto actualizado correctamente ✅',
+                                ),
+                              ),
+                            );
+
+                            _reload();
+                          } on DioException catch (e) {
+                            setStateDialog(() => loading = false);
+
+                            if (!mounted) return;
+
+                            String msg = 'No se pudo actualizar el monto';
+                            final data = e.response?.data;
+                            if (data is Map && data['detail'] != null) {
+                              msg = data['detail'].toString();
+                            }
+
+                            ScaffoldMessenger.of(
+                              context,
+                            ).showSnackBar(SnackBar(content: Text(msg)));
+                          } catch (e) {
+                            setStateDialog(() => loading = false);
+
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error: $e')),
+                            );
+                          }
+                        },
+                  child: loading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Guardar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _eliminar() async {
@@ -471,7 +519,8 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
               icon: const Icon(Icons.edit),
               onPressed: () async {
                 final full = await _future;
-                final data = full.detalle; // solo el detalle para el edit
+                final data = full.detalle;
+
                 final result = await AppShellActions.push(
                   context,
                   '/cliente/edit',
@@ -501,29 +550,36 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
 
             final full = snap.data!;
             final data = full.detalle;
+            final servicios = full.servicios;
+
+            ClienteServicioDto? servicioDispenserActivo;
+            for (final s in servicios) {
+              if (s.tipoServicio == 'ALQUILER_DISPENSER' && s.activo) {
+                servicioDispenserActivo = s;
+                break;
+              }
+            }
+
             final persona = (data['persona'] as Map?) ?? {};
+
             final nombre =
                 '${persona['nombre'] ?? ''} ${persona['apellido'] ?? ''}'
                     .trim();
             final dni = (persona['dni'] ?? data['dni'] ?? '-').toString();
             final observacion = (data['observacion'] ?? '').toString();
 
-            final cuentas = (data['cuentas'] as List?) ?? const [];
+            final cuentasRaw = (data['cuentas'] as List?) ?? const [];
 
-            final Map<String, dynamic>? cuentaPrincipal = cuentas.isNotEmpty
-                ? cuentas.first as Map<String, dynamic>
+            final cuentas = cuentasRaw
+                .map((c) => Cuenta.fromJson(c as Map<String, dynamic>))
+                .toList();
+
+            final Cuenta? cuentaPrincipal = cuentas.isNotEmpty
+                ? cuentas.first
                 : null;
 
-            final int? idCuentaPrincipal =
-                cuentaPrincipal?['id_cuenta'] as int?;
-
-            final double deudaActual = cuentaPrincipal != null
-                ? _toDouble(cuentaPrincipal['deuda'])
-                : 0;
-
-            final double saldoActual = cuentaPrincipal != null
-                ? _toDouble(cuentaPrincipal['saldo'])
-                : 0;
+            final double deudaActual = cuentaPrincipal?.deuda ?? 0;
+            final double saldoActual = cuentaPrincipal?.saldo ?? 0;
 
             final direcciones = (data['direcciones'] as List?) ?? const [];
             final telefonos = (data['telefonos'] as List?) ?? const [];
@@ -548,17 +604,60 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                 padding: const EdgeInsets.all(16),
 
                 children: [
-                  FutureBuilder<List<ClienteServicioPeriodoDto>>(
-                    future: _pendientesFuture,
-                    builder: (context, snapSrv) {
-                      if (snapSrv.connectionState == ConnectionState.waiting) {
-                        return const SizedBox.shrink();
-                      }
-                      if (snapSrv.hasError) {
-                        return const SizedBox.shrink();
-                      }
-                      return _bannerServicios(snapSrv.data ?? const []);
-                    },
+                  ClienteServiciosPendientes(
+                    legajo: widget.legajo,
+                    serviciosService: _serviciosService,
+                    medioPagoService: _medioPagoService,
+                    cuentas: cuentas,
+                    onChanged: _reload,
+                  ),
+                  _SectionCard(
+                    title: 'Servicios',
+                    child: servicioDispenserActivo == null
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Sin servicios activos'),
+                              const SizedBox(height: 8),
+                              /* OutlinedButton.icon(
+                                onPressed: () => _crearServicioDispenser(),
+                                icon: const Icon(Icons.water_drop),
+                                label: const Text('Crear alquiler dispenser'),
+                              ), */
+                            ],
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                leading: const Icon(Icons.water_drop_outlined),
+                                title: const Text(
+                                  'Alquiler dispenser',
+                                  style: TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                                subtitle: Text(
+                                  'Monto mensual: \$${servicioDispenserActivo.montoMensual.toStringAsFixed(2)}\n'
+                                  'Inicio: ${servicioDispenserActivo.fechaInicio.toIso8601String().split('T').first}',
+                                ),
+                                trailing: _EstadoChip(estado: 'ACTIVO'),
+                              ),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  OutlinedButton.icon(
+                                    onPressed: () => _editarMontoServicio(
+                                      servicioDispenserActivo!,
+                                    ),
+                                    icon: const Icon(Icons.edit),
+                                    label: const Text('Editar monto'),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                   ),
 
                   // HEADER CARD
@@ -699,21 +798,19 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                         : Wrap(
                             spacing: 12,
                             runSpacing: 12,
-                            children: cuentas.map((c0) {
-                              final c = c0 as Map;
-
+                            children: cuentas.map((c) {
                               final tipo =
-                                  (c['tipo_de_cuenta']?.toString().isNotEmpty ??
-                                      false)
-                                  ? c['tipo_de_cuenta']
+                                  (c.tipoDeCuenta != null &&
+                                      c.tipoDeCuenta!.isNotEmpty)
+                                  ? c.tipoDeCuenta!
                                   : 'Cuenta';
 
                               return _CuentaMiniCard(
                                 tipo: tipo,
-                                saldo: c['saldo'],
-                                deuda: c['deuda'],
-                                bidones: c['numero_bidones'],
-                                estado: c['estado'],
+                                saldo: c.saldo,
+                                deuda: c.deuda,
+                                bidones: c.numeroBidones,
+                                estado: c.estado,
                                 onPdf: () async {
                                   final ultimos = pedidos
                                       .map<Map<String, dynamic>>((p0) {
@@ -723,9 +820,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                                         return {
                                           'fecha': p['fecha'],
                                           'id_pedido': p['id_pedido'],
-                                          'total': _toDouble(
-                                            p['total'],
-                                          ), // ya lo convertís
+                                          'total': _toDouble(p['total']),
                                         };
                                       })
                                       .toList();
@@ -734,8 +829,8 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                                     nombreCliente: nombre,
                                     legajo: widget.legajo.toString(),
                                     fecha: DateTime.now(),
-                                    deuda: _toDouble(c['deuda']),
-                                    saldoAFavor: _toDouble(c['saldo']),
+                                    deuda: c.deuda,
+                                    saldoAFavor: c.saldo,
                                     ultimosPedidos: ultimos,
                                   );
 
@@ -890,19 +985,25 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                                 'id_empresa': 1,
                                 'deuda': deudaActual,
                                 'saldo': saldoActual,
-                                'id_cuenta':
-                                    (cuentaPrincipal?['id_cuenta'] as num?)
-                                        ?.toInt(),
-                                'cuentas': cuentas, // ✅ pasar lista completa
+                                'id_cuenta': cuentaPrincipal?.idCuenta,
+                                'cuentas': cuentas,
                               },
                             );
 
                             if (ok == true && mounted) {
-                              _reload(); // ya marca _changed
+                              _reload();
                             }
                           },
                     icon: const Icon(Icons.payments),
                     label: const Text('Registrar pago'),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  OutlinedButton.icon(
+                    onPressed: () => _crearServicioDispenser(),
+                    icon: const Icon(Icons.water_drop),
+                    label: const Text('Crear servicio dispenser'),
                   ),
 
                   const SizedBox(height: 8),
@@ -916,7 +1017,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                       );
 
                       if (ok == true && mounted) {
-                        _reload(); // refresca y avisa a la lista
+                        _reload();
                       }
                     },
                     icon: const Icon(Icons.point_of_sale),
@@ -936,11 +1037,13 @@ class _ClienteFullData {
   final Map<String, dynamic> detalle;
   final List<dynamic> pedidos;
   final List<dynamic> historicos;
+  final List<ClienteServicioDto> servicios;
 
   _ClienteFullData({
     required this.detalle,
     required this.pedidos,
     required this.historicos,
+    required this.servicios,
   });
 }
 
@@ -1285,4 +1388,53 @@ double _toDouble(dynamic v) {
     return double.tryParse(v.replaceAll(',', '.')) ?? 0;
   }
   return 0;
+}
+
+class _EstadoChip extends StatelessWidget {
+  final String estado;
+  const _EstadoChip({required this.estado});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    Color bg;
+    Color fg;
+
+    switch (estado) {
+      case 'VENCIDO':
+        bg = const Color(0xFFFFE5E5);
+        fg = const Color(0xFFB00020);
+        break;
+      case 'PENDIENTE':
+        bg = const Color(0xFFFFF3CD);
+        fg = const Color(0xFF7A5A00);
+        break;
+      case 'PAGADO':
+        bg = const Color(0xFFE7F7EE);
+        fg = const Color(0xFF1B7F3A);
+        break;
+      case 'ACTIVO':
+        bg = const Color(0xFFE7F7EE);
+        fg = const Color(0xFF1B7F3A);
+        break;
+
+      default:
+        bg = cs.surfaceVariant;
+        fg = cs.onSurfaceVariant;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: fg.withOpacity(0.25)),
+      ),
+      child: Text(
+        estado,
+        style: TextStyle(fontWeight: FontWeight.w700, color: fg, fontSize: 12),
+      ),
+    );
+  }
 }

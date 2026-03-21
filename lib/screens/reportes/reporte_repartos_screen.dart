@@ -12,7 +12,7 @@ class ReporteRepartosScreen extends StatefulWidget {
 }
 
 class _ReporteRepartosScreenState extends State<ReporteRepartosScreen> {
-  final _service = RepartoDiaService(baseUrl: 'http://localhost:8500');
+  final _service = RepartoDiaService();
 
   DateTime _desde = DateTime.now().subtract(const Duration(days: 7));
   DateTime _hasta = DateTime.now();

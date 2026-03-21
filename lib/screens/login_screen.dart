@@ -63,7 +63,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 Navigator.pop(context);
 
                 try {
-                  await _authService.resetPassword(value);
+                  //await _authService.resetPassword(value);
 
                   if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(

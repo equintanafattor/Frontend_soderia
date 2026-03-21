@@ -1,30 +1,34 @@
 // lib/services/stock_service.dart
-import 'dart:convert';
+import 'package:dio/dio.dart';
+import 'package:frontend_soderia/core/net/api_client.dart';
 import 'package:frontend_soderia/models/stock_detalle.dart';
-import 'package:http/http.dart' as http;
-
-import 'package:frontend_soderia/models/stock.dart';
 import 'package:frontend_soderia/models/movimiento_stock.dart';
 
 class StockService {
-  // mismo host/puerto que el resto del back
-  final String baseUrl = 'http://localhost:8500';
+  final Dio _dio = ApiClient.dio;
 
   // ---------------------------
   // GET /stock/detalle
   // ---------------------------
-
   Future<List<StockDetalle>> getStockDetalle({required int idEmpresa}) async {
-    final uri = Uri.parse('$baseUrl/stock/detalle?id_empresa=$idEmpresa');
+    try {
+      final res = await _dio.get(
+        '/stock/detalle',
+        queryParameters: {'id_empresa': idEmpresa},
+      );
 
-    final res = await http.get(uri);
+      final list = (res.data as List)
+          .map(
+            (e) => StockDetalle.fromJson(Map<String, dynamic>.from(e as Map)),
+          )
+          .toList();
 
-    if (res.statusCode != 200) {
-      throw Exception('Error cargando stock');
+      return list;
+    } on DioException catch (e) {
+      throw Exception(
+        'Error cargando stock: ${e.response?.statusCode} ${e.response?.data ?? e.message}',
+      );
     }
-
-    final List data = jsonDecode(res.body);
-    return data.map((e) => StockDetalle.fromJson(e)).toList();
   }
 
   // ---------------------------
@@ -36,21 +40,20 @@ class StockService {
     required int cantidad,
     String? observacion,
   }) async {
-    final uri = Uri.parse('$baseUrl/movimientos-stock');
-
-    final res = await http.post(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'id_producto': idProducto,
-        'tipo_movimiento': tipoMovimiento,
-        'cantidad': cantidad,
-        'observacion': observacion,
-      }),
-    );
-
-    if (res.statusCode != 201) {
-      throw Exception('Error ajustando stock (${res.statusCode}): ${res.body}');
+    try {
+      await _dio.post(
+        '/movimientos-stock',
+        data: {
+          'id_producto': idProducto,
+          'tipo_movimiento': tipoMovimiento,
+          'cantidad': cantidad,
+          if (observacion != null) 'observacion': observacion,
+        },
+      );
+    } on DioException catch (e) {
+      throw Exception(
+        'Error ajustando stock (${e.response?.statusCode}): ${e.response?.data ?? e.message}',
+      );
     }
   }
 
@@ -61,19 +64,23 @@ class StockService {
     required int idProducto,
     int limit = 50,
   }) async {
-    final uri = Uri.parse(
-      '$baseUrl/movimientos-stock'
-      '?id_producto=$idProducto&limit=$limit',
-    );
+    try {
+      final res = await _dio.get(
+        '/movimientos-stock',
+        queryParameters: {'id_producto': idProducto, 'limit': limit},
+      );
 
-    final res = await http.get(uri);
+      final list = (res.data as List)
+          .map(
+            (e) =>
+                MovimientoStock.fromJson(Map<String, dynamic>.from(e as Map)),
+          )
+          .toList();
 
-    if (res.statusCode == 200) {
-      final List<dynamic> json = jsonDecode(res.body);
-      return json.map((e) => MovimientoStock.fromJson(e)).toList();
-    } else {
+      return list;
+    } on DioException catch (e) {
       throw Exception(
-        'Error cargando movimientos (${res.statusCode}): ${res.body}',
+        'Error cargando movimientos (${e.response?.statusCode}): ${e.response?.data ?? e.message}',
       );
     }
   }

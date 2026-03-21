@@ -1,6 +1,7 @@
 // ignore_for_file: deprecated_member_use
 
 import 'package:flutter/material.dart';
+import 'package:frontend_soderia/core/net/api_client.dart';
 import 'package:frontend_soderia/services/pago_service.dart';
 import 'package:frontend_soderia/services/medio_pago_service.dart';
 import 'package:frontend_soderia/utils/open_pdf.dart';
@@ -30,7 +31,7 @@ class PagoLibreScreen extends StatefulWidget {
 }
 
 class _PagoLibreScreenState extends State<PagoLibreScreen> {
-  static const String baseUrl = 'http://localhost:8500';
+  final base = ApiClient.dio.options.baseUrl;
 
   final _formKey = GlobalKey<FormState>();
   final _pagoService = PagoService();
@@ -42,7 +43,7 @@ class _PagoLibreScreenState extends State<PagoLibreScreen> {
   bool _loading = false;
   int? _idMedioPago;
   int? _idCuentaSeleccionada;
-  List<Map<String, dynamic>> _mediosPago = [];
+  List<MedioPagoDto> _mediosPago = [];
 
   List<Map<String, dynamic>> _cuentas = [];
   double _deudaSel = 0;
@@ -109,14 +110,23 @@ class _PagoLibreScreenState extends State<PagoLibreScreen> {
 
     setState(() {
       _mediosPago = data;
-      if (data.isNotEmpty) {
-        _idMedioPago = data.first['id_medio_pago'];
+
+      // Seteá un valor inicial si no hay uno
+      if (_idMedioPago == null && data.isNotEmpty) {
+        _idMedioPago = data.first.id; // 👈 OJO: ahora es .id
       }
     });
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+
+    if (_idMedioPago == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Seleccioná un medio de pago')),
+      );
+      return;
+    }
 
     setState(() => _loading = true);
 
@@ -131,8 +141,7 @@ class _PagoLibreScreenState extends State<PagoLibreScreen> {
         idRepartoDia: widget.idRepartoDia,
       );
 
-      final comprobanteUrl =
-          'http://localhost:8500${result['comprobante_url']}';
+      final comprobanteUrl = '$base${result['comprobante_url']}';
 
       if (!mounted) return;
 
@@ -297,12 +306,14 @@ class _PagoLibreScreenState extends State<PagoLibreScreen> {
                   items: _mediosPago
                       .map(
                         (m) => DropdownMenuItem<int>(
-                          value: m['id_medio_pago'],
-                          child: Text(m['nombre']),
+                          value: m.id,
+                          child: Text(m.nombre),
                         ),
                       )
                       .toList(),
-                  onChanged: (v) => setState(() => _idMedioPago = v),
+                  onChanged: _loading
+                      ? null
+                      : (v) => setState(() => _idMedioPago = v),
                   decoration: const InputDecoration(
                     labelText: 'Medio de pago',
                     prefixIcon: Icon(Icons.payment),

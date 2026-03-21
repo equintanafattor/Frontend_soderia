@@ -55,9 +55,7 @@ class PagoScreen extends StatefulWidget {
 
 class _PagoScreenState extends State<PagoScreen> {
   final _pedidoService = PedidoService();
-  final _repartoDiaService = RepartoDiaService(
-    baseUrl: 'http://localhost:8500',
-  ); // 👈 HOST SOLITO
+  final _repartoDiaService = RepartoDiaService(); // 👈 HOST SOLITO
 
   // Chips de montos rápidos:
   // - total de la venta

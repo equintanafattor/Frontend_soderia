@@ -5,7 +5,7 @@ import 'package:frontend_soderia/core/navigation/destinations.dart';
 import 'package:frontend_soderia/core/navigation/shell_state.dart';
 import 'package:frontend_soderia/services/auth_service.dart';
 import 'package:frontend_soderia/widgets/app_header.dart';
-import 'package:frontend_soderia/core/session/session_state.dart';
+import 'package:frontend_soderia/core/session/session_state.dart' as session;
 
 /// AppShell adaptativo:
 /// - Móvil  (<600): AppBar + Drawer modal
@@ -267,7 +267,8 @@ class _ModalDrawer extends StatelessWidget {
               final nav = Navigator.of(context, rootNavigator: true);
               Navigator.pop(context); // cerrar drawer
               await AuthService().logout();
-              sessionState.clear(); // 👈 ACÁ
+              session.sessionState.clear();
+              shellState.selectTab(0); // opcional
               nav.pushNamedAndRemoveUntil('/login', (route) => false);
             },
           ),
@@ -326,7 +327,8 @@ class _PersistentDrawer extends StatelessWidget {
             final nav = Navigator.of(context, rootNavigator: true);
             Navigator.pop(context); // cerrar drawer
             await AuthService().logout();
-            sessionState.clear(); // 👈 ACÁ
+            session.sessionState.clear();
+            shellState.selectTab(0); // opcional
             nav.pushNamedAndRemoveUntil('/login', (route) => false);
           },
         ),

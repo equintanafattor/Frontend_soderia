@@ -1,8 +1,8 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
+import 'package:frontend_soderia/core/net/api_client.dart';
 
 class PedidoService {
-  final String baseUrl = 'http://localhost:8500/pedidos';
+  final Dio _dio = ApiClient.dio;
 
   Future<Map<String, dynamic>> crearPedido({
     required int legajo,
@@ -14,12 +14,8 @@ class PedidoService {
     required List<Map<String, dynamic>> items,
     int? idRepartoDia,
     String? observacion,
-
-    // ✅ NUEVO
     int? idCuenta,
   }) async {
-    final uri = Uri.parse(baseUrl);
-
     final body = <String, dynamic>{
       'legajo': legajo,
       'id_medio_pago': idMedioPago,
@@ -29,42 +25,35 @@ class PedidoService {
       'monto_abonado': montoAbonado,
       'items': items,
       if (idRepartoDia != null) 'id_repartodia': idRepartoDia,
-      if (idCuenta != null) 'id_cuenta': idCuenta, // ✅
+      if (idCuenta != null) 'id_cuenta': idCuenta,
       if (observacion != null && observacion.trim().isNotEmpty)
         'observacion': observacion.trim(),
     };
 
-    final res = await http.post(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(body),
-    );
-
-    if (res.statusCode == 201) {
-      return jsonDecode(res.body) as Map<String, dynamic>;
+    try {
+      final res = await _dio.post('/pedidos', data: body);
+      return Map<String, dynamic>.from(res.data as Map);
+    } on DioException catch (e) {
+      throw Exception(
+        'Error al crear pedido: ${e.response?.statusCode} ${e.response?.data ?? e.message}',
+      );
     }
-
-    throw Exception('Error al crear pedido: ${res.statusCode} ${res.body}');
   }
 
   Future<Map<String, dynamic>> confirmarPedido({
     required int idPedido,
     required int idRepartoDia,
   }) async {
-    final uri = Uri.parse('$baseUrl/$idPedido/confirmar');
-
-    final body = jsonEncode({'id_repartodia': idRepartoDia});
-
-    final res = await http.post(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: body,
-    );
-
-    if (res.statusCode == 200) {
-      return jsonDecode(res.body) as Map<String, dynamic>;
+    try {
+      final res = await _dio.post(
+        '/pedidos/$idPedido/confirmar',
+        data: {'id_repartodia': idRepartoDia},
+      );
+      return Map<String, dynamic>.from(res.data as Map);
+    } on DioException catch (e) {
+      throw Exception(
+        'Error confirmando pedido: ${e.response?.statusCode} ${e.response?.data ?? e.message}',
+      );
     }
-
-    throw Exception('Error confirmando pedido: ${res.statusCode} ${res.body}');
   }
 }

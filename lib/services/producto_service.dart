@@ -1,24 +1,28 @@
 // lib/services/producto_service.dart
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
+import 'package:frontend_soderia/core/net/api_client.dart';
 import 'package:frontend_soderia/models/producto.dart';
 
 class ProductoService {
-  // Ajustá baseUrl si lo tenés centralizado.
-  static const String baseUrl = 'http://localhost:8500';
+  final Dio _dio = ApiClient.dio;
 
   Future<List<Producto>> listar({int limit = 50, int offset = 0}) async {
-    final uri = Uri.parse('$baseUrl/productos?limit=$limit&offset=$offset');
-    final resp = await http.get(uri);
+    try {
+      final resp = await _dio.get(
+        '/productos',
+        queryParameters: {'limit': limit, 'offset': offset},
+      );
 
-    if (resp.statusCode != 200) {
-      throw Exception('Error al listar productos: ${resp.statusCode}');
+      final list = (resp.data as List)
+          .map((e) => Producto.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
+
+      return list;
+    } on DioException catch (e) {
+      throw Exception(
+        'Error al listar productos: ${e.response?.statusCode} ${e.response?.data ?? e.message}',
+      );
     }
-
-    final List<dynamic> data = jsonDecode(resp.body);
-    return data
-        .map((e) => Producto.fromJson(e as Map<String, dynamic>))
-        .toList();
   }
 
   Future<Producto> crear({
@@ -29,27 +33,25 @@ class ProductoService {
     String? observacion,
     bool descuentaStock = true,
   }) async {
-    final uri = Uri.parse('$baseUrl/productos/');
-    final body = jsonEncode({
-      'nombre': nombre,
-      'estado': estado,
-      'litros': litros,
-      'tipo_dispenser': tipoDispenser,
-      'observacion': observacion,
-      'descuenta_stock': descuentaStock,
-    });
+    try {
+      final resp = await _dio.post(
+        '/productos/',
+        data: {
+          'nombre': nombre,
+          'estado': estado,
+          'litros': litros,
+          'tipo_dispenser': tipoDispenser,
+          'observacion': observacion,
+          'descuenta_stock': descuentaStock,
+        },
+      );
 
-    final resp = await http.post(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: body,
-    );
-
-    if (resp.statusCode != 201) {
-      throw Exception('Error al crear producto: ${resp.statusCode}');
+      return Producto.fromJson(Map<String, dynamic>.from(resp.data as Map));
+    } on DioException catch (e) {
+      throw Exception(
+        'Error al crear producto: ${e.response?.statusCode} ${e.response?.data ?? e.message}',
+      );
     }
-
-    return Producto.fromJson(jsonDecode(resp.body));
   }
 
   Future<Producto> actualizar(
@@ -61,9 +63,7 @@ class ProductoService {
     String? observacion,
     bool? descuentaStock,
   }) async {
-    final uri = Uri.parse('$baseUrl/productos/$idProducto');
     final body = <String, dynamic>{};
-
     if (nombre != null) body['nombre'] = nombre;
     if (estado != null) body['estado'] = estado;
     if (litros != null) body['litros'] = litros;
@@ -71,35 +71,34 @@ class ProductoService {
     if (observacion != null) body['observacion'] = observacion;
     if (descuentaStock != null) body['descuenta_stock'] = descuentaStock;
 
-    final resp = await http.put(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(body),
-    );
-
-    if (resp.statusCode != 200) {
-      throw Exception('Error al actualizar producto: ${resp.statusCode}');
+    try {
+      final resp = await _dio.put('/productos/$idProducto', data: body);
+      return Producto.fromJson(Map<String, dynamic>.from(resp.data as Map));
+    } on DioException catch (e) {
+      throw Exception(
+        'Error al actualizar producto: ${e.response?.statusCode} ${e.response?.data ?? e.message}',
+      );
     }
-
-    return Producto.fromJson(jsonDecode(resp.body));
   }
 
   Future<void> borrar(int idProducto) async {
-    final uri = Uri.parse('$baseUrl/productos/$idProducto');
-    final resp = await http.delete(uri);
-
-    if (resp.statusCode != 204) {
-      throw Exception('Error al borrar producto: ${resp.statusCode}');
+    try {
+      await _dio.delete('/productos/$idProducto');
+    } on DioException catch (e) {
+      throw Exception(
+        'Error al borrar producto: ${e.response?.statusCode} ${e.response?.data ?? e.message}',
+      );
     }
   }
 
   Future<List<dynamic>> listarProductosDeLista(int idLista) async {
-    final res = await http.get(
-      Uri.parse('$baseUrl/listas-precios/$idLista/productos'),
-    );
-    if (res.statusCode != 200) {
-      throw Exception('Error ${res.statusCode}: ${res.body}');
+    try {
+      final resp = await _dio.get('/listas-precios/$idLista/productos');
+      return (resp.data as List).cast<dynamic>();
+    } on DioException catch (e) {
+      throw Exception(
+        'Error listando productos de lista: ${e.response?.statusCode} ${e.response?.data ?? e.message}',
+      );
     }
-    return jsonDecode(res.body) as List<dynamic>;
   }
 }

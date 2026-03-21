@@ -21,9 +21,7 @@ class ReporteResumenDiarioScreen extends StatefulWidget {
 
 class _ReporteResumenDiarioScreenState
     extends State<ReporteResumenDiarioScreen> {
-  final _repartoService = RepartoDiaService(
-    baseUrl: 'http://localhost:8500',
-  ); // ✅
+  final _repartoService = RepartoDiaService();
 
   final _cajaService = CajaEmpresaService(); 
 
