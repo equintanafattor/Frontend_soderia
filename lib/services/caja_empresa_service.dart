@@ -1,11 +1,10 @@
-// services/caja_empresa_service.dart
-import 'dart:math';
-
 import 'package:dio/dio.dart';
 import 'package:frontend_soderia/core/net/api_client.dart';
-import 'package:frontend_soderia/models/caja_empresa_movimiento_in.dart';
 import 'package:frontend_soderia/models/caja_empresa_movimiento_out.dart';
 import 'package:frontend_soderia/models/caja_empresa_total_out.dart';
+import 'package:frontend_soderia/models/pago_egreso_create.dart';
+import 'package:frontend_soderia/models/pago_ingreso_create.dart';
+import 'package:frontend_soderia/models/pago_out.dart';
 
 class CajaEmpresaService {
   final Dio _dio = ApiClient.dio;
@@ -62,6 +61,7 @@ class CajaEmpresaService {
 
       final data = Map<String, dynamic>.from(resp.data as Map);
       final total = (data['total'] as num).toInt();
+
       final items = (data['items'] as List)
           .map(
             (e) =>
@@ -101,24 +101,28 @@ class CajaEmpresaService {
       );
     }
   }
-}
 
-/// ✅ Extension MOCK: va afuera de la clase
-extension CajaEmpresaServiceMock on CajaEmpresaService {
-  Future<CajaEmpresaMovimientoOut> crearMovimientoMock(
-    CajaEmpresaMovimientoIn input,
-  ) async {
-    await Future.delayed(const Duration(milliseconds: 250));
+  Future<PagoOut> crearIngreso(PagoIngresoCreate payload) async {
+    try {
+      final resp = await _dio.post('/pagos/ingreso', data: payload.toJson());
 
-    return CajaEmpresaMovimientoOut(
-      idMovimiento: Random().nextInt(100000000),
-      idEmpresa: input.idEmpresa ?? 1,
-      fecha: input.fecha,
-      tipo: input.tipo, // 'INGRESO' | 'EGRESO'
-      monto: input.monto,
-      observacion: input.observacion,
-      medioPago: input.medioPago,
-      tipoMovimiento: input.tipo,
-    );
+      return PagoOut.fromJson(Map<String, dynamic>.from(resp.data as Map));
+    } on DioException catch (e) {
+      throw Exception(
+        'Error creando ingreso (${e.response?.statusCode}): ${e.response?.data ?? e.message}',
+      );
+    }
+  }
+
+  Future<PagoOut> crearEgreso(PagoEgresoCreate payload) async {
+    try {
+      final resp = await _dio.post('/pagos/egreso', data: payload.toJson());
+
+      return PagoOut.fromJson(Map<String, dynamic>.from(resp.data as Map));
+    } on DioException catch (e) {
+      throw Exception(
+        'Error creando egreso (${e.response?.statusCode}): ${e.response?.data ?? e.message}',
+      );
+    }
   }
 }

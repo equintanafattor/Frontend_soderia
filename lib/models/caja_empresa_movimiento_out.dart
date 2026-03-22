@@ -19,20 +19,19 @@ class CajaEmpresaMovimientoOut {
     this.tipoMovimiento,
   });
 
-  static double _parseNum(dynamic v) {
-    if (v == null) return 0;
-    if (v is num) return v.toDouble();
-    if (v is String) return double.tryParse(v) ?? 0;
-    return 0;
+  static double _toDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.parse(value);
+    throw Exception('Valor inválido para double: $value');
   }
 
   factory CajaEmpresaMovimientoOut.fromJson(Map<String, dynamic> json) {
     return CajaEmpresaMovimientoOut(
-      idMovimiento: json['id_movimiento'] as int,
-      idEmpresa: json['id_empresa'] as int,
+      idMovimiento: (json['id_movimiento'] as num).toInt(),
+      idEmpresa: (json['id_empresa'] as num).toInt(),
       fecha: DateTime.parse(json['fecha'] as String),
-      tipo: (json['tipo'] as String?) ?? '',
-      monto: _parseNum(json['monto']),
+      tipo: json['tipo'] as String,
+      monto: _toDouble(json['monto']),
       observacion: json['observacion'] as String?,
       medioPago: json['medio_pago'] as String?,
       tipoMovimiento: json['tipo_movimiento'] as String?,
