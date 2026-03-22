@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/colors.dart';
@@ -56,68 +58,38 @@ class CalendarioScreen extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 8),
-              const Text(
-                "Seleccioná un mes o buscá por cliente o fecha",
-                style: TextStyle(color: AppColors.grisTexto, fontSize: 14),
-              ),
               const SizedBox(height: 16),
 
               Row(
                 children: [
                   IconButton(
                     onPressed: () {
-                      // Cambiar a la pestaña de Inicio dentro del AppShell
                       AppShellActions.jumpToTab(context, kIndexInicio);
                     },
-                    icon: const Icon(
-                      Icons.arrow_back,
-                      color: AppColors.azul,
-                      size: 28,
-                    ),
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppColors.blanco,
-                      shape: const CircleBorder(),
-                    ),
+                    icon: const Icon(Icons.arrow_back),
                   ),
-
-                  Expanded(
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 8),
-                      child: TextField(
-                        decoration: InputDecoration(
-                          hintText: 'Día, mes o cliente...',
-                          hintStyle: const TextStyle(
-                            color: AppColors.grisTexto,
-                          ),
-                          prefixIcon: const Icon(
-                            Icons.search,
-                            color: AppColors.grisTexto,
-                          ),
-                          filled: true,
-                          fillColor: AppColors.blanco,
-                          contentPadding: const EdgeInsets.symmetric(
-                            vertical: 0,
-                            horizontal: 16,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(40),
-                            borderSide: const BorderSide(
-                              color: AppColors.bordeSuave,
-                            ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Calendario',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.azul,
                           ),
                         ),
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () {
-                      /* abrir alta si corresponde */
-                    },
-                    icon: const Icon(Icons.add, color: AppColors.blanco),
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppColors.verde,
-                      shape: const CircleBorder(),
+                        SizedBox(height: 2),
+                        Text(
+                          'Seleccioná un mes para ver tareas y recorridos',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.grisTexto,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -150,14 +122,9 @@ class CalendarioScreen extends StatelessWidget {
                         childAspectRatio: childAspectRatio,
                       ),
                       itemBuilder: (context, i) => _MesCard(
-                        nombre: _meses[i],
-                        year: year,
-                        monthOneBased: i + 1,
-                        color: _mesColor(i),
+                        mes: i + 1,
                         onTap: () {
-                          // 1) Seteamos filtro global
                           todosMonthFilter.value = MonthFilter(year, i + 1);
-                          // 2) Saltamos a pestaña Tareas
                           AppShellActions.jumpToTab(context, kIndexTareas);
                         },
                       ),
@@ -189,137 +156,179 @@ class CalendarioScreen extends StatelessWidget {
   static double _calcAspectRatio(double maxWidth, int cols) {
     final tileWidth = (maxWidth - (12.0 * (cols - 1))) / cols;
     // Queremos que cada tarjeta entre título + mini-mes sin scroll
-    const desiredHeight = 260.0; // un poco más alto para 6 filas x 7 cols
+    const desiredHeight = 320.0; // un poco más alto para 6 filas x 7 cols
     return tileWidth / desiredHeight;
   }
 }
 
 class _MesCard extends StatelessWidget {
-  final String nombre;
-  final int year;
-  final int monthOneBased; // 1..12
-  final Color color;
+  final int mes;
   final VoidCallback onTap;
 
-  const _MesCard({
-    required this.nombre,
-    required this.year,
-    required this.monthOneBased,
-    required this.color,
-    required this.onTap,
-  });
+  const _MesCard({required this.mes, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final matrix = _monthMatrixMonFirst(year, monthOneBased); // 42 celdas
+    final ahora = DateTime.now();
+    final year = ahora.year;
+    final esMesActual = mes == ahora.month;
+    final matrix = _monthMatrixMonFirst(year, mes);
+
+    final nombreMes = const [
+      'Enero',
+      'Febrero',
+      'Marzo',
+      'Abril',
+      'Mayo',
+      'Junio',
+      'Julio',
+      'Agosto',
+      'Septiembre',
+      'Octubre',
+      'Noviembre',
+      'Diciembre',
+    ][mes - 1];
 
     return InkWell(
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(16),
       onTap: onTap,
       child: Container(
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(20),
+          color: esMesActual ? Colors.white : const Color(0xFFF8FBFD),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: esMesActual ? AppColors.azul : AppColors.bordeSuave,
+            width: esMesActual ? 2 : 1.2,
+          ),
+          boxShadow: const [
+            BoxShadow(
+              blurRadius: 8,
+              offset: Offset(0, 2),
+              color: Color(0x11000000),
+            ),
+          ],
         ),
-        padding: const EdgeInsets.all(12),
-        child: LayoutBuilder(
-          builder: (context, bc) {
-            // ---- Constantes de layout (podés afinarlas) ----
-            const rows = 6;
-            const cols = 7;
-            const gap = 3.0; // espacio entre celdas
-            const titleHeight = 22.0; // alto estimado del título
-            const weekHdrHeight = 18.0; // alto de "L M M J V S"
-            const vSpacing =
-                8.0 + 6.0; // separadores verticales entre secciones
-            // ------------------------------------------------
-
-            // Área interna disponible para la grilla
-            final innerW = bc.maxWidth;
-            final innerH = bc.maxHeight;
-
-            final reservedH = titleHeight + weekHdrHeight + vSpacing;
-            final gridAvailH = (innerH - reservedH).clamp(60.0, innerH);
-
-            // Tamaño de celda máximo que entra en 6x7
-            final cellW = (innerW - (cols - 1) * gap) / cols;
-            final cellH = (gridAvailH - (rows - 1) * gap) / rows;
-            final cellSize = math.max(
-              16.0,
-              math.min(cellW, cellH),
-            ); // piso 16px
-
-            final gridHeight = rows * cellSize + (rows - 1) * gap;
-
-            // Fuente proporcional pero con topes
-            final dayFont = cellSize <= 18
-                ? 9.0
-                : (cellSize <= 22 ? 10.0 : 11.0);
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            /// Header
+            Row(
               children: [
-                // Encabezado del mes
-                Text(
-                  '$nombre $year',
-                  style: const TextStyle(
-                    color: AppColors.blanco,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
-
-                // Encabezado de días (L a D)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    for (final w in _weekdaysMonFirst)
-                      SizedBox(
-                        width: cellSize, // igual que la celda
-                        child: Text(
-                          w,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: AppColors.blanco,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-
-                // Grilla del mini-mes con altura fija calculada
-                SizedBox(
-                  height: gridHeight,
-                  child: GridView.builder(
-                    padding: EdgeInsets.zero,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: rows * cols,
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: cols,
-                      mainAxisSpacing: gap,
-                      crossAxisSpacing: gap,
-                      childAspectRatio: 1, // celdas cuadradas
+                Expanded(
+                  child: Text(
+                    nombreMes,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.azul,
                     ),
-                    itemBuilder: (_, idx) {
-                      final day = matrix[idx];
-                      final disabled = day == null;
-                      return _DayCell(
-                        day: day,
-                        disabled: disabled,
-                        fontSize: dayFont,
-                      );
-                    },
                   ),
                 ),
+                if (esMesActual)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.azul.withOpacity(0.10),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: const Text(
+                      'Actual',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.azul,
+                      ),
+                    ),
+                  ),
               ],
-            );
-          },
+            ),
+
+            const SizedBox(height: 10),
+
+            /// Días de la semana
+            Row(
+              children: _weekdaysMonFirst.map((d) {
+                return Expanded(
+                  child: Center(
+                    child: Text(
+                      d,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.grisTexto,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+
+            const SizedBox(height: 6),
+
+            /// Grilla del mes
+            Expanded(
+              child: GridView.builder(
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: 42,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 7,
+                  mainAxisSpacing: 4,
+                  crossAxisSpacing: 4,
+                ),
+                itemBuilder: (context, i) {
+                  final day = matrix[i];
+
+                  final esHoy =
+                      day != null &&
+                      ahora.year == year &&
+                      ahora.month == mes &&
+                      ahora.day == day;
+
+                  return Container(
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: day == null
+                          ? Colors.transparent
+                          : esHoy
+                          ? AppColors.verde.withOpacity(0.22)
+                          : AppColors.celeste.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(6),
+                      border: esHoy
+                          ? Border.all(color: AppColors.verde, width: 1.2)
+                          : null,
+                    ),
+                    child: day == null
+                        ? null
+                        : Text(
+                            '$day',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: esHoy
+                                  ? FontWeight.w800
+                                  : FontWeight.w600,
+                              color: esHoy ? AppColors.verde : AppColors.azul,
+                            ),
+                          ),
+                  );
+                },
+              ),
+            ),
+
+            const SizedBox(height: 10),
+
+            Text(
+              'Ver tareas',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.grisTexto,
+              ),
+            ),
+          ],
         ),
       ),
     );

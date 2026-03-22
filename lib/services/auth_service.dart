@@ -31,7 +31,8 @@ class AuthService {
 
       dynamic body = response.data;
       if (body is String) body = jsonDecode(body);
-      if (body is! Map) {
+
+      if (body is! Map<String, dynamic>) {
         print('Login: respuesta inesperada: ${response.data}');
         return false;
       }
@@ -40,12 +41,20 @@ class AuthService {
       final nombreBackend = body['nombre_usuario'] as String?;
       final idUsuario = body['id_usuario'];
 
-      if (token == null || token.isEmpty) return false;
+      if (token == null || token.isEmpty) {
+        print('Login: access_token ausente o vacío.');
+        return false;
+      }
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('auth_token', token);
       await prefs.setString('username', nombreBackend ?? usuario);
-      if (idUsuario is int) await prefs.setInt('user_id', idUsuario);
+
+      if (idUsuario is int) {
+        await prefs.setInt('user_id', idUsuario);
+      } else {
+        await prefs.remove('user_id');
+      }
 
       print('Login OK. Token guardado (len=${token.length}).');
       return true;
@@ -61,7 +70,6 @@ class AuthService {
     }
   }
 
-  // ✅ AGREGAR ESTO
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
@@ -69,7 +77,6 @@ class AuthService {
     await prefs.remove('user_id');
   }
 
-  // ✅ ÚTILES (por si en algún lado los usás)
   Future<String?> getToken() async {
     if (kFakeAuth) return 'FAKE_TOKEN_DEV';
     final prefs = await SharedPreferences.getInstance();

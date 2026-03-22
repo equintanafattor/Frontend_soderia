@@ -1,78 +1,42 @@
-// services/usuario_service.dart
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:frontend_soderia/core/net/api_client.dart';
 import 'package:frontend_soderia/models/usuario.dart';
 
-// Si tenés una clase Env o similar, reemplazá por eso
 class UsuarioService {
-  static const String _baseUrl = 'http://localhost:8719'; // adapta
-
   Future<List<Usuario>> obtenerUsuarios() async {
-    final uri = Uri.parse('$_baseUrl/usuarios');
-    final resp = await http.get(uri);
+    final resp = await ApiClient.dio.get('/usuarios/');
 
-    if (resp.statusCode != 200) {
-      throw Exception('Error al cargar usuarios (${resp.statusCode})');
-    }
-
-    final List<dynamic> jsonList = jsonDecode(resp.body) as List<dynamic>;
-    return jsonList
+    final List data = resp.data as List;
+    return data
         .map((e) => Usuario.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 
   Future<Usuario> obtenerUsuarioPorId(int id) async {
-    final uri = Uri.parse('$_baseUrl/usuarios/$id');
-    final resp = await http.get(uri);
+    final resp = await ApiClient.dio.get('/usuarios/$id');
 
-    if (resp.statusCode != 200) {
-      throw Exception('Error al cargar usuario (${resp.statusCode})');
-    }
-
-    final Map<String, dynamic> json = jsonDecode(resp.body);
-    return Usuario.fromJson(json);
+    return Usuario.fromJson(resp.data);
   }
 
   Future<Usuario> actualizarUsuario(Usuario u) async {
-    final uri = Uri.parse('$_baseUrl/usuarios/${u.id}');
-    final resp = await http.put(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(u.toJson()),
-    );
+    final resp = await ApiClient.dio.put('/usuarios/${u.id}', data: u.toJson());
 
-    if (resp.statusCode != 200) {
-      throw Exception('Error al actualizar usuario (${resp.statusCode})');
-    }
-
-    final Map<String, dynamic> json = jsonDecode(resp.body);
-    return Usuario.fromJson(json);
+    return Usuario.fromJson(resp.data);
   }
 
-  // Si más adelante querés usarlo desde UsuarioAddScreen:
   Future<void> crearUsuario({
     required String nombreUsuario,
     required String contrasena,
     int? legajoEmpleado,
     int? legajoCliente,
   }) async {
-    final url = Uri.parse('$_baseUrl/usuarios');
-
-    final body = {
-      'nombre_usuario': nombreUsuario,
-      'contrasena': contrasena,
-      'legajo_empleado': legajoEmpleado,
-      'legajo_cliente': legajoCliente,
-    };
-
-    final resp = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(body),
+    await ApiClient.dio.post(
+      '/usuarios/',
+      data: {
+        'nombre_usuario': nombreUsuario,
+        'contrasena': contrasena,
+        'legajo_empleado': legajoEmpleado,
+        'legajo_cliente': legajoCliente,
+      },
     );
-
-    if (resp.statusCode != 201) {
-      throw Exception('Error ${resp.statusCode}: ${resp.body}');
-    }
   }
 }
