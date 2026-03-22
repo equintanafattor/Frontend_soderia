@@ -46,14 +46,24 @@ class AuthService {
         return false;
       }
 
+      int? parsedUserId;
+      if (idUsuario is int) {
+        parsedUserId = idUsuario;
+      } else if (idUsuario is String) {
+        parsedUserId = int.tryParse(idUsuario);
+      }
+
       final prefs = await SharedPreferences.getInstance();
+
+      await prefs.remove('auth_token');
+      await prefs.remove('username');
+      await prefs.remove('user_id');
+
       await prefs.setString('auth_token', token);
       await prefs.setString('username', nombreBackend ?? usuario);
 
-      if (idUsuario is int) {
-        await prefs.setInt('user_id', idUsuario);
-      } else {
-        await prefs.remove('user_id');
+      if (parsedUserId != null) {
+        await prefs.setInt('user_id', parsedUserId);
       }
 
       print('Login OK. Token guardado (len=${token.length}).');
