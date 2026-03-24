@@ -1,51 +1,106 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/net/api_client.dart';
 
+const bool kFakeAuth = false;
 
 class AuthService {
-  final Dio _dio = Dio(BaseOptions(
-    baseUrl: 'https://tu-api-gaston.api', //Reemplazar con la api real
-    connectTimeout: const Duration(seconds: 5),
-    receiveTimeout: const Duration(seconds: 5)
-  ));
+  final Dio _dio = ApiClient.dio;
 
   Future<bool> login(String usuario, String password) async {
+    if (kFakeAuth) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('auth_token', 'FAKE_TOKEN_DEV');
+      await prefs.setString(
+        'username',
+        usuario.isNotEmpty ? usuario : 'DevUser',
+      );
+      await prefs.setInt('user_id', 0);
+      return true;
+    }
+
     try {
       final response = await _dio.post(
         '/auth/login',
-        data: {
-          'usuario' : usuario,
-          'password' : password,
-        },
+        data: {'nombre_usuario': usuario, 'contrasena': password},
+        options: Options(headers: {'Content-Type': 'application/json'}),
       );
 
-      // Suponiendo que la API responde con un token
-      if (response.statusCode == 200 && response.data['token'] != null) {
-        // TODO: guardar token con shared_preferencies
-        final token = response.data['token'];
+      if (response.statusCode != 200) return false;
 
-        //Guardar token en local
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('auth_token', token);
+      dynamic body = response.data;
+      if (body is String) body = jsonDecode(body);
 
-        return true;
+      if (body is! Map<String, dynamic>) {
+        print('Login: respuesta inesperada: ${response.data}');
+        return false;
       }
 
+      final token = body['access_token'] as String?;
+      final nombreBackend = body['nombre_usuario'] as String?;
+      final idUsuario = body['id_usuario'];
+
+      if (token == null || token.isEmpty) {
+        print('Login: access_token ausente o vacío.');
+        return false;
+      }
+
+      int? parsedUserId;
+      if (idUsuario is int) {
+        parsedUserId = idUsuario;
+      } else if (idUsuario is String) {
+        parsedUserId = int.tryParse(idUsuario);
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+
+      await prefs.remove('auth_token');
+      await prefs.remove('username');
+      await prefs.remove('user_id');
+
+      await prefs.setString('auth_token', token);
+      await prefs.setString('username', nombreBackend ?? usuario);
+
+      if (parsedUserId != null) {
+        await prefs.setInt('user_id', parsedUserId);
+      }
+
+      print('Login OK. Token guardado (len=${token.length}).');
+      return true;
+    } on DioException catch (e) {
+      print('Login DioException: ${e.response?.statusCode}');
+      print('REQ: ${e.requestOptions.method} ${e.requestOptions.uri}');
+      print('SENT: ${e.requestOptions.data}');
+      print('DATA: ${e.response?.data}');
       return false;
     } catch (e) {
-      // Podes loguearlo o mostrar un mensaje de error
       print('Error en login: $e');
-      return false; 
+      return false;
     }
-  }
-
-  Future<String?> getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('auth_token');
   }
 
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
+    await prefs.remove('username');
+    await prefs.remove('user_id');
+  }
+
+  Future<String?> getToken() async {
+    if (kFakeAuth) return 'FAKE_TOKEN_DEV';
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('auth_token');
+  }
+
+  Future<String?> getSavedUsuario() async {
+    if (kFakeAuth) return 'DevUser';
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('username');
+  }
+
+  Future<int?> getUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt('user_id');
   }
 }

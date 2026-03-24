@@ -35,6 +35,59 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  void _mostrarOlvidePassword() {
+    final controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Recuperar contraseña'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(
+              labelText: 'Usuario o email',
+              hintText: 'Ingresá tu usuario',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final value = controller.text.trim();
+                if (value.isEmpty) return;
+
+                Navigator.pop(context);
+
+                try {
+                  //await _authService.resetPassword(value);
+
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Si el usuario existe, se enviaron instrucciones',
+                      ),
+                    ),
+                  );
+                } catch (e) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text('Error: $e')));
+                }
+              },
+              child: const Text('Enviar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _onSubmit() async {
     final isValid = _formKey.currentState?.validate() ?? false;
     if (!isValid || _loading) return;
@@ -51,24 +104,27 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _loading = false);
 
       if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('¡Login exitoso, $usuario!')),
-        );
-        // Navegar al Home (reemplaza el stack)
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => HomeScreen(nombreUsuario: usuario)),
-        );
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('¡Login exitoso, $usuario!')));
+
+        // 👇 Navegar a la app principal y limpiar el stack
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil('/app', (route) => false, arguments: usuario);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Credenciales inválidas')),
-        );
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Credenciales inválidas')));
       }
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al iniciar sesión: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error al iniciar sesión: $e')));
     }
   }
 
@@ -78,16 +134,17 @@ class _LoginScreenState extends State<LoginScreen> {
     final isWide = MediaQuery.of(context).size.width >= 800;
 
     final leftPanel = Container(
-      color: AppColors.verde, // panel verde de tu paleta
-      child: const Center(
-        child: Text(
-          'SAN MIGUEL',
-          style: TextStyle(
-            fontSize: 36,
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.0,
-          ),
+      color: AppColors.verde,
+      child: Center(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth > 600;
+            return Image.asset(
+              'assets/images/logo_san_miguel.png',
+              width: isWide ? 360 : 240,
+              fit: BoxFit.contain,
+            );
+          },
         ),
       ),
     );
@@ -155,7 +212,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                 : Icons.visibility,
                           ),
                           onPressed: () {
-                            setState(() => _mostrarPassword = !_mostrarPassword);
+                            setState(
+                              () => _mostrarPassword = !_mostrarPassword,
+                            );
                           },
                         ),
                         border: const OutlineInputBorder(),
@@ -185,15 +244,19 @@ class _LoginScreenState extends State<LoginScreen> {
                                 height: 18,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation(Colors.white),
+                                  valueColor: AlwaysStoppedAnimation(
+                                    Colors.white,
+                                  ),
                                 ),
                               )
                             : const Icon(Icons.login),
-                        label: Text(_loading ? 'Ingresando...' : 'Iniciar sesión'),
+                        label: Text(
+                          _loading ? 'Ingresando...' : 'Iniciar sesión',
+                        ),
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          backgroundColor: cs.primary,      // azul de tu tema
-                          foregroundColor: cs.onPrimary,     // blanco
+                          backgroundColor: cs.primary, // azul de tu tema
+                          foregroundColor: cs.onPrimary, // blanco
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                           ),
@@ -205,7 +268,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     // Link "Olvidé mi contraseña" (placeholder)
                     TextButton(
-                      onPressed: _loading ? null : () {},
+                      onPressed: _loading ? null : _mostrarOlvidePassword,
                       child: const Text('¿Olvidaste tu contraseña?'),
                     ),
                   ],
@@ -218,7 +281,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     return Scaffold(
-      backgroundColor: cs.background,
+      backgroundColor: cs.surface,
       body: isWide
           // Dos columnas (tablet/desktop)
           ? Row(

@@ -1,6 +1,6 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
-import 'package:frontend_soderia/screens/home_screen.dart';
-import 'package:frontend_soderia/screens/login_screen.dart';
 import 'package:frontend_soderia/services/auth_service.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -11,6 +11,8 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  final _authService = AuthService();
+
   @override
   void initState() {
     super.initState();
@@ -23,28 +25,31 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _checkToken() async {
     try {
-      final token = await AuthService().getToken();
+      final token = await _authService.getToken();
+      final usuario = await _authService.getSavedUsuario();
 
       if (!mounted) return;
 
       if (token != null && token.isNotEmpty) {
-        // ✅ Token presente → ir al Home
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => const HomeScreen(nombreUsuario: 'Usuario'),
-          ),
+        // ✅ Token presente → ir a la app principal (AppShell)
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          '/app',
+          (route) => false,
+          arguments: usuario ?? 'Usuario',
         );
       } else {
         // ❌ Sin token → ir al Login
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          '/login',
+          (route) => false,
         );
       }
     } catch (e) {
       if (!mounted) return;
       // En caso de error leyendo prefs, enviar a Login
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        '/login',
+        (route) => false,
       );
     }
   }

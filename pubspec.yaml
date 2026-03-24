@@ -37,6 +37,15 @@ dependencies:
   cupertino_icons: ^1.0.8
   dio: ^5.9.0
   shared_preferences: ^2.5.3
+  image_picker: ^1.2.0
+  provider: ^6.1.5+1
+  flutter_dotenv: ^6.0.0
+  http: ^1.5.0
+  pdf: ^3.10.6
+  printing: ^5.12.0
+  url_launcher: ^6.2.6
+  path_provider: ^2.1.4
+  share_plus: ^10.0.0
 
 dev_dependencies:
   flutter_test:
@@ -54,7 +63,9 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
-
+  assets:
+    - .env
+    - assets/images/
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
@@ -90,3 +101,6 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+  
+

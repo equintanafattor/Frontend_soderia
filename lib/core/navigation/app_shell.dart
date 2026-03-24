@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/colors.dart';
+import 'package:frontend_soderia/core/navigation/app_shell_actions.dart';
 import 'package:frontend_soderia/core/navigation/destinations.dart';
+import 'package:frontend_soderia/core/navigation/shell_state.dart';
+import 'package:frontend_soderia/services/auth_service.dart';
+import 'package:frontend_soderia/widgets/app_header.dart';
+import 'package:frontend_soderia/core/session/session_state.dart' as session;
 
 /// AppShell adaptativo:
 /// - Móvil  (<600): AppBar + Drawer modal
@@ -19,8 +24,10 @@ class AppShell extends StatefulWidget {
     this.onRouteChange,
     this.fabBuilder,
     this.titleBuilder,
-  }) : assert(pages != null || pagesBuilder != null,
-            'Debes proveer pages o pagesBuilder');
+  }) : assert(
+         pages != null || pagesBuilder != null,
+         'Debes proveer pages o pagesBuilder',
+       );
 
   /// Lista fija de páginas. El orden debe coincidir con kDestinations.
   final List<Widget>? pages;
@@ -46,16 +53,42 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   late int _index;
+  late final VoidCallback _shellListener; // 👈 Nuevo listener
 
   @override
   void initState() {
     super.initState();
     _index = widget.initialIndex.clamp(0, kDestinations.length - 1);
+
+    // Sincroniza el estado global al iniciar
+    shellState.value = _index;
+
+    // Listener que escucha cambios globales y actualiza la UI
+    _shellListener = () {
+      if (shellState.value != _index && mounted) {
+        setState(() => _index = shellState.value);
+        widget.onRouteChange?.call(_index, kDestinations[_index]);
+      }
+    };
+
+    shellState.addListener(_shellListener);
+  }
+
+  @override
+  void dispose() {
+    shellState.removeListener(_shellListener); // evita fugas de memoria
+    super.dispose();
   }
 
   void _select(int newIndex) {
     if (newIndex == _index) return;
+
+    // Actualiza UI local
     setState(() => _index = newIndex);
+
+    // Propaga el cambio globalmente
+    shellState.selectTab(newIndex);
+
     widget.onRouteChange?.call(newIndex, kDestinations[newIndex]);
   }
 
@@ -64,25 +97,40 @@ class _AppShellState extends State<AppShell> {
     final cs = Theme.of(context).colorScheme;
     final w = MediaQuery.of(context).size.width;
     final isMobile = w < 600;
-    final isRail   = w >= 600 && w < 1024;
+    final isRail = w >= 600 && w < 1024;
 
     // Construye las páginas (inyectando _select si se usa pagesBuilder)
     final pages = widget.pagesBuilder?.call(_select) ?? widget.pages!;
+    assert(
+      pages.length == kDestinations.length,
+      'pages y kDestinations deben tener el mismo largo y orden',
+    );
 
     // Título dinámico (si titleBuilder devuelve '', no se muestra)
-    final titleText = widget.titleBuilder?.call(_index, kDestinations[_index])
-        ?? kDestinations[_index].label;
+    final titleText =
+        widget.titleBuilder?.call(_index, kDestinations[_index]) ??
+        kDestinations[_index].label;
 
     final fab = widget.fabBuilder?.call(context, _index);
 
     // Contenido principal preservando estado por pestaña
-    final body = IndexedStack(index: _index, children: pages);
+    final body = IndexedStack(
+      index: _index,
+      children: [
+        for (var i = 0; i < pages.length; i++)
+          HeroMode(
+            enabled:
+                i == _index, // 👈 solo la pestaña visible puede tener heroes
+            child: pages[i],
+          ),
+      ],
+    );
 
     // ------- MÓVIL: AppBar + Drawer modal -------
     if (isMobile) {
       return Scaffold(
         appBar: AppBar(
-          title: titleText.isEmpty ? null : Text(titleText),
+          title: AppHeader(sectionTitle: titleText),
           backgroundColor: cs.primary,
           foregroundColor: cs.onPrimary,
           elevation: 0,
@@ -94,12 +142,19 @@ class _AppShellState extends State<AppShell> {
             ),
           ),
         ),
-        drawer: _ModalDrawer(
-          selectedIndex: _index,
-          onSelect: _select,
-        ),
+        drawer: _ModalDrawer(selectedIndex: _index, onSelect: _select),
         body: body,
-        floatingActionButton: fab,
+        // donde hoy ponés floatingActionButton: fab,
+        floatingActionButton:
+            fab ??
+            (_index == 0
+                ? FloatingActionButton.extended(
+                    heroTag: null,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Agregar'),
+                    onPressed: () => AppShellActions.showAddSheet(context),
+                  )
+                : null),
       );
     }
 
@@ -107,7 +162,7 @@ class _AppShellState extends State<AppShell> {
     if (isRail) {
       return Scaffold(
         appBar: AppBar(
-          title: titleText.isEmpty ? null : Text(titleText),
+          title: AppHeader(sectionTitle: titleText),
           backgroundColor: cs.primary,
           foregroundColor: cs.onPrimary,
           elevation: 0,
@@ -153,7 +208,7 @@ class _AppShellState extends State<AppShell> {
           Expanded(
             child: Scaffold(
               appBar: AppBar(
-                title: titleText.isEmpty ? null : Text(titleText),
+                title: AppHeader(sectionTitle: titleText),
                 backgroundColor: cs.primary,
                 foregroundColor: cs.onPrimary,
                 elevation: 0,
@@ -171,10 +226,7 @@ class _AppShellState extends State<AppShell> {
 // ====== Drawers ======
 
 class _ModalDrawer extends StatelessWidget {
-  const _ModalDrawer({
-    required this.selectedIndex,
-    required this.onSelect,
-  });
+  const _ModalDrawer({required this.selectedIndex, required this.onSelect});
 
   final int selectedIndex;
   final ValueChanged<int> onSelect;
@@ -211,9 +263,13 @@ class _ModalDrawer extends StatelessWidget {
               'Cerrar sesión',
               style: TextStyle(color: AppColors.azul),
             ),
-            onTap: () {
-              Navigator.pop(context);
-              // TODO: lógica de logout (limpiar sesión y navegar a Login)
+            onTap: () async {
+              final nav = Navigator.of(context, rootNavigator: true);
+              Navigator.pop(context); // cerrar drawer
+              await AuthService().logout();
+              session.sessionState.clear();
+              shellState.selectTab(0); // opcional
+              nav.pushNamedAndRemoveUntil('/login', (route) => false);
             },
           ),
         ],
@@ -267,13 +323,16 @@ class _PersistentDrawer extends StatelessWidget {
             'Cerrar sesión',
             style: TextStyle(color: AppColors.azul),
           ),
-          onTap: () {
-            // TODO: lógica de logout (limpiar sesión y navegar a Login)
+          onTap: () async {
+            final nav = Navigator.of(context, rootNavigator: true);
+            Navigator.pop(context); // cerrar drawer
+            await AuthService().logout();
+            session.sessionState.clear();
+            shellState.selectTab(0); // opcional
+            nav.pushNamedAndRemoveUntil('/login', (route) => false);
           },
         ),
       ],
     );
   }
 }
-
-

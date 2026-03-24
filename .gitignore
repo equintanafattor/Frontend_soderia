@@ -12,6 +12,9 @@
 .swiftpm/
 migrate_working_dir/
 
+# Ignorar archivo de entorno
+.env
+
 # IntelliJ related
 *.iml
 *.ipr

@@ -1,5 +1,13 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/colors.dart';
+import 'package:frontend_soderia/services/combo_service.dart';
+import 'package:printing/printing.dart';
+
+import '../utils/pdf_generator.dart';
+import 'package:frontend_soderia/services/pedido_service.dart';
+import 'package:frontend_soderia/services/reparto_dia_service.dart';
 
 class LineaVenta {
   final String nroPedido;
@@ -17,15 +25,17 @@ class LineaVenta {
   double get subtotal => cantidad * precioUnitario;
 }
 
-enum MedioPago { efectivo, transferencia, otro }
+enum MedioPago { efectivo, transferencia, otro, mixtoReparto }
 
 class PagoScreen extends StatefulWidget {
   final String nombreCliente;
   final String legajo;
   final DateTime fecha;
-  final double deudaActual;          // para mostrar en rojo si > 0
-  final List<LineaVenta> items;      // ítems de la venta (para el recibo)
-  final double total;                // total de la venta
+  final double deudaActual;
+  final double saldoAFavorActual;
+  final List<LineaVenta> items;
+  final double total;
+  final int? idCuenta;
 
   const PagoScreen({
     super.key,
@@ -33,8 +43,10 @@ class PagoScreen extends StatefulWidget {
     required this.legajo,
     required this.fecha,
     required this.deudaActual,
+    required this.saldoAFavorActual,
     required this.items,
     required this.total,
+    required this.idCuenta,
   });
 
   @override
@@ -42,26 +54,121 @@ class PagoScreen extends StatefulWidget {
 }
 
 class _PagoScreenState extends State<PagoScreen> {
-  // Chips de montos rápidos (pueden variar según tu lógica)
-  late final List<num> _montosRapidos = [
-    widget.total * 2, // ejemplo: total + deuda posible
-    widget.total + widget.deudaActual,
-    widget.total,
-  ].map((v) => v.clamp(0, double.infinity)).toList();
+  final _pedidoService = PedidoService();
+  final _repartoDiaService = RepartoDiaService(); // 👈 HOST SOLITO
+
+  // Chips de montos rápidos:
+  // - total de la venta
+  // - deuda (si existe)
+  // - total + deuda (si ambos existen)
+  List<num> get _montosRapidos {
+    final montos = <num>[];
+
+    final total = widget.total;
+    final deuda = widget.deudaActual;
+
+    if (total > 0) {
+      montos.add(total);
+    }
+    if (deuda > 0) {
+      montos.add(deuda);
+    }
+    final suma = total + deuda;
+    if (total > 0 && deuda > 0 && suma > 0) {
+      montos.add(suma);
+    }
+
+    return montos;
+  }
 
   final TextEditingController _otroCtrl = TextEditingController();
   double? _montoElegido;
   MedioPago _medio = MedioPago.efectivo;
   bool _compartirComprobante = false;
 
-  String _money(num v) {
-    // si tenés intl, reemplazá por NumberFormat.currency(locale: 'es_AR', symbol: '\$').format(v)
-    return '\$${v.toStringAsFixed(0)}';
-  }
+  String _money(num v) => '\$${v.toStringAsFixed(0)}';
 
+  /// Valida el monto elegido:
+  /// - No puede ser null
+  /// - No puede ser negativo
+  /// - Puede ser 0 solo si el cliente tiene saldo a favor
+  /// Valida el monto elegido:
+  /// - No puede ser null
+  /// - No puede ser negativo
+  /// - Puede ser 0 (queda en deuda o usa saldo a favor si existe)
   bool get _montoValido {
     final m = _montoElegido;
-    return m != null && m > 0;
+    if (m == null || m < 0) return false;
+    return true; // 0 ahora es válido
+  }
+
+  int _mapMedioPagoToId(MedioPago medio) {
+    switch (medio) {
+      case MedioPago.efectivo:
+        return 1;
+      case MedioPago.transferencia:
+        return 2;
+      case MedioPago.otro:
+        return 3;
+      case MedioPago.mixtoReparto:
+        return 4;
+    }
+  }
+
+  String _resolverEstadoPedido({
+    required double totalVenta,
+    required double deudaActual,
+    required double saldoAFavor,
+    required double montoAbonado,
+  }) {
+    const epsilon = 0.01;
+
+    if (montoAbonado < 0) {
+      return 'pendiente';
+    }
+
+    final deudaActualDec = deudaActual;
+    final saldoActualDec = saldoAFavor;
+
+    final A = montoAbonado;
+
+    final saldoUsado = A < saldoActualDec ? A : saldoActualDec;
+
+    final deudaTmp = deudaActualDec + totalVenta - A;
+
+    double deudaNueva;
+    double saldoGenerado;
+
+    if (deudaTmp >= 0) {
+      deudaNueva = deudaTmp;
+      saldoGenerado = 0;
+    } else {
+      deudaNueva = 0;
+      saldoGenerado = -deudaTmp;
+    }
+
+    final saldoNuevo = saldoActualDec - saldoUsado + saldoGenerado;
+
+    final deudaCasiCero = deudaNueva.abs() < epsilon;
+    final saldoCasiCero = saldoNuevo.abs() < epsilon;
+
+    if (deudaCasiCero && saldoCasiCero) {
+      return 'abonado';
+    }
+
+    if (!deudaCasiCero && montoAbonado <= 0) {
+      return 'pendiente';
+    }
+
+    if (!deudaCasiCero && montoAbonado > 0) {
+      return 'abonado parcialmente';
+    }
+
+    if (deudaCasiCero && saldoNuevo > epsilon) {
+      return 'cliente pago de más';
+    }
+
+    return 'pendiente';
   }
 
   @override
@@ -71,10 +178,8 @@ class _PagoScreenState extends State<PagoScreen> {
   }
 
   Future<void> _confirmar() async {
-    // Validaciones mínimas
     if (!_montoValido) return;
 
-    // Confirmación
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -83,23 +188,184 @@ class _PagoScreenState extends State<PagoScreen> {
           'Cliente: ${widget.nombreCliente}\n'
           'Medio: ${_medio.name}\n'
           'Importe: ${_money(_montoElegido!)}\n\n'
-          '¿Registrar pago?',
+          '¿Registrar pago y crear pedido?',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirmar')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Confirmar'),
+          ),
         ],
       ),
     );
 
-    if (ok == true && mounted) {
-      // TODO: llamar API para registrar pago, emitir recibo, etc.
-      // Si _compartirComprobante == true → disparar share / WhatsApp / email.
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Pago registrado por ${_money(_montoElegido!)}')),
+    if (ok != true || !mounted) return;
+
+    try {
+      final legajoInt = int.tryParse(widget.legajo);
+      if (legajoInt == null) {
+        throw Exception('Legajo inválido: ${widget.legajo}');
+      }
+
+      final idMedio = _mapMedioPagoToId(_medio);
+
+      // Estado según pago + saldo a favor
+      /*       final estado = _resolverEstadoPedido(
+        totalVenta: widget.total,
+        deudaActual: widget.deudaActual,
+        saldoAFavor: widget.saldoAFavorActual,
+        montoAbonado: _montoElegido!,
       );
-      Navigator.pop(context, true); // volvés a la venta
+ */
+      // 👇 AHORA OBTENEMOS EL REPARTO REAL DESDE EL BACK
+      final reparto = await _repartoDiaService.obtenerPorFecha(
+        fecha: widget.fecha,
+        idEmpresa: 1,
+        // si más adelante manejás usuario logueado, pasás idUsuario acá
+        // idUsuario: ...
+      );
+      final int idRepartoDia = reparto['id_repartodia'] as int;
+
+      final idCuenta = widget.idCuenta;
+      if (idCuenta == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Seleccioná una cuenta antes de confirmar'),
+          ),
+        );
+        return;
+      }
+
+      // Crear pedido
+      final pedido = await _pedidoService.crearPedido(
+        legajo: legajoInt,
+        idMedioPago: idMedio,
+        fecha: widget.fecha,
+        montoTotal: widget.total,
+        montoAbonado: _montoElegido!,
+        idEmpresa: 1,
+        // estado: estado,
+        idRepartoDia: idRepartoDia,
+        idCuenta: idCuenta,
+        items: _buildItemsPayload(),
+      );
+
+      final idPedido = pedido['id_pedido'] as int;
+
+      // Confirmar pedido
+      await _pedidoService.confirmarPedido(
+        idPedido: idPedido,
+        idRepartoDia: idRepartoDia,
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Pedido #$idPedido creado y confirmado.\n'
+            'Pago registrado: ${_money(_montoElegido!)}',
+          ),
+        ),
+      );
+
+      if (_compartirComprobante) {
+        await _shareComprobante();
+      }
+
+      if (mounted) {
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error al registrar pedido: $e')));
     }
+  }
+
+  bool get _saldoAlDia {
+    if (!_montoValido) return false;
+
+    const epsilon = 0.01;
+
+    final netoAnterior = widget.deudaActual - widget.saldoAFavorActual;
+    final netoNuevo = netoAnterior + widget.total - (_montoElegido ?? 0);
+
+    return netoNuevo <= epsilon;
+  }
+
+  Future<void> _showShareSheet() {
+    return showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const ListTile(
+                title: Text('Compartir comprobante'),
+                subtitle: Text('Elegí un canal'),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.chat),
+                title: const Text('WhatsApp'),
+                onTap: () {
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.email_outlined),
+                title: const Text('Email'),
+                onTap: () {
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.print_outlined),
+                title: const Text('Imprimir'),
+                onTap: () {
+                  Navigator.pop(context);
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _shareComprobante() async {
+    final data = await generarComprobantePDF(
+      nombreCliente: widget.nombreCliente,
+      legajo: widget.legajo,
+      fecha: widget.fecha,
+      deudaAnterior: widget.deudaActual,
+      saldoAFavorAnterior: widget.saldoAFavorActual,
+      totalVenta: widget.total,
+      montoPagado: _montoElegido!,
+      medioPago: _medio.name,
+      items: widget.items.map((it) {
+        return {
+          'producto': it.producto,
+          'cantidad': it.cantidad,
+          'precioUnitario': it.precioUnitario,
+        };
+      }).toList(),
+    );
+
+    await Printing.sharePdf(
+      bytes: data,
+      filename: 'comprobante_${widget.legajo}.pdf',
+    );
   }
 
   @override
@@ -108,161 +374,229 @@ class _PagoScreenState extends State<PagoScreen> {
     final w = MediaQuery.of(context).size.width;
     final isMobile = w < 720;
 
+    final bool _otroActivo =
+        _montoElegido == null || !_montosRapidos.contains(_montoElegido);
+
     final confirmButton = _ConfirmarButton(
       enabled: _montoValido,
       label: 'Confirmar pago',
       onPressed: _confirmar,
     );
 
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: AppColors.azul,
-        foregroundColor: Colors.white,
-        title: Text('Pago — ${widget.nombreCliente}'),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: isMobile ? null : confirmButton,
-      bottomNavigationBar: isMobile ? confirmButton : null,
-      body: Padding(
-        padding: EdgeInsets.only(bottom: isMobile ? 84 : 0),
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            // Encabezado
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: _EncabezadoCliente(
-                    nombre: widget.nombreCliente,
-                    legajo: widget.legajo,
-                    deuda: widget.deudaActual,
+    return WillPopScope(
+      onWillPop: () async {
+        Navigator.pop(context, false); // ⛔ no hubo cambios
+        return false; // evitamos el pop automático
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: AppColors.azul,
+          foregroundColor: Colors.white,
+          title: Text('Pago — ${widget.nombreCliente}'),
+        ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+        floatingActionButton: isMobile ? null : confirmButton,
+        bottomNavigationBar: isMobile ? confirmButton : null,
+        body: Padding(
+          padding: EdgeInsets.only(bottom: isMobile ? 84 : 0),
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: _EncabezadoCliente(
+                      nombre: widget.nombreCliente,
+                      legajo: widget.legajo,
+                      deuda: widget.deudaActual,
+                      saldoAFavor: widget.saldoAFavorActual,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                _FechaPill(fecha: widget.fecha),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            const Divider(thickness: 1.4),
-            const SizedBox(height: 4),
-
-            // Cabecera tabla
-            _TablaHeader(),
-            const SizedBox(height: 4),
-
-            // Filas
-            ...widget.items.map((it) => _TablaRow(
+                  const SizedBox(width: 12),
+                  _FechaPill(fecha: widget.fecha),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Divider(thickness: 1.4),
+              const SizedBox(height: 4),
+              _TablaHeader(),
+              const SizedBox(height: 4),
+              ...widget.items.map(
+                (it) => _TablaRow(
                   nro: it.nroPedido,
-                  producto: it.producto,
+                  producto: it.nroPedido.startsWith('combo')
+                      ? '📦 ${it.producto}'
+                      : it.producto,
                   cantidad: it.cantidad,
                   pu: it.precioUnitario,
                   pt: it.subtotal,
-                )),
-            const SizedBox(height: 8),
-            const Divider(thickness: 1.4),
-
-            // Total
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                'Total: ${_money(widget.total)}',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: Colors.black87,
-                    ),
+                ),
               ),
-            ),
+              const SizedBox(height: 8),
+              const Divider(thickness: 1.4),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  'Total: ${_money(widget.total)}',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'El cliente abonará:',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  if (widget.saldoAFavorActual > 0)
+                    _MontoChip(
+                      label: 'Usar saldo a favor',
+                      selected: _montoElegido == 0,
+                      onTap: () {
+                        setState(() {
+                          _montoElegido = 0;
+                          _otroCtrl.clear();
+                        });
+                      },
+                    )
+                  else
+                    _MontoChip(
+                      label: 'Pagar \$0 (queda en deuda)',
+                      selected: _montoElegido == 0,
+                      onTap: () {
+                        setState(() {
+                          _montoElegido = 0;
+                          _otroCtrl.clear();
+                        });
+                      },
+                    ),
 
-            const SizedBox(height: 16),
+                  for (final m in _montosRapidos)
+                    _MontoChip(
+                      label: _money(m),
+                      selected: _montoElegido == m,
+                      onTap: () {
+                        setState(() {
+                          _montoElegido = m.toDouble();
+                          _otroCtrl.clear();
+                        });
+                      },
+                    ),
 
-            // Monto a abonar
-            Text('El cliente abonará:', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                for (final m in _montosRapidos)
                   _MontoChip(
-                    label: _money(m),
-                    selected: _montoElegido == m,
+                    label: 'Otro',
+                    selected: _otroActivo,
                     onTap: () {
                       setState(() {
-                        _montoElegido = m as double?;
-                        _otroCtrl.clear();
+                        _montoElegido = null;
+                        _otroCtrl.text = '';
                       });
                     },
+                    filled: _otroActivo,
                   ),
-                _MontoChip(
-                  label: 'Otro',
-                  selected: _montoElegido != null &&
-                      !_montosRapidos.contains(_montoElegido),
-                  onTap: () {
-                    setState(() {
-                      _montoElegido = null;
-                    });
-                  },
-                  filled: true,
-                ),
-                SizedBox(
-                  width: 160,
-                  child: TextField(
-                    controller: _otroCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      isDense: true,
-                      labelText: 'Importe',
-                      prefixText: '\$ ',
-                      border: OutlineInputBorder(),
+
+                  if (_otroActivo)
+                    SizedBox(
+                      width: 160,
+                      child: TextField(
+                        controller: _otroCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          labelText: 'Importe (puede ser 0)',
+                          prefixText: '\$ ',
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (txt) {
+                          final cleaned = txt.replaceAll(
+                            RegExp(r'[^0-9.]'),
+                            '',
+                          );
+                          final val = double.tryParse(cleaned);
+                          setState(() {
+                            _montoElegido = val;
+                          });
+                        },
+                      ),
                     ),
-                    onChanged: (txt) {
-                      final cleaned = txt.replaceAll(RegExp(r'[^0-9.]'), '');
-                      final val = double.tryParse(cleaned);
-                      setState(() {
-                        _montoElegido = val;
-                      });
-                    },
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (_saldoAlDia)
+                Row(
+                  children: const [
+                    Icon(Icons.verified, color: Colors.green),
+                    SizedBox(width: 8),
+                    Text(
+                      'Saldo al día ✅',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
+              const SizedBox(height: 16),
+              Text(
+                'Medio de pago:',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              _Segmented<MedioPago>(
+                value: _medio,
+                items: const [
+                  (MedioPago.efectivo, 'Efectivo'),
+                  (MedioPago.transferencia, 'Transferencia'),
+                  (MedioPago.otro, 'Otro'),
+                ],
+                onChanged: (v) => setState(() => _medio = v),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Compartir comprobante'),
+                  Switch(
+                    value: _compartirComprobante,
+                    activeColor: AppColors.azul,
+                    onChanged: (v) => setState(() => _compartirComprobante = v),
                   ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-
-            // Medio de pago
-            Text('Medio de pago:', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            _Segmented<MedioPago>(
-              value: _medio,
-              items: const [
-                (MedioPago.efectivo, 'Efectivo'),
-                (MedioPago.transferencia, 'Transferencia'),
-                (MedioPago.otro, 'Otro'),
-              ],
-              onChanged: (v) => setState(() => _medio = v),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Compartir comprobante
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Compartir comprobante'),
-                Switch(
-                  value: _compartirComprobante,
-                  // ignore: deprecated_member_use
-                  activeColor: AppColors.azul,
-                  onChanged: (v) => setState(() => _compartirComprobante = v),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  // ---------------- HELPERS UI ----------------
+
+  List<Map<String, dynamic>> _buildItemsPayload() {
+    return widget.items.map((it) {
+      final parts = it.nroPedido.split('-');
+      final tipo = parts[0]; // "producto" | "combo"
+      final id = int.parse(parts[1]);
+
+      if (tipo == 'combo') {
+        return {
+          'id_combo': id,
+          'cantidad': it.cantidad,
+          'precio_unitario': it.precioUnitario,
+        };
+      }
+
+      // producto simple
+      return {
+        'id_producto': id,
+        'cantidad': it.cantidad,
+        'precio_unitario': it.precioUnitario,
+      };
+    }).toList();
   }
 }
 
@@ -272,10 +606,13 @@ class _EncabezadoCliente extends StatelessWidget {
   final String nombre;
   final String legajo;
   final double deuda;
+  final double saldoAFavor;
+
   const _EncabezadoCliente({
     required this.nombre,
     required this.legajo,
     required this.deuda,
+    required this.saldoAFavor,
   });
 
   @override
@@ -284,15 +621,16 @@ class _EncabezadoCliente extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(nombre,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                )),
+        Text(
+          nombre,
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+        ),
         const SizedBox(height: 4),
         Row(
           children: [
-            Text('Legajo: ',
-                style: TextStyle(color: cs.onSurfaceVariant)),
+            Text('Legajo: ', style: TextStyle(color: cs.onSurfaceVariant)),
             Text(legajo, style: const TextStyle(fontWeight: FontWeight.w600)),
           ],
         ),
@@ -309,6 +647,22 @@ class _EncabezadoCliente extends StatelessWidget {
             ),
           ],
         ),
+        const SizedBox(height: 2),
+        Row(
+          children: [
+            Text(
+              'Saldo a favor: ',
+              style: TextStyle(color: cs.onSurfaceVariant),
+            ),
+            Text(
+              '\$ ${saldoAFavor.toStringAsFixed(0)}',
+              style: const TextStyle(
+                color: Colors.teal,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }
@@ -320,7 +674,8 @@ class _FechaPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final f = '${fecha.day.toString().padLeft(2, '0')}/'
+    final f =
+        '${fecha.day.toString().padLeft(2, '0')}/'
         '${fecha.month.toString().padLeft(2, '0')}/'
         '${fecha.year}';
     return Container(
@@ -338,7 +693,9 @@ class _FechaPill extends StatelessWidget {
 class _TablaHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700);
+    final style = Theme.of(
+      context,
+    ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Row(
@@ -377,9 +734,7 @@ class _TablaRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
       decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(color: cs.outlineVariant),
-        ),
+        border: Border(top: BorderSide(color: cs.outlineVariant)),
       ),
       child: Row(
         children: [
@@ -431,7 +786,10 @@ class _MontoChip extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
           border: Border.all(color: border.color, width: border.width),
         ),
-        child: Text(label, style: TextStyle(color: fg, fontWeight: FontWeight.w700)),
+        child: Text(
+          label,
+          style: TextStyle(color: fg, fontWeight: FontWeight.w700),
+        ),
       ),
     );
   }
@@ -460,7 +818,10 @@ class _Segmented<T> extends StatelessWidget {
           selected: selected,
           onSelected: (_) => onChanged(e.$1),
           selectedColor: AppColors.azul,
-          labelStyle: TextStyle(color: selected ? Colors.white : Colors.black87, fontWeight: FontWeight.w700),
+          labelStyle: TextStyle(
+            color: selected ? Colors.white : Colors.black87,
+            fontWeight: FontWeight.w700,
+          ),
           backgroundColor: Colors.transparent,
           side: const BorderSide(color: Colors.black87, width: 1.2),
         );
