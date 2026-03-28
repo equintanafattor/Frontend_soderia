@@ -66,7 +66,7 @@ class StockService {
   }) async {
     try {
       final res = await _dio.get(
-        '/movimientos-stock',
+        '/movimientos-stock/',
         queryParameters: {'id_producto': idProducto, 'limit': limit},
       );
 

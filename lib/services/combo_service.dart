@@ -6,7 +6,7 @@ class ComboService {
 
   Future<List<dynamic>> listar() async {
     try {
-      final res = await _dio.get('/combos');
+      final res = await _dio.get('/combos/');
       return (res.data as List).cast<dynamic>();
     } on DioException catch (e) {
       throw Exception(

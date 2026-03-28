@@ -9,7 +9,7 @@ class ProductoService {
   Future<List<Producto>> listar({int limit = 50, int offset = 0}) async {
     try {
       final resp = await _dio.get(
-        '/productos',
+        '/productos/',
         queryParameters: {'limit': limit, 'offset': offset},
       );
 
