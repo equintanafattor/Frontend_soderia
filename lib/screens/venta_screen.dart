@@ -119,6 +119,9 @@ class _VentaScreenState extends State<VentaScreen> {
     _futureListasPrecios = _listaPrecioService.listarListas();
 
     _idListaSeleccionada = widget.idListaPrecios;
+    _futureItems = _listaPrecioService.listarItemsDeLista(
+      widget.idListaPrecios,
+    );
   }
 
   // -------- Helpers --------
