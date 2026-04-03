@@ -24,7 +24,6 @@ class PedidoService {
       'monto_total': montoTotal,
       'monto_abonado': montoAbonado,
       'items': items,
-      if (idRepartoDia != null) 'id_repartodia': idRepartoDia,
       if (idCuenta != null) 'id_cuenta': idCuenta,
       if (observacion != null && observacion.trim().isNotEmpty)
         'observacion': observacion.trim(),
