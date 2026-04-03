@@ -32,7 +32,7 @@ class ComboService {
   }) async {
     try {
       final res = await _dio.post(
-        '/combos',
+        '/combos/',
         data: {'nombre': nombre, 'estado': estado, 'id_empresa': 1},
       );
       return Map<String, dynamic>.from(res.data as Map);

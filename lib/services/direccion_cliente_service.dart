@@ -7,7 +7,7 @@ class DireccionClienteService {
   final Dio _dio = ApiClient.dio;
 
   Future<List<DireccionCliente>> obtenerDirecciones(int legajo) async {
-    final resp = await _dio.get('/clientes/$legajo/direcciones');
+    final resp = await _dio.get('/clientes/$legajo/direcciones/');
     final data = resp.data as List<dynamic>;
     return data
         .map((e) => DireccionCliente.fromJson(e as Map<String, dynamic>))
