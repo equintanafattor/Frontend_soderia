@@ -69,7 +69,7 @@ class ComboService {
   }) async {
     try {
       // ✅ ruta correcta (sin duplicar /combos)
-      await _dio.post(
+      await _dio.put(
         '/combos/$idCombo/productos',
         data: {'id_producto': idProducto, 'cantidad': cantidad},
       );
