@@ -255,11 +255,11 @@ class _TodosScreenState extends State<TodosScreen> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    _PlusButton(
-                      onPressed: () {
-                        debugPrint('Nuevo desde +');
-                      },
-                    ),
+                    // _PlusButton(
+                    //   onPressed: () {
+                    //     debugPrint('Nuevo desde +');
+                    //   },
+                    // ),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -377,8 +377,15 @@ class _TodosScreenState extends State<TodosScreen> {
                         child: JornadaCard(
                           fecha: fecha,
                           nombres: nombres,
-                          onAddPressed: () {
-                            debugPrint('Agregar cliente al $fecha');
+                          onAddPressed: () async {
+                            final res = await Navigator.pushNamed(
+                              context,
+                              '/cliente/new',
+                            );
+
+                            if (res == true) {
+                              _refrescar();
+                            }
                           },
                         ),
                       );
@@ -394,7 +401,7 @@ class _TodosScreenState extends State<TodosScreen> {
   }
 
   // Botón opcional para ir a hoy manualmente
-/*   Widget? _buildIrAHoyFab() {
+  /*   Widget? _buildIrAHoyFab() {
     final hoy = DateTime.now();
     if (hoy.year != mesActual.year || hoy.month != mesActual.month) return null;
 

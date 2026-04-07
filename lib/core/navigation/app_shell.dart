@@ -239,7 +239,7 @@ class _ModalDrawer extends StatelessWidget {
         children: [
           const DrawerHeader(
             child: Text(
-              'Dashboard',
+              'Sodería',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
           ),
@@ -295,7 +295,7 @@ class _PersistentDrawer extends StatelessWidget {
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: Text(
-            'Dashboard',
+            'Sodería',
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
         ),
