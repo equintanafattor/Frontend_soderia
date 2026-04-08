@@ -123,9 +123,9 @@ class DayFilterButtons extends StatelessWidget {
     return Wrap(
       spacing: 8,
       children: [
+        buildChip('Ayer', Icons.arrow_back),
         buildChip('Hoy', Icons.today),
         buildChip('Mañana', Icons.arrow_forward),
-        buildChip('Ayer', Icons.arrow_back),
         buildChip('Todos', Icons.calendar_month),
       ],
     );

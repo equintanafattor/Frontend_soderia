@@ -50,7 +50,7 @@ class ListaPrecioService {
   Future<List<dynamic>> listarListas({int limit = 50, int offset = 0}) async {
     try {
       final res = await _dio.get(
-        '/listas-precios',
+        '/listas-precios/',
         queryParameters: {'limit': limit, 'offset': offset},
       );
       return (res.data as List).cast<dynamic>();

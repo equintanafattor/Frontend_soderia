@@ -6,7 +6,7 @@ class ComboService {
 
   Future<List<dynamic>> listar() async {
     try {
-      final res = await _dio.get('/combos');
+      final res = await _dio.get('/combos/');
       return (res.data as List).cast<dynamic>();
     } on DioException catch (e) {
       throw Exception(
@@ -32,7 +32,7 @@ class ComboService {
   }) async {
     try {
       final res = await _dio.post(
-        '/combos',
+        '/combos/',
         data: {'nombre': nombre, 'estado': estado, 'id_empresa': 1},
       );
       return Map<String, dynamic>.from(res.data as Map);
@@ -69,7 +69,7 @@ class ComboService {
   }) async {
     try {
       // ✅ ruta correcta (sin duplicar /combos)
-      await _dio.post(
+      await _dio.put(
         '/combos/$idCombo/productos',
         data: {'id_producto': idProducto, 'cantidad': cantidad},
       );

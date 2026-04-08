@@ -4,6 +4,21 @@ import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/colors.dart';
 import 'package:frontend_soderia/core/enums/estado_visita.dart';
 
+String _formatearTurno(String? turno) {
+  if (turno == null) return '';
+
+  switch (turno.toLowerCase()) {
+    case 'manana':
+      return 'mañana';
+    case 'tarde':
+      return 'tarde';
+    case 'noche':
+      return 'noche';
+    default:
+      return turno;
+  }
+}
+
 class VisitCard extends StatelessWidget {
   final String nombre;
   final String direccion;
@@ -56,7 +71,7 @@ class VisitCard extends StatelessWidget {
         break;
     }
 
-    final String turnoLabel = (turnoVisita ?? '').trim();
+    final String turnoLabel = _formatearTurno(turnoVisita).trim();
 
     final bool disabled = onTap == null;
 

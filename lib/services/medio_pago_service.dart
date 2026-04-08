@@ -23,7 +23,7 @@ class MedioPagoService {
   Future<List<MedioPagoDto>> listar({bool forceRefresh = false}) async {
     if (!forceRefresh && _cache != null) return _cache!;
 
-    final res = await _dio.get('/medios-pago'); // 👈 sin slash final
+    final res = await _dio.get('/medios-pago/'); // 👈 sin slash final
     final data = res.data;
 
     if (data is! List) {

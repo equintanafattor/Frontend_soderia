@@ -31,7 +31,7 @@ class PedidoService {
     };
 
     try {
-      final res = await _dio.post('/pedidos', data: body);
+      final res = await _dio.post('/pedidos/', data: body);
       return Map<String, dynamic>.from(res.data as Map);
     } on DioException catch (e) {
       throw Exception(
