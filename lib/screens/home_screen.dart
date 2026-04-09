@@ -4,16 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/enums/estado_visita.dart';
 import 'package:frontend_soderia/core/navigation/destinations.dart';
 import 'package:frontend_soderia/core/navigation/shell_state.dart';
-import 'package:frontend_soderia/core/state/todos_filter.dart';
 import 'package:frontend_soderia/core/session/session_state.dart';
+import 'package:frontend_soderia/core/state/todos_filter.dart';
+import 'package:frontend_soderia/core/net/api_client.dart';
+import 'package:frontend_soderia/data/remote/catalogo_api.dart';
+import 'package:frontend_soderia/repositories/catalogo_repository.dart';
 
 import 'package:frontend_soderia/widgets/day_filter_buttons.dart';
 import 'package:frontend_soderia/widgets/visit_card.dart';
 
-import 'package:frontend_soderia/services/agenda_visitas_service.dart';
-import 'package:frontend_soderia/models/clientes_por_dia.dart';
-import 'package:frontend_soderia/services/direccion_cliente_service.dart';
-import 'package:frontend_soderia/models/direccion_cliente.dart';
+import 'package:frontend_soderia/data/local/local_db.dart';
+import 'package:frontend_soderia/data/remote/reparto_api.dart';
+import 'package:frontend_soderia/repositories/reparto_repository.dart';
 
 class HomeScreen extends StatefulWidget {
   final String nombreUsuario;
@@ -28,35 +30,30 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   String filtroSeleccionado = 'Hoy';
 
-  final AgendaVisitasService _agendaService = AgendaVisitasService();
-  final DireccionClienteService _direccionService = DireccionClienteService();
-
   late DateTime _fechaObjetivo;
-  late Future<ClientesPorDia> _futureAgenda;
+  late Future<List<RepartoClienteConDatos>> _futureAgenda;
   late final VoidCallback _homeDayFilterListener;
   late final VoidCallback _shellListener;
 
-  void _recargarAgenda() {
-    setState(() {
-      _futureAgenda = _agendaService.obtenerClientesPorFecha(
-        _soloFecha(_fechaObjetivo),
-      );
-    });
-  }
+  late final RepartoRepository _repartoRepository;
+  late final CatalogoRepository _catalogoRepository;
 
   @override
   void initState() {
     super.initState();
 
-    // ✅ “sube” el usuario al estado global (AppShell lo ve siempre)
     final current = sessionState.value;
     if (current == null || current.nombre != widget.nombreUsuario) {
       sessionState.setUser(SessionUser(nombre: widget.nombreUsuario));
     }
-    _fechaObjetivo = DateTime.now();
-    _futureAgenda = _agendaService.obtenerClientesPorFecha(
-      _soloFecha(_fechaObjetivo),
+
+    _repartoRepository = RepartoRepository(
+      db: appDb,
+      api: RepartoApi(ApiClient.dio),
     );
+
+    _fechaObjetivo = _soloFecha(DateTime.now());
+    _futureAgenda = _inicializarPantalla();
 
     _homeDayFilterListener = () {
       final value = homeDayFilter.value;
@@ -73,22 +70,24 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         filtroSeleccionado = value;
         _fechaObjetivo = nuevaFecha;
-        _futureAgenda = _agendaService.obtenerClientesPorFecha(
-          _soloFecha(_fechaObjetivo),
-        );
+        _futureAgenda = _inicializarPantalla();
       });
     };
 
     homeDayFilter.addListener(_homeDayFilterListener);
 
     _shellListener = () {
-      // Si el tab activo es Home (index 0)
       if (shellState.value == kIndexInicio) {
         _recargarAgenda();
       }
     };
 
     shellState.addListener(_shellListener);
+
+    _catalogoRepository = CatalogoRepository(
+      db: appDb,
+      api: CatalogoApi(ApiClient.dio),
+    );
   }
 
   @override
@@ -96,6 +95,38 @@ class _HomeScreenState extends State<HomeScreen> {
     homeDayFilter.removeListener(_homeDayFilterListener);
     shellState.removeListener(_shellListener);
     super.dispose();
+  }
+
+  Future<List<RepartoClienteConDatos>> _inicializarPantalla() async {
+    try {
+      // 👇 1. Trae reparto (clientes)
+      await _repartoRepository.bootstrapDelDia(
+        fecha: _fechaObjetivo,
+        idEmpresa: 1,
+      );
+
+      // 👇 2. Trae catálogo (productos, listas, medios de pago)
+      await _catalogoRepository.bootstrapCatalogo(
+        idListaInicial: 1, // podés hacerlo dinámico después
+      );
+    } catch (_) {
+      // si falla, seguimos con lo local (offline mode)
+    }
+
+    return _cargarAgendaLocal();
+  }
+
+  Future<List<RepartoClienteConDatos>> _cargarAgendaLocal() async {
+    final idReparto = await _repartoRepository.obtenerIdRepartoActualLocal();
+    if (idReparto == null) return [];
+
+    return _repartoRepository.obtenerClientesDelDiaLocal(idReparto: idReparto);
+  }
+
+  void _recargarAgenda() {
+    setState(() {
+      _futureAgenda = _inicializarPantalla();
+    });
   }
 
   DateTime _soloFecha(DateTime dt) => DateTime(dt.year, dt.month, dt.day);
@@ -125,9 +156,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       filtroSeleccionado = nuevoFiltro;
       _fechaObjetivo = nuevaFecha;
-      _futureAgenda = _agendaService.obtenerClientesPorFecha(
-        _soloFecha(_fechaObjetivo),
-      );
+      _futureAgenda = _inicializarPantalla();
     });
   }
 
@@ -152,16 +181,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-
               DayFilterButtons(
                 selected: filtroSeleccionado,
                 onFilterChanged: _onFilterChanged,
               ),
-
               const SizedBox(height: 24),
-
               Expanded(
-                child: FutureBuilder<ClientesPorDia>(
+                child: FutureBuilder<List<RepartoClienteConDatos>>(
                   future: _futureAgenda,
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
@@ -177,9 +203,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       );
                     }
 
-                    final agenda = snapshot.data;
+                    final clientes = snapshot.data ?? [];
 
-                    if (agenda == null || agenda.clientes.isEmpty) {
+                    if (clientes.isEmpty) {
                       return Center(
                         child: Text(
                           'No hay visitas para $filtroSeleccionado',
@@ -189,55 +215,35 @@ class _HomeScreenState extends State<HomeScreen> {
                     }
 
                     return ListView.builder(
-                      itemCount: agenda.clientes.length,
+                      itemCount: clientes.length,
                       itemBuilder: (context, index) {
-                        final c = agenda.clientes[index];
+                        final c = clientes[index];
+                        final estado = mapEstadoVisita(
+                          c.estadoVisita ?? 'pendiente',
+                        );
 
-                        // 🔴 MAPEO REAL DEL ESTADO
-                        final estado = mapEstadoVisita(c.estadoVisita);
+                        final bool puedeEntrar =
+                            estado == EstadoVisita.pendiente ||
+                            estado == EstadoVisita.postergado;
 
-                        return FutureBuilder<DireccionCliente?>(
-                          future: _direccionService.obtenerDireccionPrincipal(
-                            c.legajo,
-                          ),
-                          builder: (context, dirSnapshot) {
-                            String direccionTexto = 'Sin dirección';
-
-                            if (dirSnapshot.connectionState ==
-                                ConnectionState.waiting) {
-                              direccionTexto = 'Cargando dirección...';
-                            } else if (dirSnapshot.hasData &&
-                                dirSnapshot.data != null) {
-                              direccionTexto =
-                                  dirSnapshot.data!.descripcionCorta;
-                            }
-
-                            final estado = mapEstadoVisita(c.estadoVisita);
-
-                            final bool puedeEntrar =
-                                estado == EstadoVisita.pendiente ||
-                                estado == EstadoVisita.postergado;
-
-                            return VisitCard(
-                              nombre: c.nombreCompleto,
-                              direccion: direccionTexto,
-                              estado: estado,
-                              turnoVisita: c.turnoVisita,
-                              onTap: puedeEntrar
-                                  ? () async {
-                                      final res =
-                                          await Navigator.of(
-                                            context,
-                                            rootNavigator: true,
-                                          ).pushNamed(
-                                            '/venta',
-                                            arguments: {'legajo': c.legajo},
-                                          );
-                                      if (res == true) _recargarAgenda();
-                                    }
-                                  : null, // 👈 BLOQUEA EL TAP
-                            );
-                          },
+                        return VisitCard(
+                          nombre: c.nombre,
+                          direccion: c.direccion ?? 'Sin dirección',
+                          estado: estado,
+                          turnoVisita: c.turno,
+                          onTap: puedeEntrar
+                              ? () async {
+                                  final res =
+                                      await Navigator.of(
+                                        context,
+                                        rootNavigator: true,
+                                      ).pushNamed(
+                                        '/venta',
+                                        arguments: {'legajo': c.legajo},
+                                      );
+                                  if (res == true) _recargarAgenda();
+                                }
+                              : null,
                         );
                       },
                     );

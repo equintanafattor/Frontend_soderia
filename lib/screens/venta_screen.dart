@@ -10,6 +10,13 @@ import 'package:frontend_soderia/screens/clientes/cliente_edit_screen.dart';
 import 'package:frontend_soderia/services/visita_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:frontend_soderia/data/local/local_db.dart';
+import 'package:frontend_soderia/data/local/daos/sync_queue_dao.dart';
+import 'package:frontend_soderia/repositories/visita_repository.dart';
+import 'package:frontend_soderia/repositories/catalogo_repository.dart';
+import 'package:frontend_soderia/data/remote/catalogo_api.dart';
+import 'package:frontend_soderia/core/net/api_client.dart';
+
 class VentaScreen extends StatefulWidget {
   final int legajoCliente;
   final int idListaPrecios;
@@ -24,13 +31,11 @@ class VentaScreen extends StatefulWidget {
   State<VentaScreen> createState() => _VentaScreenState();
 }
 
-// ------------------- Modelo interno de carrito -------------------
-
 enum TipoItemVenta { producto, combo }
 
 class CarritoItem {
   final TipoItemVenta tipo;
-  final int idItem; // id_producto o id_combo
+  final int idItem;
   final String nombre;
   final double precioUnitario;
   int cantidad;
@@ -45,7 +50,6 @@ class CarritoItem {
 }
 
 class _VentaScreenState extends State<VentaScreen> {
-  // ================= CUENTAS (selección) =================
   List<Map<String, dynamic>> _cuentas = [];
   Map<String, dynamic>? _cuentaSeleccionada;
 
@@ -64,10 +68,8 @@ class _VentaScreenState extends State<VentaScreen> {
 
   bool get _tieneCuentaSeleccionada => _cuentaSeleccionada != null;
 
-  // Carrito actual (clave: id_producto → item)
   final Map<String, CarritoItem> _carrito = {};
 
-  // Futuros para cliente (detalle) y productos
   late Future<Map<String, dynamic>> _futureClienteDetalle;
   int? _idListaSeleccionada;
   Future<List<dynamic>> _futureItems = Future.value(const []);
@@ -75,8 +77,11 @@ class _VentaScreenState extends State<VentaScreen> {
   String _key(TipoItemVenta tipo, int id) => '${tipo.name}-$id';
 
   final _clienteService = ClienteService();
-  final _visitaService = VisitaService();
   final _listaPrecioService = ListaPrecioService();
+
+  late final VisitaRepository _visitaRepository;
+
+  bool _modoLocalCliente = false;
 
   double _parsePrecio(dynamic v) {
     if (v is num) return v.toDouble();
@@ -109,25 +114,134 @@ class _VentaScreenState extends State<VentaScreen> {
     }
   }
 
+  late final CatalogoRepository _catalogoRepository;
+  bool _modoLocalCatalogo = false;
+
+  Future<List<dynamic>> _cargarListasHibrido() async {
+    try {
+      final listas = await _listaPrecioService.listarListas();
+      _modoLocalCatalogo = false;
+      return listas;
+    } catch (_) {
+      _modoLocalCatalogo = true;
+      return await _catalogoRepository.obtenerListasLocales();
+    }
+  }
+
+  Future<List<dynamic>> _cargarItemsHibrido(int idLista) async {
+    try {
+      final items = await _listaPrecioService.listarItemsDeLista(idLista);
+      _modoLocalCatalogo = false;
+      return items;
+    } catch (_) {
+      _modoLocalCatalogo = true;
+
+      final itemsLocales = await _catalogoRepository.obtenerItemsDeListaLocal();
+
+      return itemsLocales
+          .map(
+            (i) => {
+              'tipo': i.tipo,
+              'id_item': i.idItem,
+              'nombre': i.nombre,
+              'precio': i.precio,
+              'estado': i.estado,
+            },
+          )
+          .toList();
+    }
+  }
+
   @override
   void initState() {
     super.initState();
 
-    _futureClienteDetalle = _clienteService.obtenerDetalleCliente(
-      widget.legajoCliente,
+    final queueDao = SyncQueueDao(appDb);
+    _visitaRepository = VisitaRepository(db: appDb, queueDao: queueDao);
+
+    _catalogoRepository = CatalogoRepository(
+      db: appDb,
+      api: CatalogoApi(ApiClient.dio),
     );
-    _futureListasPrecios = _listaPrecioService.listarListas();
+
+    _futureClienteDetalle = _cargarClienteHibrido();
 
     _idListaSeleccionada = widget.idListaPrecios;
-    _futureItems = _listaPrecioService.listarItemsDeLista(
-      widget.idListaPrecios,
-    );
+    _futureListasPrecios = _cargarListasHibrido();
+    _futureItems = _cargarItemsHibrido(widget.idListaPrecios);
   }
 
-  // -------- Helpers --------
+  Future<Map<String, dynamic>> _cargarClienteHibrido() async {
+    final local = await (appDb.select(
+      appDb.clientesLocal,
+    )..where((t) => t.legajo.equals(widget.legajoCliente))).getSingleOrNull();
+
+    try {
+      final remoto = await _clienteService.obtenerDetalleCliente(
+        widget.legajoCliente,
+      );
+      _modoLocalCliente = false;
+      return remoto;
+    } catch (_) {
+      _modoLocalCliente = true;
+      return _buildClienteDetalleDesdeLocal(local);
+    }
+  }
+
+  Map<String, dynamic> _buildClienteDetalleDesdeLocal(dynamic local) {
+    final persona = _personaDesdeNombreLocal(local?.nombre?.toString() ?? '');
+
+    return {
+      'legajo': widget.legajoCliente,
+      'observacion': null,
+      'persona': persona,
+      'direcciones': [
+        if ((local?.direccion as String?) != null &&
+            (local!.direccion as String).trim().isNotEmpty)
+          {'direccion': local.direccion, 'zona': null},
+      ],
+      'telefonos': [
+        if ((local?.telefono as String?) != null &&
+            (local!.telefono as String).trim().isNotEmpty)
+          {'nro_telefono': local.telefono},
+      ],
+      'cuentas': [
+        {
+          'id_cuenta': local?.idCuenta,
+          'deuda': local?.deuda ?? 0.0,
+          'saldo': local?.saldo ?? 0.0,
+          'tipo_de_cuenta': 'Cuenta',
+          'estado': 'local',
+        },
+      ],
+      'historicos': const [],
+    };
+  }
+
+  Map<String, dynamic> _personaDesdeNombreLocal(String nombreLocal) {
+    final nombre = nombreLocal.trim();
+
+    if (nombre.contains(',')) {
+      final parts = nombre.split(',');
+      final apellido = parts.isNotEmpty ? parts.first.trim() : '';
+      final nombrePersona = parts.length > 1
+          ? parts.sublist(1).join(',').trim()
+          : '';
+      return {'nombre': nombrePersona, 'apellido': apellido};
+    }
+
+    final parts = nombre.split(' ').where((e) => e.trim().isNotEmpty).toList();
+    if (parts.length >= 2) {
+      return {
+        'nombre': parts.sublist(0, parts.length - 1).join(' '),
+        'apellido': parts.last,
+      };
+    }
+
+    return {'nombre': nombre, 'apellido': ''};
+  }
 
   Widget _selectorCuentaWidget() {
-    // Sin cuentas
     if (_cuentas.isEmpty) {
       return const Padding(
         padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
@@ -165,6 +279,14 @@ class _VentaScreenState extends State<VentaScreen> {
                   child: Text(
                     'Seleccioná una cuenta para continuar',
                     style: TextStyle(color: Colors.red),
+                  ),
+                ),
+              if (_modoLocalCliente)
+                const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Text(
+                    'Datos cargados localmente',
+                    style: TextStyle(color: Colors.orange),
                   ),
                 ),
             ],
@@ -232,9 +354,14 @@ class _VentaScreenState extends State<VentaScreen> {
 
   Future<void> _registrarVisita(String estado) async {
     try {
-      await _visitaService.crearVisita(
+      await _visitaRepository.registrarVisitaOffline(
         legajo: widget.legajoCliente,
         estado: estado,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Visita guardada en el dispositivo')),
       );
     } catch (e) {
       if (!mounted) return;
@@ -289,8 +416,8 @@ class _VentaScreenState extends State<VentaScreen> {
   void _seleccionarLista(int idLista) {
     setState(() {
       _idListaSeleccionada = idLista;
-      _carrito.clear(); // 🔒 evita mezclar precios
-      _futureItems = _listaPrecioService.listarItemsDeLista(idLista);
+      _carrito.clear();
+      _futureItems = _cargarItemsHibrido(idLista);
     });
   }
 
@@ -322,11 +449,15 @@ class _VentaScreenState extends State<VentaScreen> {
   ) async {
     if (idCuenta == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Seleccioná una cuenta para la venta')),
+        const SnackBar(
+          content: Text(
+            'No hay cuenta local válida. Para venta offline falta guardar idCuenta en SQLite.',
+          ),
+        ),
       );
       return;
     }
-    // Si por alguna razón se llegó acá sin ítems, no sigo
+
     if (_carrito.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No hay productos en la venta')),
@@ -334,7 +465,6 @@ class _VentaScreenState extends State<VentaScreen> {
       return;
     }
 
-    // 1) Mapear el carrito → List<LineaVenta>
     final List<LineaVenta> items = [];
 
     _carrito.forEach((_, item) {
@@ -350,7 +480,6 @@ class _VentaScreenState extends State<VentaScreen> {
 
     final total = _total;
 
-    // 2) Navegar a PagoScreen con los datos reales
     final ok = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => PagoScreen(
@@ -358,21 +487,19 @@ class _VentaScreenState extends State<VentaScreen> {
           legajo: legajo,
           fecha: DateTime.now(),
           deudaActual: deuda,
-          saldoAFavorActual: saldoAFavor, // 👈 el que ya calculás del back
+          saldoAFavorActual: saldoAFavor,
           items: items,
           total: total,
-          idCuenta: idCuenta, // ✅ NUEVO
+          idCuenta: idCuenta,
         ),
       ),
     );
 
-    // 3) Si pago OK
     if (ok == true && mounted) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Venta confirmada')));
 
-      // Navigator.pop(context);
       Navigator.of(context).pop(true);
     }
   }
@@ -399,13 +526,11 @@ class _VentaScreenState extends State<VentaScreen> {
       ),
     );
     if (ok == true && mounted) {
-      // Registrar visita como NO_COMPRA
       await _registrarVisita(VisitaEstado.noCompra);
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Visita marcada como "No compra"')),
       );
-      // Navigator.pop(context);
       Navigator.of(context).pop(true);
     }
   }
@@ -419,7 +544,7 @@ class _VentaScreenState extends State<VentaScreen> {
       context,
     ).showSnackBar(const SnackBar(content: Text('Visita postergada')));
 
-    Navigator.of(context).pop(true); // 👈 CLAVE
+    Navigator.of(context).pop(true);
   }
 
   @override
@@ -439,13 +564,12 @@ class _VentaScreenState extends State<VentaScreen> {
           );
         }
 
-        final cli = snap.data!; // este es el detalle del cliente
+        final cli = snap.data!;
         final persona = cli['persona'] ?? {};
         final nombre = '${persona['nombre'] ?? ''} ${persona['apellido'] ?? ''}'
             .trim();
         final legajoStr = cli['legajo'].toString();
 
-        // ---- Dirección: tomamos la primera de "direcciones" ----
         String direccion = '';
         String direccionBase = '';
 
@@ -463,35 +587,30 @@ class _VentaScreenState extends State<VentaScreen> {
           direccion = partes.join(' · ');
         }
 
-        // ---- Cuentas: guardamos TODAS y seleccionamos por defecto si hace falta ----
         final cuentasRaw = (cli['cuentas'] as List?) ?? [];
         _cuentas = cuentasRaw
             .whereType<Map>()
             .map((e) => Map<String, dynamic>.from(e as Map))
             .toList();
 
-        // Auto-selección:
-        // - si hay 1 sola -> la seleccionamos
-        // - si hay varias y todavía no eligió -> dejamos null para obligar a elegir
         if (_cuentas.length == 1 && _cuentaSeleccionada == null) {
           _cuentaSeleccionada = _cuentas.first;
         }
 
-        // si la seleccionada ya no existe (por refresh), la limpiamos
         if (_cuentaSeleccionada != null) {
           final selId = _idCuentaSeleccionada;
           final sigue = _cuentas.any(
             (c) => (c['id_cuenta'] as num?)?.toInt() == selId,
           );
-          if (!sigue)
+          if (!sigue) {
             _cuentaSeleccionada = _cuentas.length == 1 ? _cuentas.first : null;
+          }
         }
 
         final deuda = _deudaSel;
         final saldoAFavor = _saldoSel;
         final idCuenta = _idCuentaSeleccionada;
 
-        // ---- Historial: viene dentro de "historicos" ----
         final historicos = (cli['historicos'] as List?) ?? [];
 
         return _buildScaffold(
@@ -518,14 +637,14 @@ class _VentaScreenState extends State<VentaScreen> {
     required double saldoAFavor,
     required List<dynamic> historicos,
     required Map<String, dynamic> dataCliente,
-    required int? idCuenta, // ✅ NUEVO
+    required int? idCuenta,
   }) {
     final cs = Theme.of(context).colorScheme;
     final w = MediaQuery.of(context).size.width;
     final isMobile = w < 600;
 
     final confirm = ConfirmAction(
-      enabled: _ventaValida && _tieneCuentaSeleccionada, // ✅
+      enabled: _ventaValida && _tieneCuentaSeleccionada,
       total: _total,
       onConfirm: () =>
           _confirmarVenta(nombreCliente, legajo, deuda, saldoAFavor, idCuenta),
@@ -554,8 +673,7 @@ class _VentaScreenState extends State<VentaScreen> {
 
                 if (res == true && mounted) {
                   setState(() {
-                    _futureClienteDetalle = _clienteService
-                        .obtenerDetalleCliente(widget.legajoCliente);
+                    _futureClienteDetalle = _cargarClienteHibrido();
                   });
                 }
               },
@@ -564,8 +682,6 @@ class _VentaScreenState extends State<VentaScreen> {
               tooltip: 'Ver ubicación',
               icon: const Icon(Icons.location_on),
               onPressed: () {
-                // Usamos dirección base (sin "Zona ...") si existe,
-                // si no, caemos a lo que se muestra en UI.
                 final toOpen = (direccionBase.isNotEmpty)
                     ? direccionBase
                     : direccion;
@@ -589,6 +705,32 @@ class _VentaScreenState extends State<VentaScreen> {
         bottomNavigationBar: isMobile ? confirm : null,
         body: Column(
           children: [
+            if (_modoLocalCliente)
+              Container(
+                width: double.infinity,
+                color: Colors.orange.shade100,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: const Text(
+                  'Mostrando datos locales del cliente. El catálogo todavía requiere conexión.',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ),
+            if (_modoLocalCatalogo)
+              Container(
+                width: double.infinity,
+                color: Colors.orange.shade100,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: const Text(
+                  'Mostrando catálogo local',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ),
             _selectorCuentaWidget(),
             _selectorListaPrecios(),
             Expanded(
@@ -620,22 +762,29 @@ class _VentaScreenState extends State<VentaScreen> {
     return FutureBuilder<List<dynamic>>(
       future: _futureListasPrecios,
       builder: (context, snap) {
-        if (!snap.hasData) {
+        if (snap.connectionState == ConnectionState.waiting) {
           return const Padding(
             padding: EdgeInsets.all(12),
             child: LinearProgressIndicator(),
           );
         }
 
-        final listas = snap.data!;
+        if (snap.hasError) {
+          return const Padding(
+            padding: EdgeInsets.all(12),
+            child: Text('No se pudieron cargar listas de precios'),
+          );
+        }
 
-        final activas = listas
-            .where(
-              (l) =>
-                  (l['estado'] ?? '').toString().toLowerCase().trim() ==
-                  'activo',
-            )
-            .toList();
+        final listas = snap.data ?? const [];
+
+        final activas = listas.where((l) {
+          final estado = (l['estado'] ?? l.estado ?? '')
+              .toString()
+              .toLowerCase()
+              .trim();
+          return estado == 'activo';
+        }).toList();
 
         if (activas.isEmpty) {
           return const Padding(
@@ -644,19 +793,22 @@ class _VentaScreenState extends State<VentaScreen> {
           );
         }
 
-        // si la seleccionada no existe o está inactiva, caigo a la primera activa
         final existeYActiva =
             _idListaSeleccionada != null &&
-            activas.any((l) => l['id_lista'] == _idListaSeleccionada);
+            activas.any((l) {
+              final id = l is Map<String, dynamic> ? l['id_lista'] : l.idLista;
+              return id == _idListaSeleccionada;
+            });
 
         if (!existeYActiva) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted) return;
             setState(() {
-              _idListaSeleccionada = activas.first['id_lista'] as int;
-              _futureItems = _listaPrecioService.listarItemsDeLista(
-                _idListaSeleccionada!,
-              );
+              final primera = activas.first;
+              _idListaSeleccionada = primera is Map<String, dynamic>
+                  ? (primera['id_lista'] as num).toInt()
+                  : primera.idLista as int;
+              _futureItems = _cargarItemsHibrido(_idListaSeleccionada!);
             });
           });
         }
@@ -670,14 +822,16 @@ class _VentaScreenState extends State<VentaScreen> {
               border: OutlineInputBorder(),
               isDense: true,
             ),
-            items: activas
-                .map(
-                  (l) => DropdownMenuItem<int>(
-                    value: l['id_lista'],
-                    child: Text(l['nombre']),
-                  ),
-                )
-                .toList(),
+            items: activas.map((l) {
+              final id = l is Map<String, dynamic>
+                  ? (l['id_lista'] as num).toInt()
+                  : l.idLista as int;
+              final nombre = l is Map<String, dynamic>
+                  ? (l['nombre'] ?? '').toString()
+                  : l.nombre as String;
+
+              return DropdownMenuItem<int>(value: id, child: Text(nombre));
+            }).toList(),
             onChanged: (v) {
               if (v != null && v != _idListaSeleccionada) {
                 _seleccionarLista(v);
@@ -688,8 +842,6 @@ class _VentaScreenState extends State<VentaScreen> {
       },
     );
   }
-
-  // ---------- Tabs ----------
 
   Widget _tabVentaActual(
     BuildContext context,
@@ -704,7 +856,6 @@ class _VentaScreenState extends State<VentaScreen> {
       children: [
         _HeaderInfo(legajo: legajo, deuda: deuda, saldoAFavor: saldoAFavor),
         const SizedBox(height: 12),
-
         Wrap(
           spacing: 12,
           runSpacing: 8,
@@ -722,11 +873,9 @@ class _VentaScreenState extends State<VentaScreen> {
             ),
           ],
         ),
-
         const SizedBox(height: 16),
         Text('Ítems', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
-
         if (_carrito.isEmpty)
           Container(
             padding: const EdgeInsets.all(16),
@@ -745,7 +894,6 @@ class _VentaScreenState extends State<VentaScreen> {
               ],
             ),
           ),
-
         ..._carrito.entries.map((entry) {
           final key = entry.key;
           final item = entry.value;
@@ -755,9 +903,8 @@ class _VentaScreenState extends State<VentaScreen> {
             child: ListTile(
               leading: Icon(
                 item.tipo == TipoItemVenta.combo
-                    ? Icons
-                          .inventory_2 // 📦 combo
-                    : Icons.local_drink, // 💧 producto
+                    ? Icons.inventory_2
+                    : Icons.local_drink,
               ),
               title: Text(item.nombre),
               subtitle: Text(
@@ -793,17 +940,17 @@ class _VentaScreenState extends State<VentaScreen> {
     }
 
     return FutureBuilder<List<dynamic>>(
-      future: _futureItems, // ✅ el del State (NO redeclarar acá)
+      future: _futureItems,
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
 
         if (snap.hasError) {
-          return Center(child: Text('Error cargando ítems: ${snap.error}'));
+          return const Center(child: Text('No se pudieron cargar los ítems'));
         }
 
-        final items = (snap.data ?? const []);
+        final items = snap.data ?? const [];
 
         if (items.isEmpty) {
           return const Center(
@@ -815,7 +962,17 @@ class _VentaScreenState extends State<VentaScreen> {
           padding: const EdgeInsets.all(16),
           itemCount: items.length,
           itemBuilder: (_, i) {
-            final it = items[i] as Map<String, dynamic>;
+            final raw = items[i];
+
+            final Map<String, dynamic> it = raw is Map<String, dynamic>
+                ? raw
+                : {
+                    'tipo': raw.tipo,
+                    'id_item': raw.idItem,
+                    'nombre': raw.nombre,
+                    'precio': raw.precio,
+                    'estado': raw.estado,
+                  };
 
             final tipo = it['tipo'] == 'combo'
                 ? TipoItemVenta.combo
@@ -826,7 +983,6 @@ class _VentaScreenState extends State<VentaScreen> {
 
             final double precio = _parsePrecio(it['precio']);
 
-            // estado SOLO aplica a combos
             final bool activo = esCombo
                 ? (it['estado'] == true ||
                       it['estado'] == 'true' ||
@@ -834,7 +990,6 @@ class _VentaScreenState extends State<VentaScreen> {
                       (it['estado']?.toString().toLowerCase() == 'activo'))
                 : true;
 
-            // 👉 puede venderse?
             final bool puedeVender = activo && (!esCombo || tienePrecio);
 
             final icon = esCombo ? Icons.inventory_2 : Icons.local_drink;
@@ -924,11 +1079,10 @@ class _VentaScreenState extends State<VentaScreen> {
   }
 }
 
-// ---------- Widgets auxiliares ----------
-
 class _TitleCliente extends StatelessWidget {
   final String nombre;
   final String direccion;
+
   const _TitleCliente({required this.nombre, required this.direccion});
 
   @override
@@ -1006,6 +1160,7 @@ class _InfoItem extends StatelessWidget {
   final String label;
   final String value;
   final TextStyle? valueStyle;
+
   const _InfoItem({required this.label, required this.value, this.valueStyle});
 
   @override
@@ -1026,6 +1181,7 @@ class _InfoItem extends StatelessWidget {
 
 class _CantidadDialog extends StatefulWidget {
   final int cantidadInicial;
+
   const _CantidadDialog({required this.cantidadInicial});
 
   @override
@@ -1077,8 +1233,6 @@ class _CantidadDialogState extends State<_CantidadDialog> {
     );
   }
 }
-
-// ---------- Botón Confirmar (responsive) ----------
 
 class ConfirmAction extends StatelessWidget {
   final bool enabled;

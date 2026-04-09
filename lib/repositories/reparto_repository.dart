@@ -1,4 +1,4 @@
-import 'package:drift/drift.dart' show Value;
+import 'package:drift/drift.dart' show Value, Variable;
 
 import '../data/local/app_database.dart';
 import '../data/remote/reparto_api.dart';
@@ -7,10 +7,7 @@ class RepartoRepository {
   final AppDatabase db;
   final RepartoApi api;
 
-  RepartoRepository({
-    required this.db,
-    required this.api,
-  });
+  RepartoRepository({required this.db, required this.api});
 
   Future<void> bootstrapDelDia({
     required DateTime fecha,
@@ -33,11 +30,26 @@ class RepartoRepository {
 
     final reparto = Map<String, dynamic>.from(repartoResp.data);
     final agenda = Map<String, dynamic>.from(agendaResp.data);
-    final clientesAgenda =
-        List<Map<String, dynamic>>.from(agenda['clientes'] ?? const []);
+    final clientesAgenda = List<Map<String, dynamic>>.from(
+      agenda['clientes'] ?? const [],
+    );
 
     await db.transaction(() async {
+      await db.delete(db.repartoActualLocal).go();
       await db.delete(db.repartoClientesLocal).go();
+
+      await db
+          .into(db.repartoActualLocal)
+          .insert(
+            RepartoActualLocalCompanion(
+              idReparto: Value(reparto['id_repartodia'] as int),
+              fecha: Value(DateTime.parse(reparto['fecha'] as String)),
+              idUsuario: Value(reparto['id_usuario'] as int?),
+              idEmpresa: Value(reparto['id_empresa'] as int?),
+              observacion: Value(reparto['observacion'] as String?),
+              updatedAt: Value(DateTime.now()),
+            ),
+          );
 
       final legajos = clientesAgenda
           .map((c) => c['legajo'])
@@ -46,9 +58,9 @@ class RepartoRepository {
           .toList();
 
       if (legajos.isNotEmpty) {
-        await (db.delete(db.clientesLocal)
-              ..where((t) => t.legajo.isIn(legajos)))
-            .go();
+        await (db.delete(
+          db.clientesLocal,
+        )..where((t) => t.legajo.isIn(legajos))).go();
       }
 
       for (final item in clientesAgenda) {
@@ -58,22 +70,26 @@ class RepartoRepository {
         final detalle = Map<String, dynamic>.from(detalleResp.data);
 
         final persona = detalle['persona'] as Map<String, dynamic>?;
-        final direcciones =
-            List<Map<String, dynamic>>.from(detalle['direcciones'] ?? const []);
-        final telefonos =
-            List<Map<String, dynamic>>.from(detalle['telefonos'] ?? const []);
-        final cuentas =
-            List<Map<String, dynamic>>.from(detalle['cuentas'] ?? const []);
+        final direcciones = List<Map<String, dynamic>>.from(
+          detalle['direcciones'] ?? const [],
+        );
+        final telefonos = List<Map<String, dynamic>>.from(
+          detalle['telefonos'] ?? const [],
+        );
+        final cuentas = List<Map<String, dynamic>>.from(
+          detalle['cuentas'] ?? const [],
+        );
 
         final direccion = direcciones.isNotEmpty
-            ? (direcciones.first['direccion'] as String?)
+            ? direcciones.first['direccion'] as String?
             : null;
 
         final telefono = telefonos.isNotEmpty
-            ? (telefonos.first['nro_telefono'] as String?)
+            ? telefonos.first['nro_telefono'] as String?
             : null;
 
         final cuenta = cuentas.isNotEmpty ? cuentas.first : null;
+        final idCuenta = (cuenta?['id_cuenta'] as num?)?.toInt();
         final saldo = _toDouble(cuenta?['saldo']);
         final deuda = _toDouble(cuenta?['deuda']);
 
@@ -82,26 +98,32 @@ class RepartoRepository {
           persona?['nombre']?.toString().trim(),
         ].where((e) => e != null && e!.isNotEmpty).join(', ');
 
-        await db.into(db.clientesLocal).insert(
-              ClientesLocalCompanion.insert(
-                legajo: legajo,
-                nombre: nombre.isEmpty ? 'Cliente $legajo' : nombre,
+        await db
+            .into(db.clientesLocal)
+            .insert(
+              ClientesLocalCompanion(
+                legajo: Value(legajo),
+                nombre: Value(nombre.isEmpty ? 'Cliente $legajo' : nombre),
                 direccion: Value(direccion),
                 telefono: Value(telefono),
+                idCuenta: Value(idCuenta),
                 saldo: Value(saldo),
                 deuda: Value(deuda),
                 updatedAt: Value(DateTime.now()),
               ),
             );
 
-        await db.into(db.repartoClientesLocal).insert(
-              RepartoClientesLocalCompanion.insert(
-                idReparto: reparto['id_repartodia'] as int,
-                legajo: legajo,
+        await db
+            .into(db.repartoClientesLocal)
+            .insert(
+              RepartoClientesLocalCompanion(
+                idReparto: Value(reparto['id_repartodia'] as int),
+                legajo: Value(legajo),
                 turno: Value(item['turno_visita'] as String?),
                 posicion: const Value.absent(),
                 estadoVisita: Value(item['estado_visita'] as String?),
                 observacion: Value(detalle['observacion'] as String?),
+                dirty: const Value(false),
                 updatedAt: Value(DateTime.now()),
               ),
             );
@@ -109,11 +131,21 @@ class RepartoRepository {
     });
   }
 
+  Future<int?> obtenerIdRepartoActualLocal() async {
+    final row = await db.select(db.repartoActualLocal).getSingleOrNull();
+    return row?.idReparto;
+  }
+
+  Future<RepartoActualLocalData?> obtenerRepartoActualLocal() {
+    return db.select(db.repartoActualLocal).getSingleOrNull();
+  }
+
   Future<List<RepartoClienteConDatos>> obtenerClientesDelDiaLocal({
     required int idReparto,
   }) async {
-    final rows = await db.customSelect(
-      '''
+    final rows = await db
+        .customSelect(
+          '''
       SELECT
         r.id,
         r.id_reparto,
@@ -136,16 +168,17 @@ class RepartoRepository {
         CASE WHEN r.posicion IS NULL THEN 999999 ELSE r.posicion END,
         c.nombre
       ''',
-      variables: [Variable.withInt(idReparto)],
-      readsFrom: {db.repartoClientesLocal, db.clientesLocal},
-    ).get();
+          variables: [Variable.withInt(idReparto)],
+          readsFrom: {db.repartoClientesLocal, db.clientesLocal},
+        )
+        .get();
 
     return rows
         .map(
           (r) => RepartoClienteConDatos(
-            id: r.read<int>('id'),
-            idReparto: r.read<int>('id_reparto'),
-            legajo: r.read<int>('legajo'),
+            id: r.read<int>('id') ?? 0,
+            idReparto: r.read<int>('id_reparto') ?? 0,
+            legajo: r.read<int>('legajo') ?? 0,
             turno: r.read<String>('turno'),
             posicion: r.read<int>('posicion'),
             estadoVisita: r.read<String>('estado_visita'),
