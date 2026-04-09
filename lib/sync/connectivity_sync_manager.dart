@@ -12,12 +12,12 @@ class ConnectivitySyncManager {
     _sub = Connectivity().onConnectivityChanged.listen((results) async {
       final hasConnection = results.any((r) => r != ConnectivityResult.none);
       if (hasConnection) {
-        await syncService.syncPending();
+        await syncService.syncPendientes();
       }
     });
   }
 
-  void dispose() {
-    _sub?.cancel();
+  Future<void> dispose() async {
+    await _sub?.cancel();
   }
 }

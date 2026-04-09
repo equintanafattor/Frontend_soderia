@@ -119,6 +119,43 @@ class MediosPagoLocales extends Table {
   Set<Column> get primaryKey => {idMedioPago};
 }
 
+class PedidosLocales extends Table {
+  TextColumn get localUuid => text()();
+  IntColumn get serverId => integer().nullable()();
+
+  IntColumn get legajo => integer()();
+  IntColumn get idCuenta => integer()();
+  IntColumn get idRepartoDia => integer()();
+  IntColumn get idMedioPago => integer()();
+
+  RealColumn get montoTotal => real()();
+  RealColumn get montoAbonado => real().withDefault(const Constant(0))();
+
+  TextColumn get estado => text()(); // pendiente, abonado, etc
+  TextColumn get observacion => text().nullable()();
+
+  TextColumn get estadoSync => text().withDefault(const Constant('PENDING'))();
+
+  DateTimeColumn get fecha => dateTime()();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get updatedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {localUuid};
+}
+
+class PedidoItemsLocales extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  TextColumn get pedidoLocalUuid => text()();
+
+  IntColumn get idProducto => integer().nullable()();
+  IntColumn get idCombo => integer().nullable()();
+
+  RealColumn get cantidad => real()();
+  RealColumn get precioUnitario => real()();
+}
+
 @DriftDatabase(
   tables: [
     ClientesLocal,
@@ -130,13 +167,15 @@ class MediosPagoLocales extends Table {
     ListasPreciosLocales,
     PrecioItemsLocales,
     MediosPagoLocales,
+    PedidosLocales,
+    PedidoItemsLocales,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 }
 
 LazyDatabase _openConnection() {
@@ -146,5 +185,3 @@ LazyDatabase _openConnection() {
     return NativeDatabase(file);
   });
 }
-
-

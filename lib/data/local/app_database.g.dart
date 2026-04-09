@@ -4369,6 +4369,1247 @@ class MediosPagoLocalesCompanion extends UpdateCompanion<MediosPagoLocale> {
   }
 }
 
+class $PedidosLocalesTable extends PedidosLocales
+    with TableInfo<$PedidosLocalesTable, PedidosLocale> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PedidosLocalesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _localUuidMeta = const VerificationMeta(
+    'localUuid',
+  );
+  @override
+  late final GeneratedColumn<String> localUuid = GeneratedColumn<String>(
+    'local_uuid',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _serverIdMeta = const VerificationMeta(
+    'serverId',
+  );
+  @override
+  late final GeneratedColumn<int> serverId = GeneratedColumn<int>(
+    'server_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _legajoMeta = const VerificationMeta('legajo');
+  @override
+  late final GeneratedColumn<int> legajo = GeneratedColumn<int>(
+    'legajo',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _idCuentaMeta = const VerificationMeta(
+    'idCuenta',
+  );
+  @override
+  late final GeneratedColumn<int> idCuenta = GeneratedColumn<int>(
+    'id_cuenta',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _idRepartoDiaMeta = const VerificationMeta(
+    'idRepartoDia',
+  );
+  @override
+  late final GeneratedColumn<int> idRepartoDia = GeneratedColumn<int>(
+    'id_reparto_dia',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _idMedioPagoMeta = const VerificationMeta(
+    'idMedioPago',
+  );
+  @override
+  late final GeneratedColumn<int> idMedioPago = GeneratedColumn<int>(
+    'id_medio_pago',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _montoTotalMeta = const VerificationMeta(
+    'montoTotal',
+  );
+  @override
+  late final GeneratedColumn<double> montoTotal = GeneratedColumn<double>(
+    'monto_total',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _montoAbonadoMeta = const VerificationMeta(
+    'montoAbonado',
+  );
+  @override
+  late final GeneratedColumn<double> montoAbonado = GeneratedColumn<double>(
+    'monto_abonado',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _estadoMeta = const VerificationMeta('estado');
+  @override
+  late final GeneratedColumn<String> estado = GeneratedColumn<String>(
+    'estado',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _observacionMeta = const VerificationMeta(
+    'observacion',
+  );
+  @override
+  late final GeneratedColumn<String> observacion = GeneratedColumn<String>(
+    'observacion',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _estadoSyncMeta = const VerificationMeta(
+    'estadoSync',
+  );
+  @override
+  late final GeneratedColumn<String> estadoSync = GeneratedColumn<String>(
+    'estado_sync',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('PENDING'),
+  );
+  static const VerificationMeta _fechaMeta = const VerificationMeta('fecha');
+  @override
+  late final GeneratedColumn<DateTime> fecha = GeneratedColumn<DateTime>(
+    'fecha',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    localUuid,
+    serverId,
+    legajo,
+    idCuenta,
+    idRepartoDia,
+    idMedioPago,
+    montoTotal,
+    montoAbonado,
+    estado,
+    observacion,
+    estadoSync,
+    fecha,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'pedidos_locales';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PedidosLocale> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('local_uuid')) {
+      context.handle(
+        _localUuidMeta,
+        localUuid.isAcceptableOrUnknown(data['local_uuid']!, _localUuidMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_localUuidMeta);
+    }
+    if (data.containsKey('server_id')) {
+      context.handle(
+        _serverIdMeta,
+        serverId.isAcceptableOrUnknown(data['server_id']!, _serverIdMeta),
+      );
+    }
+    if (data.containsKey('legajo')) {
+      context.handle(
+        _legajoMeta,
+        legajo.isAcceptableOrUnknown(data['legajo']!, _legajoMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_legajoMeta);
+    }
+    if (data.containsKey('id_cuenta')) {
+      context.handle(
+        _idCuentaMeta,
+        idCuenta.isAcceptableOrUnknown(data['id_cuenta']!, _idCuentaMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_idCuentaMeta);
+    }
+    if (data.containsKey('id_reparto_dia')) {
+      context.handle(
+        _idRepartoDiaMeta,
+        idRepartoDia.isAcceptableOrUnknown(
+          data['id_reparto_dia']!,
+          _idRepartoDiaMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_idRepartoDiaMeta);
+    }
+    if (data.containsKey('id_medio_pago')) {
+      context.handle(
+        _idMedioPagoMeta,
+        idMedioPago.isAcceptableOrUnknown(
+          data['id_medio_pago']!,
+          _idMedioPagoMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_idMedioPagoMeta);
+    }
+    if (data.containsKey('monto_total')) {
+      context.handle(
+        _montoTotalMeta,
+        montoTotal.isAcceptableOrUnknown(data['monto_total']!, _montoTotalMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_montoTotalMeta);
+    }
+    if (data.containsKey('monto_abonado')) {
+      context.handle(
+        _montoAbonadoMeta,
+        montoAbonado.isAcceptableOrUnknown(
+          data['monto_abonado']!,
+          _montoAbonadoMeta,
+        ),
+      );
+    }
+    if (data.containsKey('estado')) {
+      context.handle(
+        _estadoMeta,
+        estado.isAcceptableOrUnknown(data['estado']!, _estadoMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_estadoMeta);
+    }
+    if (data.containsKey('observacion')) {
+      context.handle(
+        _observacionMeta,
+        observacion.isAcceptableOrUnknown(
+          data['observacion']!,
+          _observacionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('estado_sync')) {
+      context.handle(
+        _estadoSyncMeta,
+        estadoSync.isAcceptableOrUnknown(data['estado_sync']!, _estadoSyncMeta),
+      );
+    }
+    if (data.containsKey('fecha')) {
+      context.handle(
+        _fechaMeta,
+        fecha.isAcceptableOrUnknown(data['fecha']!, _fechaMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_fechaMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {localUuid};
+  @override
+  PedidosLocale map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PedidosLocale(
+      localUuid: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}local_uuid'],
+      )!,
+      serverId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}server_id'],
+      ),
+      legajo: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}legajo'],
+      )!,
+      idCuenta: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id_cuenta'],
+      )!,
+      idRepartoDia: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id_reparto_dia'],
+      )!,
+      idMedioPago: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id_medio_pago'],
+      )!,
+      montoTotal: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}monto_total'],
+      )!,
+      montoAbonado: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}monto_abonado'],
+      )!,
+      estado: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}estado'],
+      )!,
+      observacion: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}observacion'],
+      ),
+      estadoSync: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}estado_sync'],
+      )!,
+      fecha: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}fecha'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
+    );
+  }
+
+  @override
+  $PedidosLocalesTable createAlias(String alias) {
+    return $PedidosLocalesTable(attachedDatabase, alias);
+  }
+}
+
+class PedidosLocale extends DataClass implements Insertable<PedidosLocale> {
+  final String localUuid;
+  final int? serverId;
+  final int legajo;
+  final int idCuenta;
+  final int idRepartoDia;
+  final int idMedioPago;
+  final double montoTotal;
+  final double montoAbonado;
+  final String estado;
+  final String? observacion;
+  final String estadoSync;
+  final DateTime fecha;
+  final DateTime createdAt;
+  final DateTime? updatedAt;
+  const PedidosLocale({
+    required this.localUuid,
+    this.serverId,
+    required this.legajo,
+    required this.idCuenta,
+    required this.idRepartoDia,
+    required this.idMedioPago,
+    required this.montoTotal,
+    required this.montoAbonado,
+    required this.estado,
+    this.observacion,
+    required this.estadoSync,
+    required this.fecha,
+    required this.createdAt,
+    this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['local_uuid'] = Variable<String>(localUuid);
+    if (!nullToAbsent || serverId != null) {
+      map['server_id'] = Variable<int>(serverId);
+    }
+    map['legajo'] = Variable<int>(legajo);
+    map['id_cuenta'] = Variable<int>(idCuenta);
+    map['id_reparto_dia'] = Variable<int>(idRepartoDia);
+    map['id_medio_pago'] = Variable<int>(idMedioPago);
+    map['monto_total'] = Variable<double>(montoTotal);
+    map['monto_abonado'] = Variable<double>(montoAbonado);
+    map['estado'] = Variable<String>(estado);
+    if (!nullToAbsent || observacion != null) {
+      map['observacion'] = Variable<String>(observacion);
+    }
+    map['estado_sync'] = Variable<String>(estadoSync);
+    map['fecha'] = Variable<DateTime>(fecha);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    return map;
+  }
+
+  PedidosLocalesCompanion toCompanion(bool nullToAbsent) {
+    return PedidosLocalesCompanion(
+      localUuid: Value(localUuid),
+      serverId: serverId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serverId),
+      legajo: Value(legajo),
+      idCuenta: Value(idCuenta),
+      idRepartoDia: Value(idRepartoDia),
+      idMedioPago: Value(idMedioPago),
+      montoTotal: Value(montoTotal),
+      montoAbonado: Value(montoAbonado),
+      estado: Value(estado),
+      observacion: observacion == null && nullToAbsent
+          ? const Value.absent()
+          : Value(observacion),
+      estadoSync: Value(estadoSync),
+      fecha: Value(fecha),
+      createdAt: Value(createdAt),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+    );
+  }
+
+  factory PedidosLocale.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PedidosLocale(
+      localUuid: serializer.fromJson<String>(json['localUuid']),
+      serverId: serializer.fromJson<int?>(json['serverId']),
+      legajo: serializer.fromJson<int>(json['legajo']),
+      idCuenta: serializer.fromJson<int>(json['idCuenta']),
+      idRepartoDia: serializer.fromJson<int>(json['idRepartoDia']),
+      idMedioPago: serializer.fromJson<int>(json['idMedioPago']),
+      montoTotal: serializer.fromJson<double>(json['montoTotal']),
+      montoAbonado: serializer.fromJson<double>(json['montoAbonado']),
+      estado: serializer.fromJson<String>(json['estado']),
+      observacion: serializer.fromJson<String?>(json['observacion']),
+      estadoSync: serializer.fromJson<String>(json['estadoSync']),
+      fecha: serializer.fromJson<DateTime>(json['fecha']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'localUuid': serializer.toJson<String>(localUuid),
+      'serverId': serializer.toJson<int?>(serverId),
+      'legajo': serializer.toJson<int>(legajo),
+      'idCuenta': serializer.toJson<int>(idCuenta),
+      'idRepartoDia': serializer.toJson<int>(idRepartoDia),
+      'idMedioPago': serializer.toJson<int>(idMedioPago),
+      'montoTotal': serializer.toJson<double>(montoTotal),
+      'montoAbonado': serializer.toJson<double>(montoAbonado),
+      'estado': serializer.toJson<String>(estado),
+      'observacion': serializer.toJson<String?>(observacion),
+      'estadoSync': serializer.toJson<String>(estadoSync),
+      'fecha': serializer.toJson<DateTime>(fecha),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+    };
+  }
+
+  PedidosLocale copyWith({
+    String? localUuid,
+    Value<int?> serverId = const Value.absent(),
+    int? legajo,
+    int? idCuenta,
+    int? idRepartoDia,
+    int? idMedioPago,
+    double? montoTotal,
+    double? montoAbonado,
+    String? estado,
+    Value<String?> observacion = const Value.absent(),
+    String? estadoSync,
+    DateTime? fecha,
+    DateTime? createdAt,
+    Value<DateTime?> updatedAt = const Value.absent(),
+  }) => PedidosLocale(
+    localUuid: localUuid ?? this.localUuid,
+    serverId: serverId.present ? serverId.value : this.serverId,
+    legajo: legajo ?? this.legajo,
+    idCuenta: idCuenta ?? this.idCuenta,
+    idRepartoDia: idRepartoDia ?? this.idRepartoDia,
+    idMedioPago: idMedioPago ?? this.idMedioPago,
+    montoTotal: montoTotal ?? this.montoTotal,
+    montoAbonado: montoAbonado ?? this.montoAbonado,
+    estado: estado ?? this.estado,
+    observacion: observacion.present ? observacion.value : this.observacion,
+    estadoSync: estadoSync ?? this.estadoSync,
+    fecha: fecha ?? this.fecha,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+  );
+  PedidosLocale copyWithCompanion(PedidosLocalesCompanion data) {
+    return PedidosLocale(
+      localUuid: data.localUuid.present ? data.localUuid.value : this.localUuid,
+      serverId: data.serverId.present ? data.serverId.value : this.serverId,
+      legajo: data.legajo.present ? data.legajo.value : this.legajo,
+      idCuenta: data.idCuenta.present ? data.idCuenta.value : this.idCuenta,
+      idRepartoDia: data.idRepartoDia.present
+          ? data.idRepartoDia.value
+          : this.idRepartoDia,
+      idMedioPago: data.idMedioPago.present
+          ? data.idMedioPago.value
+          : this.idMedioPago,
+      montoTotal: data.montoTotal.present
+          ? data.montoTotal.value
+          : this.montoTotal,
+      montoAbonado: data.montoAbonado.present
+          ? data.montoAbonado.value
+          : this.montoAbonado,
+      estado: data.estado.present ? data.estado.value : this.estado,
+      observacion: data.observacion.present
+          ? data.observacion.value
+          : this.observacion,
+      estadoSync: data.estadoSync.present
+          ? data.estadoSync.value
+          : this.estadoSync,
+      fecha: data.fecha.present ? data.fecha.value : this.fecha,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PedidosLocale(')
+          ..write('localUuid: $localUuid, ')
+          ..write('serverId: $serverId, ')
+          ..write('legajo: $legajo, ')
+          ..write('idCuenta: $idCuenta, ')
+          ..write('idRepartoDia: $idRepartoDia, ')
+          ..write('idMedioPago: $idMedioPago, ')
+          ..write('montoTotal: $montoTotal, ')
+          ..write('montoAbonado: $montoAbonado, ')
+          ..write('estado: $estado, ')
+          ..write('observacion: $observacion, ')
+          ..write('estadoSync: $estadoSync, ')
+          ..write('fecha: $fecha, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    localUuid,
+    serverId,
+    legajo,
+    idCuenta,
+    idRepartoDia,
+    idMedioPago,
+    montoTotal,
+    montoAbonado,
+    estado,
+    observacion,
+    estadoSync,
+    fecha,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PedidosLocale &&
+          other.localUuid == this.localUuid &&
+          other.serverId == this.serverId &&
+          other.legajo == this.legajo &&
+          other.idCuenta == this.idCuenta &&
+          other.idRepartoDia == this.idRepartoDia &&
+          other.idMedioPago == this.idMedioPago &&
+          other.montoTotal == this.montoTotal &&
+          other.montoAbonado == this.montoAbonado &&
+          other.estado == this.estado &&
+          other.observacion == this.observacion &&
+          other.estadoSync == this.estadoSync &&
+          other.fecha == this.fecha &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class PedidosLocalesCompanion extends UpdateCompanion<PedidosLocale> {
+  final Value<String> localUuid;
+  final Value<int?> serverId;
+  final Value<int> legajo;
+  final Value<int> idCuenta;
+  final Value<int> idRepartoDia;
+  final Value<int> idMedioPago;
+  final Value<double> montoTotal;
+  final Value<double> montoAbonado;
+  final Value<String> estado;
+  final Value<String?> observacion;
+  final Value<String> estadoSync;
+  final Value<DateTime> fecha;
+  final Value<DateTime> createdAt;
+  final Value<DateTime?> updatedAt;
+  final Value<int> rowid;
+  const PedidosLocalesCompanion({
+    this.localUuid = const Value.absent(),
+    this.serverId = const Value.absent(),
+    this.legajo = const Value.absent(),
+    this.idCuenta = const Value.absent(),
+    this.idRepartoDia = const Value.absent(),
+    this.idMedioPago = const Value.absent(),
+    this.montoTotal = const Value.absent(),
+    this.montoAbonado = const Value.absent(),
+    this.estado = const Value.absent(),
+    this.observacion = const Value.absent(),
+    this.estadoSync = const Value.absent(),
+    this.fecha = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PedidosLocalesCompanion.insert({
+    required String localUuid,
+    this.serverId = const Value.absent(),
+    required int legajo,
+    required int idCuenta,
+    required int idRepartoDia,
+    required int idMedioPago,
+    required double montoTotal,
+    this.montoAbonado = const Value.absent(),
+    required String estado,
+    this.observacion = const Value.absent(),
+    this.estadoSync = const Value.absent(),
+    required DateTime fecha,
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : localUuid = Value(localUuid),
+       legajo = Value(legajo),
+       idCuenta = Value(idCuenta),
+       idRepartoDia = Value(idRepartoDia),
+       idMedioPago = Value(idMedioPago),
+       montoTotal = Value(montoTotal),
+       estado = Value(estado),
+       fecha = Value(fecha);
+  static Insertable<PedidosLocale> custom({
+    Expression<String>? localUuid,
+    Expression<int>? serverId,
+    Expression<int>? legajo,
+    Expression<int>? idCuenta,
+    Expression<int>? idRepartoDia,
+    Expression<int>? idMedioPago,
+    Expression<double>? montoTotal,
+    Expression<double>? montoAbonado,
+    Expression<String>? estado,
+    Expression<String>? observacion,
+    Expression<String>? estadoSync,
+    Expression<DateTime>? fecha,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (localUuid != null) 'local_uuid': localUuid,
+      if (serverId != null) 'server_id': serverId,
+      if (legajo != null) 'legajo': legajo,
+      if (idCuenta != null) 'id_cuenta': idCuenta,
+      if (idRepartoDia != null) 'id_reparto_dia': idRepartoDia,
+      if (idMedioPago != null) 'id_medio_pago': idMedioPago,
+      if (montoTotal != null) 'monto_total': montoTotal,
+      if (montoAbonado != null) 'monto_abonado': montoAbonado,
+      if (estado != null) 'estado': estado,
+      if (observacion != null) 'observacion': observacion,
+      if (estadoSync != null) 'estado_sync': estadoSync,
+      if (fecha != null) 'fecha': fecha,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PedidosLocalesCompanion copyWith({
+    Value<String>? localUuid,
+    Value<int?>? serverId,
+    Value<int>? legajo,
+    Value<int>? idCuenta,
+    Value<int>? idRepartoDia,
+    Value<int>? idMedioPago,
+    Value<double>? montoTotal,
+    Value<double>? montoAbonado,
+    Value<String>? estado,
+    Value<String?>? observacion,
+    Value<String>? estadoSync,
+    Value<DateTime>? fecha,
+    Value<DateTime>? createdAt,
+    Value<DateTime?>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return PedidosLocalesCompanion(
+      localUuid: localUuid ?? this.localUuid,
+      serverId: serverId ?? this.serverId,
+      legajo: legajo ?? this.legajo,
+      idCuenta: idCuenta ?? this.idCuenta,
+      idRepartoDia: idRepartoDia ?? this.idRepartoDia,
+      idMedioPago: idMedioPago ?? this.idMedioPago,
+      montoTotal: montoTotal ?? this.montoTotal,
+      montoAbonado: montoAbonado ?? this.montoAbonado,
+      estado: estado ?? this.estado,
+      observacion: observacion ?? this.observacion,
+      estadoSync: estadoSync ?? this.estadoSync,
+      fecha: fecha ?? this.fecha,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (localUuid.present) {
+      map['local_uuid'] = Variable<String>(localUuid.value);
+    }
+    if (serverId.present) {
+      map['server_id'] = Variable<int>(serverId.value);
+    }
+    if (legajo.present) {
+      map['legajo'] = Variable<int>(legajo.value);
+    }
+    if (idCuenta.present) {
+      map['id_cuenta'] = Variable<int>(idCuenta.value);
+    }
+    if (idRepartoDia.present) {
+      map['id_reparto_dia'] = Variable<int>(idRepartoDia.value);
+    }
+    if (idMedioPago.present) {
+      map['id_medio_pago'] = Variable<int>(idMedioPago.value);
+    }
+    if (montoTotal.present) {
+      map['monto_total'] = Variable<double>(montoTotal.value);
+    }
+    if (montoAbonado.present) {
+      map['monto_abonado'] = Variable<double>(montoAbonado.value);
+    }
+    if (estado.present) {
+      map['estado'] = Variable<String>(estado.value);
+    }
+    if (observacion.present) {
+      map['observacion'] = Variable<String>(observacion.value);
+    }
+    if (estadoSync.present) {
+      map['estado_sync'] = Variable<String>(estadoSync.value);
+    }
+    if (fecha.present) {
+      map['fecha'] = Variable<DateTime>(fecha.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PedidosLocalesCompanion(')
+          ..write('localUuid: $localUuid, ')
+          ..write('serverId: $serverId, ')
+          ..write('legajo: $legajo, ')
+          ..write('idCuenta: $idCuenta, ')
+          ..write('idRepartoDia: $idRepartoDia, ')
+          ..write('idMedioPago: $idMedioPago, ')
+          ..write('montoTotal: $montoTotal, ')
+          ..write('montoAbonado: $montoAbonado, ')
+          ..write('estado: $estado, ')
+          ..write('observacion: $observacion, ')
+          ..write('estadoSync: $estadoSync, ')
+          ..write('fecha: $fecha, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $PedidoItemsLocalesTable extends PedidoItemsLocales
+    with TableInfo<$PedidoItemsLocalesTable, PedidoItemsLocale> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PedidoItemsLocalesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _pedidoLocalUuidMeta = const VerificationMeta(
+    'pedidoLocalUuid',
+  );
+  @override
+  late final GeneratedColumn<String> pedidoLocalUuid = GeneratedColumn<String>(
+    'pedido_local_uuid',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _idProductoMeta = const VerificationMeta(
+    'idProducto',
+  );
+  @override
+  late final GeneratedColumn<int> idProducto = GeneratedColumn<int>(
+    'id_producto',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _idComboMeta = const VerificationMeta(
+    'idCombo',
+  );
+  @override
+  late final GeneratedColumn<int> idCombo = GeneratedColumn<int>(
+    'id_combo',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _cantidadMeta = const VerificationMeta(
+    'cantidad',
+  );
+  @override
+  late final GeneratedColumn<double> cantidad = GeneratedColumn<double>(
+    'cantidad',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _precioUnitarioMeta = const VerificationMeta(
+    'precioUnitario',
+  );
+  @override
+  late final GeneratedColumn<double> precioUnitario = GeneratedColumn<double>(
+    'precio_unitario',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    pedidoLocalUuid,
+    idProducto,
+    idCombo,
+    cantidad,
+    precioUnitario,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'pedido_items_locales';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PedidoItemsLocale> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('pedido_local_uuid')) {
+      context.handle(
+        _pedidoLocalUuidMeta,
+        pedidoLocalUuid.isAcceptableOrUnknown(
+          data['pedido_local_uuid']!,
+          _pedidoLocalUuidMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_pedidoLocalUuidMeta);
+    }
+    if (data.containsKey('id_producto')) {
+      context.handle(
+        _idProductoMeta,
+        idProducto.isAcceptableOrUnknown(data['id_producto']!, _idProductoMeta),
+      );
+    }
+    if (data.containsKey('id_combo')) {
+      context.handle(
+        _idComboMeta,
+        idCombo.isAcceptableOrUnknown(data['id_combo']!, _idComboMeta),
+      );
+    }
+    if (data.containsKey('cantidad')) {
+      context.handle(
+        _cantidadMeta,
+        cantidad.isAcceptableOrUnknown(data['cantidad']!, _cantidadMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_cantidadMeta);
+    }
+    if (data.containsKey('precio_unitario')) {
+      context.handle(
+        _precioUnitarioMeta,
+        precioUnitario.isAcceptableOrUnknown(
+          data['precio_unitario']!,
+          _precioUnitarioMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_precioUnitarioMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  PedidoItemsLocale map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PedidoItemsLocale(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      pedidoLocalUuid: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pedido_local_uuid'],
+      )!,
+      idProducto: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id_producto'],
+      ),
+      idCombo: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id_combo'],
+      ),
+      cantidad: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}cantidad'],
+      )!,
+      precioUnitario: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}precio_unitario'],
+      )!,
+    );
+  }
+
+  @override
+  $PedidoItemsLocalesTable createAlias(String alias) {
+    return $PedidoItemsLocalesTable(attachedDatabase, alias);
+  }
+}
+
+class PedidoItemsLocale extends DataClass
+    implements Insertable<PedidoItemsLocale> {
+  final int id;
+  final String pedidoLocalUuid;
+  final int? idProducto;
+  final int? idCombo;
+  final double cantidad;
+  final double precioUnitario;
+  const PedidoItemsLocale({
+    required this.id,
+    required this.pedidoLocalUuid,
+    this.idProducto,
+    this.idCombo,
+    required this.cantidad,
+    required this.precioUnitario,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['pedido_local_uuid'] = Variable<String>(pedidoLocalUuid);
+    if (!nullToAbsent || idProducto != null) {
+      map['id_producto'] = Variable<int>(idProducto);
+    }
+    if (!nullToAbsent || idCombo != null) {
+      map['id_combo'] = Variable<int>(idCombo);
+    }
+    map['cantidad'] = Variable<double>(cantidad);
+    map['precio_unitario'] = Variable<double>(precioUnitario);
+    return map;
+  }
+
+  PedidoItemsLocalesCompanion toCompanion(bool nullToAbsent) {
+    return PedidoItemsLocalesCompanion(
+      id: Value(id),
+      pedidoLocalUuid: Value(pedidoLocalUuid),
+      idProducto: idProducto == null && nullToAbsent
+          ? const Value.absent()
+          : Value(idProducto),
+      idCombo: idCombo == null && nullToAbsent
+          ? const Value.absent()
+          : Value(idCombo),
+      cantidad: Value(cantidad),
+      precioUnitario: Value(precioUnitario),
+    );
+  }
+
+  factory PedidoItemsLocale.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PedidoItemsLocale(
+      id: serializer.fromJson<int>(json['id']),
+      pedidoLocalUuid: serializer.fromJson<String>(json['pedidoLocalUuid']),
+      idProducto: serializer.fromJson<int?>(json['idProducto']),
+      idCombo: serializer.fromJson<int?>(json['idCombo']),
+      cantidad: serializer.fromJson<double>(json['cantidad']),
+      precioUnitario: serializer.fromJson<double>(json['precioUnitario']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'pedidoLocalUuid': serializer.toJson<String>(pedidoLocalUuid),
+      'idProducto': serializer.toJson<int?>(idProducto),
+      'idCombo': serializer.toJson<int?>(idCombo),
+      'cantidad': serializer.toJson<double>(cantidad),
+      'precioUnitario': serializer.toJson<double>(precioUnitario),
+    };
+  }
+
+  PedidoItemsLocale copyWith({
+    int? id,
+    String? pedidoLocalUuid,
+    Value<int?> idProducto = const Value.absent(),
+    Value<int?> idCombo = const Value.absent(),
+    double? cantidad,
+    double? precioUnitario,
+  }) => PedidoItemsLocale(
+    id: id ?? this.id,
+    pedidoLocalUuid: pedidoLocalUuid ?? this.pedidoLocalUuid,
+    idProducto: idProducto.present ? idProducto.value : this.idProducto,
+    idCombo: idCombo.present ? idCombo.value : this.idCombo,
+    cantidad: cantidad ?? this.cantidad,
+    precioUnitario: precioUnitario ?? this.precioUnitario,
+  );
+  PedidoItemsLocale copyWithCompanion(PedidoItemsLocalesCompanion data) {
+    return PedidoItemsLocale(
+      id: data.id.present ? data.id.value : this.id,
+      pedidoLocalUuid: data.pedidoLocalUuid.present
+          ? data.pedidoLocalUuid.value
+          : this.pedidoLocalUuid,
+      idProducto: data.idProducto.present
+          ? data.idProducto.value
+          : this.idProducto,
+      idCombo: data.idCombo.present ? data.idCombo.value : this.idCombo,
+      cantidad: data.cantidad.present ? data.cantidad.value : this.cantidad,
+      precioUnitario: data.precioUnitario.present
+          ? data.precioUnitario.value
+          : this.precioUnitario,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PedidoItemsLocale(')
+          ..write('id: $id, ')
+          ..write('pedidoLocalUuid: $pedidoLocalUuid, ')
+          ..write('idProducto: $idProducto, ')
+          ..write('idCombo: $idCombo, ')
+          ..write('cantidad: $cantidad, ')
+          ..write('precioUnitario: $precioUnitario')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    pedidoLocalUuid,
+    idProducto,
+    idCombo,
+    cantidad,
+    precioUnitario,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PedidoItemsLocale &&
+          other.id == this.id &&
+          other.pedidoLocalUuid == this.pedidoLocalUuid &&
+          other.idProducto == this.idProducto &&
+          other.idCombo == this.idCombo &&
+          other.cantidad == this.cantidad &&
+          other.precioUnitario == this.precioUnitario);
+}
+
+class PedidoItemsLocalesCompanion extends UpdateCompanion<PedidoItemsLocale> {
+  final Value<int> id;
+  final Value<String> pedidoLocalUuid;
+  final Value<int?> idProducto;
+  final Value<int?> idCombo;
+  final Value<double> cantidad;
+  final Value<double> precioUnitario;
+  const PedidoItemsLocalesCompanion({
+    this.id = const Value.absent(),
+    this.pedidoLocalUuid = const Value.absent(),
+    this.idProducto = const Value.absent(),
+    this.idCombo = const Value.absent(),
+    this.cantidad = const Value.absent(),
+    this.precioUnitario = const Value.absent(),
+  });
+  PedidoItemsLocalesCompanion.insert({
+    this.id = const Value.absent(),
+    required String pedidoLocalUuid,
+    this.idProducto = const Value.absent(),
+    this.idCombo = const Value.absent(),
+    required double cantidad,
+    required double precioUnitario,
+  }) : pedidoLocalUuid = Value(pedidoLocalUuid),
+       cantidad = Value(cantidad),
+       precioUnitario = Value(precioUnitario);
+  static Insertable<PedidoItemsLocale> custom({
+    Expression<int>? id,
+    Expression<String>? pedidoLocalUuid,
+    Expression<int>? idProducto,
+    Expression<int>? idCombo,
+    Expression<double>? cantidad,
+    Expression<double>? precioUnitario,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (pedidoLocalUuid != null) 'pedido_local_uuid': pedidoLocalUuid,
+      if (idProducto != null) 'id_producto': idProducto,
+      if (idCombo != null) 'id_combo': idCombo,
+      if (cantidad != null) 'cantidad': cantidad,
+      if (precioUnitario != null) 'precio_unitario': precioUnitario,
+    });
+  }
+
+  PedidoItemsLocalesCompanion copyWith({
+    Value<int>? id,
+    Value<String>? pedidoLocalUuid,
+    Value<int?>? idProducto,
+    Value<int?>? idCombo,
+    Value<double>? cantidad,
+    Value<double>? precioUnitario,
+  }) {
+    return PedidoItemsLocalesCompanion(
+      id: id ?? this.id,
+      pedidoLocalUuid: pedidoLocalUuid ?? this.pedidoLocalUuid,
+      idProducto: idProducto ?? this.idProducto,
+      idCombo: idCombo ?? this.idCombo,
+      cantidad: cantidad ?? this.cantidad,
+      precioUnitario: precioUnitario ?? this.precioUnitario,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (pedidoLocalUuid.present) {
+      map['pedido_local_uuid'] = Variable<String>(pedidoLocalUuid.value);
+    }
+    if (idProducto.present) {
+      map['id_producto'] = Variable<int>(idProducto.value);
+    }
+    if (idCombo.present) {
+      map['id_combo'] = Variable<int>(idCombo.value);
+    }
+    if (cantidad.present) {
+      map['cantidad'] = Variable<double>(cantidad.value);
+    }
+    if (precioUnitario.present) {
+      map['precio_unitario'] = Variable<double>(precioUnitario.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PedidoItemsLocalesCompanion(')
+          ..write('id: $id, ')
+          ..write('pedidoLocalUuid: $pedidoLocalUuid, ')
+          ..write('idProducto: $idProducto, ')
+          ..write('idCombo: $idCombo, ')
+          ..write('cantidad: $cantidad, ')
+          ..write('precioUnitario: $precioUnitario')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -4386,6 +5627,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $PrecioItemsLocalesTable(this);
   late final $MediosPagoLocalesTable mediosPagoLocales =
       $MediosPagoLocalesTable(this);
+  late final $PedidosLocalesTable pedidosLocales = $PedidosLocalesTable(this);
+  late final $PedidoItemsLocalesTable pedidoItemsLocales =
+      $PedidoItemsLocalesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4400,6 +5644,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     listasPreciosLocales,
     precioItemsLocales,
     mediosPagoLocales,
+    pedidosLocales,
+    pedidoItemsLocales,
   ];
 }
 
@@ -6705,6 +7951,623 @@ typedef $$MediosPagoLocalesTableProcessedTableManager =
       MediosPagoLocale,
       PrefetchHooks Function()
     >;
+typedef $$PedidosLocalesTableCreateCompanionBuilder =
+    PedidosLocalesCompanion Function({
+      required String localUuid,
+      Value<int?> serverId,
+      required int legajo,
+      required int idCuenta,
+      required int idRepartoDia,
+      required int idMedioPago,
+      required double montoTotal,
+      Value<double> montoAbonado,
+      required String estado,
+      Value<String?> observacion,
+      Value<String> estadoSync,
+      required DateTime fecha,
+      Value<DateTime> createdAt,
+      Value<DateTime?> updatedAt,
+      Value<int> rowid,
+    });
+typedef $$PedidosLocalesTableUpdateCompanionBuilder =
+    PedidosLocalesCompanion Function({
+      Value<String> localUuid,
+      Value<int?> serverId,
+      Value<int> legajo,
+      Value<int> idCuenta,
+      Value<int> idRepartoDia,
+      Value<int> idMedioPago,
+      Value<double> montoTotal,
+      Value<double> montoAbonado,
+      Value<String> estado,
+      Value<String?> observacion,
+      Value<String> estadoSync,
+      Value<DateTime> fecha,
+      Value<DateTime> createdAt,
+      Value<DateTime?> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$PedidosLocalesTableFilterComposer
+    extends Composer<_$AppDatabase, $PedidosLocalesTable> {
+  $$PedidosLocalesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get localUuid => $composableBuilder(
+    column: $table.localUuid,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get serverId => $composableBuilder(
+    column: $table.serverId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get legajo => $composableBuilder(
+    column: $table.legajo,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get idCuenta => $composableBuilder(
+    column: $table.idCuenta,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get idRepartoDia => $composableBuilder(
+    column: $table.idRepartoDia,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get idMedioPago => $composableBuilder(
+    column: $table.idMedioPago,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get montoTotal => $composableBuilder(
+    column: $table.montoTotal,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get montoAbonado => $composableBuilder(
+    column: $table.montoAbonado,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get estado => $composableBuilder(
+    column: $table.estado,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get observacion => $composableBuilder(
+    column: $table.observacion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get estadoSync => $composableBuilder(
+    column: $table.estadoSync,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get fecha => $composableBuilder(
+    column: $table.fecha,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PedidosLocalesTableOrderingComposer
+    extends Composer<_$AppDatabase, $PedidosLocalesTable> {
+  $$PedidosLocalesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get localUuid => $composableBuilder(
+    column: $table.localUuid,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get serverId => $composableBuilder(
+    column: $table.serverId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get legajo => $composableBuilder(
+    column: $table.legajo,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get idCuenta => $composableBuilder(
+    column: $table.idCuenta,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get idRepartoDia => $composableBuilder(
+    column: $table.idRepartoDia,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get idMedioPago => $composableBuilder(
+    column: $table.idMedioPago,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get montoTotal => $composableBuilder(
+    column: $table.montoTotal,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get montoAbonado => $composableBuilder(
+    column: $table.montoAbonado,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get estado => $composableBuilder(
+    column: $table.estado,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get observacion => $composableBuilder(
+    column: $table.observacion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get estadoSync => $composableBuilder(
+    column: $table.estadoSync,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get fecha => $composableBuilder(
+    column: $table.fecha,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PedidosLocalesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PedidosLocalesTable> {
+  $$PedidosLocalesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get localUuid =>
+      $composableBuilder(column: $table.localUuid, builder: (column) => column);
+
+  GeneratedColumn<int> get serverId =>
+      $composableBuilder(column: $table.serverId, builder: (column) => column);
+
+  GeneratedColumn<int> get legajo =>
+      $composableBuilder(column: $table.legajo, builder: (column) => column);
+
+  GeneratedColumn<int> get idCuenta =>
+      $composableBuilder(column: $table.idCuenta, builder: (column) => column);
+
+  GeneratedColumn<int> get idRepartoDia => $composableBuilder(
+    column: $table.idRepartoDia,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get idMedioPago => $composableBuilder(
+    column: $table.idMedioPago,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get montoTotal => $composableBuilder(
+    column: $table.montoTotal,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get montoAbonado => $composableBuilder(
+    column: $table.montoAbonado,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get estado =>
+      $composableBuilder(column: $table.estado, builder: (column) => column);
+
+  GeneratedColumn<String> get observacion => $composableBuilder(
+    column: $table.observacion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get estadoSync => $composableBuilder(
+    column: $table.estadoSync,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get fecha =>
+      $composableBuilder(column: $table.fecha, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$PedidosLocalesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PedidosLocalesTable,
+          PedidosLocale,
+          $$PedidosLocalesTableFilterComposer,
+          $$PedidosLocalesTableOrderingComposer,
+          $$PedidosLocalesTableAnnotationComposer,
+          $$PedidosLocalesTableCreateCompanionBuilder,
+          $$PedidosLocalesTableUpdateCompanionBuilder,
+          (
+            PedidosLocale,
+            BaseReferences<_$AppDatabase, $PedidosLocalesTable, PedidosLocale>,
+          ),
+          PedidosLocale,
+          PrefetchHooks Function()
+        > {
+  $$PedidosLocalesTableTableManager(
+    _$AppDatabase db,
+    $PedidosLocalesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PedidosLocalesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PedidosLocalesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PedidosLocalesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> localUuid = const Value.absent(),
+                Value<int?> serverId = const Value.absent(),
+                Value<int> legajo = const Value.absent(),
+                Value<int> idCuenta = const Value.absent(),
+                Value<int> idRepartoDia = const Value.absent(),
+                Value<int> idMedioPago = const Value.absent(),
+                Value<double> montoTotal = const Value.absent(),
+                Value<double> montoAbonado = const Value.absent(),
+                Value<String> estado = const Value.absent(),
+                Value<String?> observacion = const Value.absent(),
+                Value<String> estadoSync = const Value.absent(),
+                Value<DateTime> fecha = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PedidosLocalesCompanion(
+                localUuid: localUuid,
+                serverId: serverId,
+                legajo: legajo,
+                idCuenta: idCuenta,
+                idRepartoDia: idRepartoDia,
+                idMedioPago: idMedioPago,
+                montoTotal: montoTotal,
+                montoAbonado: montoAbonado,
+                estado: estado,
+                observacion: observacion,
+                estadoSync: estadoSync,
+                fecha: fecha,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String localUuid,
+                Value<int?> serverId = const Value.absent(),
+                required int legajo,
+                required int idCuenta,
+                required int idRepartoDia,
+                required int idMedioPago,
+                required double montoTotal,
+                Value<double> montoAbonado = const Value.absent(),
+                required String estado,
+                Value<String?> observacion = const Value.absent(),
+                Value<String> estadoSync = const Value.absent(),
+                required DateTime fecha,
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PedidosLocalesCompanion.insert(
+                localUuid: localUuid,
+                serverId: serverId,
+                legajo: legajo,
+                idCuenta: idCuenta,
+                idRepartoDia: idRepartoDia,
+                idMedioPago: idMedioPago,
+                montoTotal: montoTotal,
+                montoAbonado: montoAbonado,
+                estado: estado,
+                observacion: observacion,
+                estadoSync: estadoSync,
+                fecha: fecha,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PedidosLocalesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PedidosLocalesTable,
+      PedidosLocale,
+      $$PedidosLocalesTableFilterComposer,
+      $$PedidosLocalesTableOrderingComposer,
+      $$PedidosLocalesTableAnnotationComposer,
+      $$PedidosLocalesTableCreateCompanionBuilder,
+      $$PedidosLocalesTableUpdateCompanionBuilder,
+      (
+        PedidosLocale,
+        BaseReferences<_$AppDatabase, $PedidosLocalesTable, PedidosLocale>,
+      ),
+      PedidosLocale,
+      PrefetchHooks Function()
+    >;
+typedef $$PedidoItemsLocalesTableCreateCompanionBuilder =
+    PedidoItemsLocalesCompanion Function({
+      Value<int> id,
+      required String pedidoLocalUuid,
+      Value<int?> idProducto,
+      Value<int?> idCombo,
+      required double cantidad,
+      required double precioUnitario,
+    });
+typedef $$PedidoItemsLocalesTableUpdateCompanionBuilder =
+    PedidoItemsLocalesCompanion Function({
+      Value<int> id,
+      Value<String> pedidoLocalUuid,
+      Value<int?> idProducto,
+      Value<int?> idCombo,
+      Value<double> cantidad,
+      Value<double> precioUnitario,
+    });
+
+class $$PedidoItemsLocalesTableFilterComposer
+    extends Composer<_$AppDatabase, $PedidoItemsLocalesTable> {
+  $$PedidoItemsLocalesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pedidoLocalUuid => $composableBuilder(
+    column: $table.pedidoLocalUuid,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get idProducto => $composableBuilder(
+    column: $table.idProducto,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get idCombo => $composableBuilder(
+    column: $table.idCombo,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get cantidad => $composableBuilder(
+    column: $table.cantidad,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get precioUnitario => $composableBuilder(
+    column: $table.precioUnitario,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PedidoItemsLocalesTableOrderingComposer
+    extends Composer<_$AppDatabase, $PedidoItemsLocalesTable> {
+  $$PedidoItemsLocalesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pedidoLocalUuid => $composableBuilder(
+    column: $table.pedidoLocalUuid,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get idProducto => $composableBuilder(
+    column: $table.idProducto,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get idCombo => $composableBuilder(
+    column: $table.idCombo,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get cantidad => $composableBuilder(
+    column: $table.cantidad,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get precioUnitario => $composableBuilder(
+    column: $table.precioUnitario,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PedidoItemsLocalesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PedidoItemsLocalesTable> {
+  $$PedidoItemsLocalesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get pedidoLocalUuid => $composableBuilder(
+    column: $table.pedidoLocalUuid,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get idProducto => $composableBuilder(
+    column: $table.idProducto,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get idCombo =>
+      $composableBuilder(column: $table.idCombo, builder: (column) => column);
+
+  GeneratedColumn<double> get cantidad =>
+      $composableBuilder(column: $table.cantidad, builder: (column) => column);
+
+  GeneratedColumn<double> get precioUnitario => $composableBuilder(
+    column: $table.precioUnitario,
+    builder: (column) => column,
+  );
+}
+
+class $$PedidoItemsLocalesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PedidoItemsLocalesTable,
+          PedidoItemsLocale,
+          $$PedidoItemsLocalesTableFilterComposer,
+          $$PedidoItemsLocalesTableOrderingComposer,
+          $$PedidoItemsLocalesTableAnnotationComposer,
+          $$PedidoItemsLocalesTableCreateCompanionBuilder,
+          $$PedidoItemsLocalesTableUpdateCompanionBuilder,
+          (
+            PedidoItemsLocale,
+            BaseReferences<
+              _$AppDatabase,
+              $PedidoItemsLocalesTable,
+              PedidoItemsLocale
+            >,
+          ),
+          PedidoItemsLocale,
+          PrefetchHooks Function()
+        > {
+  $$PedidoItemsLocalesTableTableManager(
+    _$AppDatabase db,
+    $PedidoItemsLocalesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PedidoItemsLocalesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PedidoItemsLocalesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PedidoItemsLocalesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> pedidoLocalUuid = const Value.absent(),
+                Value<int?> idProducto = const Value.absent(),
+                Value<int?> idCombo = const Value.absent(),
+                Value<double> cantidad = const Value.absent(),
+                Value<double> precioUnitario = const Value.absent(),
+              }) => PedidoItemsLocalesCompanion(
+                id: id,
+                pedidoLocalUuid: pedidoLocalUuid,
+                idProducto: idProducto,
+                idCombo: idCombo,
+                cantidad: cantidad,
+                precioUnitario: precioUnitario,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String pedidoLocalUuid,
+                Value<int?> idProducto = const Value.absent(),
+                Value<int?> idCombo = const Value.absent(),
+                required double cantidad,
+                required double precioUnitario,
+              }) => PedidoItemsLocalesCompanion.insert(
+                id: id,
+                pedidoLocalUuid: pedidoLocalUuid,
+                idProducto: idProducto,
+                idCombo: idCombo,
+                cantidad: cantidad,
+                precioUnitario: precioUnitario,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PedidoItemsLocalesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PedidoItemsLocalesTable,
+      PedidoItemsLocale,
+      $$PedidoItemsLocalesTableFilterComposer,
+      $$PedidoItemsLocalesTableOrderingComposer,
+      $$PedidoItemsLocalesTableAnnotationComposer,
+      $$PedidoItemsLocalesTableCreateCompanionBuilder,
+      $$PedidoItemsLocalesTableUpdateCompanionBuilder,
+      (
+        PedidoItemsLocale,
+        BaseReferences<
+          _$AppDatabase,
+          $PedidoItemsLocalesTable,
+          PedidoItemsLocale
+        >,
+      ),
+      PedidoItemsLocale,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -6727,4 +8590,8 @@ class $AppDatabaseManager {
       $$PrecioItemsLocalesTableTableManager(_db, _db.precioItemsLocales);
   $$MediosPagoLocalesTableTableManager get mediosPagoLocales =>
       $$MediosPagoLocalesTableTableManager(_db, _db.mediosPagoLocales);
+  $$PedidosLocalesTableTableManager get pedidosLocales =>
+      $$PedidosLocalesTableTableManager(_db, _db.pedidosLocales);
+  $$PedidoItemsLocalesTableTableManager get pedidoItemsLocales =>
+      $$PedidoItemsLocalesTableTableManager(_db, _db.pedidoItemsLocales);
 }

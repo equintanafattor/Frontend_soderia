@@ -16,6 +16,8 @@ import 'package:frontend_soderia/widgets/visit_card.dart';
 import 'package:frontend_soderia/data/local/local_db.dart';
 import 'package:frontend_soderia/data/remote/reparto_api.dart';
 import 'package:frontend_soderia/repositories/reparto_repository.dart';
+import 'package:frontend_soderia/data/local/daos/sync_queue_dao.dart';
+import 'package:frontend_soderia/sync/sync_service.dart';
 
 class HomeScreen extends StatefulWidget {
   final String nombreUsuario;
@@ -37,6 +39,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   late final RepartoRepository _repartoRepository;
   late final CatalogoRepository _catalogoRepository;
+  late final SyncQueueDao _syncQueueDao;
+  late final SyncService _syncService;
 
   @override
   void initState() {
@@ -51,6 +55,9 @@ class _HomeScreenState extends State<HomeScreen> {
       db: appDb,
       api: RepartoApi(ApiClient.dio),
     );
+
+    _syncQueueDao = SyncQueueDao(appDb);
+    _syncService = SyncService(db: appDb, queueDao: _syncQueueDao);
 
     _fechaObjetivo = _soloFecha(DateTime.now());
     _futureAgenda = _inicializarPantalla();
@@ -99,19 +106,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<List<RepartoClienteConDatos>> _inicializarPantalla() async {
     try {
-      // 👇 1. Trae reparto (clientes)
       await _repartoRepository.bootstrapDelDia(
         fecha: _fechaObjetivo,
         idEmpresa: 1,
       );
+    } catch (_) {}
 
-      // 👇 2. Trae catálogo (productos, listas, medios de pago)
-      await _catalogoRepository.bootstrapCatalogo(
-        idListaInicial: 1, // podés hacerlo dinámico después
-      );
-    } catch (_) {
-      // si falla, seguimos con lo local (offline mode)
-    }
+    try {
+      await _catalogoRepository.bootstrapCatalogo();
+    } catch (_) {}
+
+    try {
+      await _syncService.syncPendientes();
+    } catch (_) {}
 
     return _cargarAgendaLocal();
   }
@@ -160,6 +167,49 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  Widget _syncBanner() {
+    return StreamBuilder<int>(
+      stream: _syncQueueDao.watchPendingCount(),
+      builder: (context, snap) {
+        final count = snap.data ?? 0;
+
+        if (count == 0) return const SizedBox.shrink();
+
+        return Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.orange.shade100,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.orange.shade300),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.sync_problem_outlined),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Hay $count operaciones pendientes de sincronización',
+                ),
+              ),
+              TextButton(
+                onPressed: () async {
+                  await _syncService.syncPendientes();
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Sincronización ejecutada')),
+                  );
+                },
+                child: const Text('Sincronizar ahora'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -181,6 +231,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SizedBox(height: 16),
+              _syncBanner(),
               DayFilterButtons(
                 selected: filtroSeleccionado,
                 onFilterChanged: _onFilterChanged,

@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/core/colors.dart';
 import 'package:frontend_soderia/core/navigation/app_shell_actions.dart';
+import 'package:frontend_soderia/repositories/pedido_repository.dart';
 import 'package:frontend_soderia/screens/pago_screen.dart';
 import 'package:frontend_soderia/services/cliente_service.dart';
 import 'package:frontend_soderia/services/lista_precio_service.dart';
@@ -80,6 +81,30 @@ class _VentaScreenState extends State<VentaScreen> {
   final _listaPrecioService = ListaPrecioService();
 
   late final VisitaRepository _visitaRepository;
+  List<dynamic> _mediosPago = [];
+  int? _idMedioPagoSeleccionado;
+  late Future<List<dynamic>> _futureMediosPago;
+
+  Future<List<dynamic>> _cargarMediosPagoHibrido() async {
+    try {
+      final medios = await _catalogoRepository.obtenerMediosPagoLocales();
+
+      if (medios.isNotEmpty) {
+        return medios;
+      }
+
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<int?> _obtenerIdRepartoDiaActual() async {
+    final reparto = await appDb
+        .select(appDb.repartoActualLocal)
+        .getSingleOrNull();
+    return reparto?.idReparto;
+  }
 
   bool _modoLocalCliente = false;
 
@@ -169,6 +194,7 @@ class _VentaScreenState extends State<VentaScreen> {
     _idListaSeleccionada = widget.idListaPrecios;
     _futureListasPrecios = _cargarListasHibrido();
     _futureItems = _cargarItemsHibrido(widget.idListaPrecios);
+    _futureMediosPago = _cargarMediosPagoHibrido();
   }
 
   Future<Map<String, dynamic>> _cargarClienteHibrido() async {
@@ -301,6 +327,58 @@ class _VentaScreenState extends State<VentaScreen> {
           onTap: _cuentas.length > 1 ? _pickCuenta : null,
         ),
       ),
+    );
+  }
+
+  Widget _selectorMedioPago() {
+    return FutureBuilder<List<dynamic>>(
+      future: _futureMediosPago,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
+            child: LinearProgressIndicator(),
+          );
+        }
+
+        final medios = snap.data ?? const [];
+
+        if (medios.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
+            child: Text('No hay medios de pago cargados localmente'),
+          );
+        }
+
+        if (_idMedioPagoSeleccionado == null) {
+          final primero = medios.first;
+          _idMedioPagoSeleccionado = primero.idMedioPago as int;
+        }
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+          child: DropdownButtonFormField<int>(
+            value: _idMedioPagoSeleccionado,
+            decoration: const InputDecoration(
+              labelText: 'Medio de pago',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            items: medios.map((m) {
+              return DropdownMenuItem<int>(
+                value: m.idMedioPago as int,
+                child: Text(m.nombre as String),
+              );
+            }).toList(),
+            onChanged: (v) {
+              if (v == null) return;
+              setState(() {
+                _idMedioPagoSeleccionado = v;
+              });
+            },
+          ),
+        );
+      },
     );
   }
 
@@ -478,30 +556,60 @@ class _VentaScreenState extends State<VentaScreen> {
       );
     });
 
+    final idMedioPago = _idMedioPagoSeleccionado;
+
+    if (idMedioPago == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Seleccioná un medio de pago')),
+      );
+      return;
+    }
+
     final total = _total;
 
-    final ok = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => PagoScreen(
-          nombreCliente: nombreCliente,
-          legajo: legajo,
-          fecha: DateTime.now(),
-          deudaActual: deuda,
-          saldoAFavorActual: saldoAFavor,
-          items: items,
-          total: total,
-          idCuenta: idCuenta,
-        ),
-      ),
+    final pedidoRepo = PedidoRepository(
+      db: appDb,
+      queueDao: SyncQueueDao(appDb),
     );
 
-    if (ok == true && mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Venta confirmada')));
+    final itemsPayload = _carrito.values.map((item) {
+      return {
+        'id_producto': item.tipo == TipoItemVenta.producto ? item.idItem : null,
+        'id_combo': item.tipo == TipoItemVenta.combo ? item.idItem : null,
+        'cantidad': item.cantidad.toDouble(),
+        'precio_unitario': item.precioUnitario,
+      };
+    }).toList();
 
-      Navigator.of(context).pop(true);
+    final idRepartoDia = await _obtenerIdRepartoDiaActual();
+
+    if (idRepartoDia == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No hay reparto actual cargado en el dispositivo'),
+        ),
+      );
+      return;
     }
+
+    await pedidoRepo.crearPedidoOffline(
+      legajo: int.parse(legajo),
+      idCuenta: idCuenta,
+      idRepartoDia: idRepartoDia,
+      idMedioPago: idMedioPago,
+      montoTotal: total,
+      items: itemsPayload,
+    );
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Pedido guardado offline')));
+
+    Navigator.of(context).pop(true);
   }
 
   void _noCompra(String nombreCliente) async {
@@ -733,6 +841,7 @@ class _VentaScreenState extends State<VentaScreen> {
               ),
             _selectorCuentaWidget(),
             _selectorListaPrecios(),
+            _selectorMedioPago(),
             Expanded(
               child: Padding(
                 padding: EdgeInsets.only(bottom: isMobile ? 84 : 0),
