@@ -16,7 +16,6 @@ class _ClientesListScreenState extends State<ClientesListScreen> {
   String _orden = 'Apellido (A→Z)';
   bool _cargando = false;
 
-  // ahora viene del backend
   List<dynamic> _data = [];
 
   @override
@@ -43,15 +42,17 @@ class _ClientesListScreenState extends State<ClientesListScreen> {
 
   List<dynamic> get _filtered {
     final q = _search.text.trim().toLowerCase();
-    // cada item del back tiene: legajo, dni, observacion, persona:{nombre,apellido,...}
+
     var list = _data.where((c) {
       if (q.isEmpty) return true;
-      final persona = c['persona'] ?? {};
-      final nombreCompleto =
-          '${persona['nombre'] ?? ''} ${persona['apellido'] ?? ''}'
-              .toLowerCase();
-      final dni = '${c['dni'] ?? ''}'.toLowerCase();
-      return nombreCompleto.contains(q) || dni.contains(q);
+
+      final telefonos = (c['telefonos'] as List?) ?? [];
+
+      final coincideTelefono = telefonos.any(
+        (t) => '${t['nro_telefono'] ?? ''}'.toLowerCase().contains(q),
+      );
+
+      return coincideTelefono;
     }).toList();
 
     switch (_orden) {
@@ -74,6 +75,7 @@ class _ClientesListScreenState extends State<ClientesListScreen> {
       case 'Más antiguos':
         break;
     }
+
     return list;
   }
 
@@ -103,7 +105,7 @@ class _ClientesListScreenState extends State<ClientesListScreen> {
                   onChanged: (_) => setState(() {}),
                   decoration: const InputDecoration(
                     prefixIcon: Icon(Icons.search),
-                    hintText: 'Buscar por nombre o DNI...',
+                    hintText: 'Buscar por teléfono...',
                     border: OutlineInputBorder(),
                     isDense: true,
                   ),
@@ -169,6 +171,12 @@ class _ClientesListScreenState extends State<ClientesListScreen> {
                       final nombre = persona['nombre'] ?? '';
                       final legajo = c['legajo'];
 
+                      final telefonos = (c['telefonos'] as List?) ?? [];
+                      final telefono = telefonos.isNotEmpty
+                          ? (telefonos.first['nro_telefono'] ?? 'Sin teléfono')
+                                .toString()
+                          : 'Sin teléfono';
+
                       return ListTile(
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -183,8 +191,7 @@ class _ClientesListScreenState extends State<ClientesListScreen> {
                           ),
                         ),
                         title: Text('$apellido, $nombre'),
-                        subtitle: Text('DNI: ${c['dni']}'),
-                        // 👇 solo este trailing
+                        subtitle: Text('Tel: $telefono'),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
