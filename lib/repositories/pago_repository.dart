@@ -10,10 +10,7 @@ class PagoRepository {
   final SyncQueueDao queueDao;
   final Uuid _uuid = const Uuid();
 
-  PagoRepository({
-    required this.db,
-    required this.queueDao,
-  });
+  PagoRepository({required this.db, required this.queueDao});
 
   Future<String> registrarPagoOffline({
     required int legajo,
@@ -29,18 +26,20 @@ class PagoRepository {
     final now = DateTime.now();
 
     await db.transaction(() async {
-      await db.into(db.pagosLocales).insert(
-        PagosLocalesCompanion.insert(
-          localUuid: localUuid,
-          legajo: legajo,
-          idCuenta: idCuenta,
-          idRepartoDia: idRepartoDia,
-          idMedioPago: idMedioPago,
-          monto: monto,
-          fecha: now,
-          observacion: Value(observacion),
-        ),
-      );
+      await db
+          .into(db.pagosLocales)
+          .insert(
+            PagosLocalesCompanion.insert(
+              localUuid: localUuid,
+              legajo: legajo,
+              idCuenta: idCuenta,
+              idRepartoDia: idRepartoDia,
+              idMedioPago: idMedioPago,
+              monto: monto,
+              fecha: now,
+              observacion: Value(observacion),
+            ),
+          );
 
       await queueDao.enqueue(
         localOperationId: _uuid.v4(),
@@ -64,17 +63,19 @@ class PagoRepository {
         deviceId: deviceId,
       );
 
-      final cuenta = await (db.select(db.clientesLocal)
-            ..where((t) => t.legajo.equals(legajo)))
-          .getSingleOrNull();
+      final cuenta = await (db.select(
+        db.clientesLocal,
+      )..where((t) => t.legajo.equals(legajo))).getSingleOrNull();
 
       if (cuenta != null) {
-        final nuevaDeuda = (cuenta.deuda - monto).clamp(0, double.infinity);
-        final nuevoSaldo = cuenta.saldo + monto;
+        final nuevaDeuda = (cuenta.deuda - monto)
+            .clamp(0.0, double.infinity)
+            .toDouble();
+        final nuevoSaldo = (cuenta.saldo + monto).toDouble();
 
-        await (db.update(db.clientesLocal)
-              ..where((t) => t.legajo.equals(legajo)))
-            .write(
+        await (db.update(
+          db.clientesLocal,
+        )..where((t) => t.legajo.equals(legajo))).write(
           ClientesLocalCompanion(
             saldo: Value(nuevoSaldo),
             deuda: Value(nuevaDeuda),
@@ -91,9 +92,9 @@ class PagoRepository {
     required String localUuid,
     required int serverId,
   }) async {
-    await (db.update(db.pagosLocales)
-          ..where((t) => t.localUuid.equals(localUuid)))
-        .write(
+    await (db.update(
+      db.pagosLocales,
+    )..where((t) => t.localUuid.equals(localUuid))).write(
       PagosLocalesCompanion(
         serverId: Value(serverId),
         estadoSync: const Value('SYNCED'),
@@ -103,9 +104,9 @@ class PagoRepository {
   }
 
   Future<void> markPagoError(String localUuid) async {
-    await (db.update(db.pagosLocales)
-          ..where((t) => t.localUuid.equals(localUuid)))
-        .write(
+    await (db.update(
+      db.pagosLocales,
+    )..where((t) => t.localUuid.equals(localUuid))).write(
       PagosLocalesCompanion(
         estadoSync: const Value('ERROR'),
         updatedAt: Value(DateTime.now()),
