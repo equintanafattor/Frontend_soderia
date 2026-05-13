@@ -42,10 +42,10 @@ class RepartoRepository {
           .into(db.repartoActualLocal)
           .insert(
             RepartoActualLocalCompanion(
-              idReparto: Value(reparto['id_repartodia'] as int),
+              idReparto: Value((reparto['id_repartodia'] as num).toInt()),
               fecha: Value(DateTime.parse(reparto['fecha'] as String)),
-              idUsuario: Value(reparto['id_usuario'] as int?),
-              idEmpresa: Value(reparto['id_empresa'] as int?),
+              idUsuario: Value((reparto['id_usuario'] as num?)?.toInt()),
+              idEmpresa: Value((reparto['id_empresa'] as num?)?.toInt()),
               observacion: Value(reparto['observacion'] as String?),
               updatedAt: Value(DateTime.now()),
             ),
@@ -64,7 +64,7 @@ class RepartoRepository {
       }
 
       for (final item in clientesAgenda) {
-        final legajo = item['legajo'] as int;
+        final legajo = (item['legajo'] as num).toInt();
 
         final detalleResp = await api.obtenerDetalleCliente(legajo);
         final detalle = Map<String, dynamic>.from(detalleResp.data);
@@ -173,24 +173,43 @@ class RepartoRepository {
         )
         .get();
 
-    return rows
-        .map(
-          (r) => RepartoClienteConDatos(
-            id: r.read<int>('id') ?? 0,
-            idReparto: r.read<int>('id_reparto') ?? 0,
-            legajo: r.read<int>('legajo') ?? 0,
-            turno: r.read<String>('turno'),
-            posicion: r.read<int>('posicion'),
-            estadoVisita: r.read<String>('estado_visita'),
-            observacion: r.read<String>('observacion'),
-            nombre: r.read<String>('nombre') ?? '',
-            direccion: r.read<String>('direccion'),
-            telefono: r.read<String>('telefono'),
-            saldo: r.read<double>('saldo') ?? 0,
-            deuda: r.read<double>('deuda') ?? 0,
-          ),
-        )
-        .toList();
+    return rows.map((r) {
+      final id = r.read<int>('id') ?? 0;
+      final idReparto = r.read<int>('id_reparto') ?? 0;
+      final legajo = r.read<int>('legajo') ?? 0;
+
+      final posicionRaw = r.data['posicion'];
+      final posicion = posicionRaw == null
+          ? null
+          : (posicionRaw as num).toInt();
+
+      String? readString(String key) {
+        final v = r.data[key];
+        return v == null ? null : v.toString();
+      }
+
+      double readDouble(String key) {
+        final v = r.data[key];
+        if (v == null) return 0;
+        if (v is num) return v.toDouble();
+        return double.tryParse(v.toString()) ?? 0;
+      }
+
+      return RepartoClienteConDatos(
+        id: id,
+        idReparto: idReparto,
+        legajo: legajo,
+        turno: readString('turno'),
+        posicion: posicion,
+        estadoVisita: readString('estado_visita'),
+        observacion: readString('observacion'),
+        nombre: readString('nombre') ?? '',
+        direccion: readString('direccion'),
+        telefono: readString('telefono'),
+        saldo: readDouble('saldo'),
+        deuda: readDouble('deuda'),
+      );
+    }).toList();
   }
 
   String _soloFecha(DateTime fecha) {

@@ -46,10 +46,14 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
 
-    final current = sessionState.value;
-    if (current == null || current.nombre != widget.nombreUsuario) {
-      sessionState.setUser(SessionUser(nombre: widget.nombreUsuario));
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      final current = sessionState.value;
+      if (current == null || current.nombre != widget.nombreUsuario) {
+        sessionState.setUser(SessionUser(nombre: widget.nombreUsuario));
+      }
+    });
 
     _repartoRepository = RepartoRepository(
       db: appDb,

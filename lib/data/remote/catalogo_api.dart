@@ -6,7 +6,7 @@ class CatalogoApi {
   CatalogoApi(this.dio);
 
   Future<Response> listarListas() {
-    return dio.get('/listas-precios');
+    return dio.get('/listas-precios/');
   }
 
   Future<Response> listarItemsDeLista(int idLista) {
@@ -14,6 +14,6 @@ class CatalogoApi {
   }
 
   Future<Response> listarMediosPago() {
-    return dio.get('/medios-pago');
+    return dio.get('/medios-pago/');
   }
 }

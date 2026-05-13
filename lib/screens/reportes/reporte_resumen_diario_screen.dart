@@ -23,7 +23,7 @@ class _ReporteResumenDiarioScreenState
     extends State<ReporteResumenDiarioScreen> {
   final _repartoService = RepartoDiaService();
 
-  final _cajaService = CajaEmpresaService(); 
+  final _cajaService = CajaEmpresaService();
 
   DateTime _fecha = DateTime.now();
   bool _cargando = false;
@@ -42,6 +42,8 @@ class _ReporteResumenDiarioScreenState
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
+
     setState(() {
       _cargando = true;
       _error = null;
@@ -59,19 +61,22 @@ class _ReporteResumenDiarioScreenState
       );
 
       final results = await Future.wait([repartoFuture, cajaFuture]);
+
+      if (!mounted) return;
+
       final reparto = results[0] as RepartoDiaOut?;
       final totalCaja = results[1] as CajaEmpresaTotalOut;
 
       setState(() {
         _reparto = reparto;
         _totalCaja = totalCaja;
+        _cargando = false;
       });
     } catch (e) {
+      if (!mounted) return;
+
       setState(() {
         _error = e.toString();
-      });
-    } finally {
-      setState(() {
         _cargando = false;
       });
     }
