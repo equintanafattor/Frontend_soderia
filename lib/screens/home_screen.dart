@@ -36,6 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late Future<List<RepartoClienteConDatos>> _futureAgenda;
   late final VoidCallback _homeDayFilterListener;
   late final VoidCallback _shellListener;
+  final ScrollController _scrollController = ScrollController();
 
   late final RepartoRepository _repartoRepository;
   late final CatalogoRepository _catalogoRepository;
@@ -105,6 +106,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     homeDayFilter.removeListener(_homeDayFilterListener);
     shellState.removeListener(_shellListener);
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -168,6 +170,41 @@ class _HomeScreenState extends State<HomeScreen> {
       filtroSeleccionado = nuevoFiltro;
       _fechaObjetivo = nuevaFecha;
       _futureAgenda = _inicializarPantalla();
+    });
+  }
+
+  Future<void> _recargarAgendaYMostrarSiguiente(int legajoActual) async {
+    final future = _inicializarPantalla();
+
+    setState(() {
+      _futureAgenda = future;
+    });
+
+    final clientes = await future;
+
+    if (!mounted) return;
+
+    final actualIndex = clientes.indexWhere((c) => c.legajo == legajoActual);
+
+    final siguienteIndex = clientes.indexWhere((cliente) {
+      final index = clientes.indexOf(cliente);
+      final estado = mapEstadoVisita(cliente.estadoVisita ?? 'pendiente');
+
+      return index > actualIndex &&
+          (estado == EstadoVisita.pendiente ||
+              estado == EstadoVisita.postergado);
+    });
+
+    if (siguienteIndex == -1) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
+
+      _scrollController.animateTo(
+        siguienteIndex * 112,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOut,
+      );
     });
   }
 
@@ -270,6 +307,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     }
 
                     return ListView.builder(
+                      controller: _scrollController,
                       itemCount: clientes.length,
                       itemBuilder: (context, index) {
                         final c = clientes[index];
@@ -296,7 +334,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                         '/venta',
                                         arguments: {'legajo': c.legajo},
                                       );
-                                  if (res == true) _recargarAgenda();
+                                  if (res == true) {
+                                    await _recargarAgendaYMostrarSiguiente(
+                                      c.legajo,
+                                    );
+                                  }
                                 }
                               : null,
                         );
