@@ -5,6 +5,7 @@ import 'package:printing/printing.dart';
 import 'package:frontend_soderia/models/cuenta.dart';
 import 'package:frontend_soderia/core/navigation/app_shell_actions.dart';
 import 'package:frontend_soderia/utils/estado_cuenta_pdf.dart';
+import 'package:frontend_soderia/services/cliente_service.dart';
 
 class ClienteCuentasSection extends StatelessWidget {
   final int legajo;
@@ -13,7 +14,9 @@ class ClienteCuentasSection extends StatelessWidget {
   final List<dynamic> pedidos;
   final VoidCallback onChanged;
 
-  const ClienteCuentasSection({
+  final _clienteService = ClienteService();
+
+  ClienteCuentasSection({
     super.key,
     required this.legajo,
     required this.nombreCliente,
@@ -21,6 +24,100 @@ class ClienteCuentasSection extends StatelessWidget {
     required this.pedidos,
     required this.onChanged,
   });
+
+  Future<void> _aplicarInteres(BuildContext context, Cuenta cuenta) async {
+    final porcentajeCtrl = TextEditingController(text: '10');
+    final observacionCtrl = TextEditingController();
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Aplicar interés'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Cuenta: ${cuenta.tipoDeCuenta ?? cuenta.nombre}\n'
+                'Deuda actual: \$${cuenta.deuda.toStringAsFixed(2)}',
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: porcentajeCtrl,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Porcentaje',
+                  suffixText: '%',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: observacionCtrl,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Observación opcional',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(ctx, true),
+              icon: const Icon(Icons.percent),
+              label: const Text('Aplicar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (ok != true) return;
+
+    final porcentaje = double.tryParse(
+      porcentajeCtrl.text.trim().replaceAll(',', '.'),
+    );
+
+    if (porcentaje == null || porcentaje <= 0) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ingresá un porcentaje válido')),
+      );
+      return;
+    }
+
+    try {
+      await _clienteService.aplicarInteresCuenta(
+        legajo: legajo,
+        idCuenta: cuenta.idCuenta,
+        porcentaje: porcentaje,
+        observacion: observacionCtrl.text.trim().isEmpty
+            ? null
+            : observacionCtrl.text.trim(),
+      );
+
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Interés aplicado correctamente')),
+      );
+
+      onChanged();
+    } catch (e) {
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -80,6 +177,7 @@ class ClienteCuentasSection extends StatelessWidget {
 
                     await Printing.layoutPdf(onLayout: (_) async => pdfBytes);
                   },
+                  onAplicarInteres: () => _aplicarInteres(context, c),
                 );
               }).toList(),
             ),
@@ -94,6 +192,7 @@ class _CuentaMiniCard extends StatelessWidget {
   final int? bidones;
   final String? estado;
   final VoidCallback onPdf;
+  final VoidCallback onAplicarInteres;
 
   const _CuentaMiniCard({
     required this.tipo,
@@ -102,6 +201,7 @@ class _CuentaMiniCard extends StatelessWidget {
     required this.bidones,
     required this.estado,
     required this.onPdf,
+    required this.onAplicarInteres,
   });
 
   @override
@@ -138,13 +238,20 @@ class _CuentaMiniCard extends StatelessWidget {
                   ),
                 ),
               const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: IconButton(
-                  icon: const Icon(Icons.picture_as_pdf),
-                  tooltip: 'Estado de cuenta',
-                  onPressed: onPdf,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.percent),
+                    tooltip: 'Aplicar interés',
+                    onPressed: deuda > 0 ? onAplicarInteres : null,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.picture_as_pdf),
+                    tooltip: 'Estado de cuenta',
+                    onPressed: onPdf,
+                  ),
+                ],
               ),
             ],
           ),

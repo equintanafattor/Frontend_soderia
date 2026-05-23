@@ -1,22 +1,48 @@
 // ignore_for_file: deprecated_member_use
 
 import 'package:flutter/material.dart';
-import 'package:frontend_soderia/core/colors.dart';
-import 'package:frontend_soderia/core/navigation/app_shell_actions.dart';
-import 'package:frontend_soderia/repositories/pedido_repository.dart';
-import 'package:frontend_soderia/screens/pago_screen.dart';
-import 'package:frontend_soderia/services/cliente_service.dart';
-import 'package:frontend_soderia/services/lista_precio_service.dart';
-import 'package:frontend_soderia/screens/clientes/cliente_edit_screen.dart';
-import 'package:frontend_soderia/services/visita_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+// Core
+import 'package:frontend_soderia/core/colors.dart';
+import 'package:frontend_soderia/core/navigation/app_shell_actions.dart';
+import 'package:frontend_soderia/core/net/api_client.dart';
+
+// Data local
 import 'package:frontend_soderia/data/local/local_db.dart';
 import 'package:frontend_soderia/data/local/daos/sync_queue_dao.dart';
-import 'package:frontend_soderia/repositories/visita_repository.dart';
-import 'package:frontend_soderia/repositories/catalogo_repository.dart';
+
+// Remote
 import 'package:frontend_soderia/data/remote/catalogo_api.dart';
-import 'package:frontend_soderia/core/net/api_client.dart';
+
+// Models
+import 'package:frontend_soderia/models/venta/venta_carrito_item.dart';
+
+// Repositories
+import 'package:frontend_soderia/repositories/catalogo_repository.dart';
+import 'package:frontend_soderia/repositories/pedido_repository.dart';
+import 'package:frontend_soderia/repositories/visita_repository.dart';
+
+// Screens
+import 'package:frontend_soderia/screens/clientes/cliente_edit_screen.dart';
+import 'package:frontend_soderia/screens/pago_screen.dart';
+
+// Services
+import 'package:frontend_soderia/services/cliente_service.dart';
+import 'package:frontend_soderia/services/lista_precio_service.dart';
+import 'package:frontend_soderia/services/visita_service.dart';
+
+// Widgets
+import 'package:frontend_soderia/widgets/venta/venta_cantidad_dialog.dart';
+import 'package:frontend_soderia/widgets/venta/venta_confirm_action.dart';
+import 'package:frontend_soderia/widgets/venta/venta_header_info.dart';
+import 'package:frontend_soderia/widgets/venta/venta_title_cliente.dart';
+import 'package:frontend_soderia/widgets/venta/venta_actual_tab.dart';
+import 'package:frontend_soderia/widgets/venta/venta_historial_tab.dart';
+import 'package:frontend_soderia/widgets/venta/venta_items_tab.dart';
+import 'package:frontend_soderia/widgets/venta/venta_selector_cuenta.dart';
+import 'package:frontend_soderia/widgets/venta/venta_selector_lista_precios.dart';
+import 'package:frontend_soderia/widgets/venta/venta_selector_medio_pago.dart';
 
 class VentaScreen extends StatefulWidget {
   final int legajoCliente;
@@ -30,24 +56,6 @@ class VentaScreen extends StatefulWidget {
 
   @override
   State<VentaScreen> createState() => _VentaScreenState();
-}
-
-enum TipoItemVenta { producto, combo }
-
-class CarritoItem {
-  final TipoItemVenta tipo;
-  final int idItem;
-  final String nombre;
-  final double precioUnitario;
-  int cantidad;
-
-  CarritoItem({
-    required this.tipo,
-    required this.idItem,
-    required this.nombre,
-    required this.precioUnitario,
-    required this.cantidad,
-  });
 }
 
 class _VentaScreenState extends State<VentaScreen> {
@@ -267,121 +275,6 @@ class _VentaScreenState extends State<VentaScreen> {
     return {'nombre': nombre, 'apellido': ''};
   }
 
-  Widget _selectorCuentaWidget() {
-    if (_cuentas.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
-        child: Card(
-          child: ListTile(
-            leading: Icon(Icons.warning_amber),
-            title: Text('Este cliente no tiene cuentas'),
-            subtitle: Text('Creá una cuenta para poder vender.'),
-          ),
-        ),
-      );
-    }
-
-    final tipo = (_cuentaSeleccionada?['tipo_de_cuenta'] ?? 'Cuenta')
-        .toString();
-    final estado = (_cuentaSeleccionada?['estado'] ?? '').toString();
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-      child: Card(
-        child: ListTile(
-          leading: const Icon(Icons.account_balance_wallet_outlined),
-          title: Text('Cuenta: $tipo'),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Deuda: \$ ${_deudaSel.toStringAsFixed(0)}  ·  '
-                'Saldo: \$ ${_saldoSel.toStringAsFixed(0)}',
-              ),
-              if (estado.isNotEmpty) Text('Estado: $estado'),
-              if (_cuentas.length > 1 && !_tieneCuentaSeleccionada)
-                const Padding(
-                  padding: EdgeInsets.only(top: 4),
-                  child: Text(
-                    'Seleccioná una cuenta para continuar',
-                    style: TextStyle(color: Colors.red),
-                  ),
-                ),
-              if (_modoLocalCliente)
-                const Padding(
-                  padding: EdgeInsets.only(top: 4),
-                  child: Text(
-                    'Datos cargados localmente',
-                    style: TextStyle(color: Colors.orange),
-                  ),
-                ),
-            ],
-          ),
-          trailing: _cuentas.length <= 1
-              ? null
-              : OutlinedButton.icon(
-                  onPressed: _pickCuenta,
-                  icon: const Icon(Icons.swap_horiz),
-                  label: const Text('Cambiar'),
-                ),
-          onTap: _cuentas.length > 1 ? _pickCuenta : null,
-        ),
-      ),
-    );
-  }
-
-  Widget _selectorMedioPago() {
-    return FutureBuilder<List<dynamic>>(
-      future: _futureMediosPago,
-      builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
-          return const Padding(
-            padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
-            child: LinearProgressIndicator(),
-          );
-        }
-
-        final medios = snap.data ?? const [];
-
-        if (medios.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
-            child: Text('No hay medios de pago cargados localmente'),
-          );
-        }
-
-        if (_idMedioPagoSeleccionado == null) {
-          final primero = medios.first;
-          _idMedioPagoSeleccionado = primero.idMedioPago as int;
-        }
-
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-          child: DropdownButtonFormField<int>(
-            value: _idMedioPagoSeleccionado,
-            decoration: const InputDecoration(
-              labelText: 'Medio de pago',
-              border: OutlineInputBorder(),
-              isDense: true,
-            ),
-            items: medios.map((m) {
-              return DropdownMenuItem<int>(
-                value: m.idMedioPago as int,
-                child: Text(m.nombre as String),
-              );
-            }).toList(),
-            onChanged: (v) {
-              if (v == null) return;
-              setState(() {
-                _idMedioPagoSeleccionado = v;
-              });
-            },
-          ),
-        );
-      },
-    );
-  }
-
   Future<void> _pickCuenta() async {
     final selected = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
@@ -505,7 +398,7 @@ class _VentaScreenState extends State<VentaScreen> {
 
     final nueva = await showDialog<int>(
       context: context,
-      builder: (_) => _CantidadDialog(cantidadInicial: item.cantidad),
+      builder: (_) => VentaCantidadDialog(cantidadInicial: item.cantidad),
     );
     if (nueva == null) return;
 
@@ -751,7 +644,7 @@ class _VentaScreenState extends State<VentaScreen> {
     final w = MediaQuery.of(context).size.width;
     final isMobile = w < 600;
 
-    final confirm = ConfirmAction(
+    final confirm = VentaConfirmAction(
       enabled: _ventaValida && _tieneCuentaSeleccionada,
       total: _total,
       onConfirm: () =>
@@ -764,8 +657,25 @@ class _VentaScreenState extends State<VentaScreen> {
         appBar: AppBar(
           backgroundColor: AppColors.azul,
           foregroundColor: Colors.white,
-          title: _TitleCliente(nombre: nombreCliente, direccion: direccion),
+          title: VentaTitleCliente(nombre: nombreCliente, direccion: direccion),
           actions: [
+            IconButton(
+              tooltip: 'Ver detalle',
+              icon: const Icon(Icons.person_search),
+              onPressed: () async {
+                final res = await AppShellActions.push(
+                  context,
+                  '/cliente/detail',
+                  arguments: {'legajo': widget.legajoCliente},
+                );
+
+                if (res == true && mounted) {
+                  setState(() {
+                    _futureClienteDetalle = _cargarClienteHibrido();
+                  });
+                }
+              },
+            ),
             IconButton(
               tooltip: 'Editar cliente',
               icon: const Icon(Icons.edit),
@@ -839,571 +749,74 @@ class _VentaScreenState extends State<VentaScreen> {
                   style: TextStyle(fontSize: 12),
                 ),
               ),
-            _selectorCuentaWidget(),
-            _selectorListaPrecios(),
-            _selectorMedioPago(),
+            VentaSelectorCuenta(
+              cuentas: _cuentas,
+              cuentaSeleccionada: _cuentaSeleccionada,
+              modoLocalCliente: _modoLocalCliente,
+              onPickCuenta: _pickCuenta,
+            ),
+
+            VentaSelectorListaPrecios(
+              futureListasPrecios: _futureListasPrecios,
+              idListaSeleccionada: _idListaSeleccionada,
+              onChanged: _seleccionarLista,
+              onDefaultSelected: (id) {
+                if (!mounted) return;
+                setState(() {
+                  _idListaSeleccionada = id;
+                  _futureItems = _cargarItemsHibrido(id);
+                });
+              },
+            ),
+
+            VentaSelectorMedioPago(
+              futureMediosPago: _futureMediosPago,
+              idMedioPagoSeleccionado: _idMedioPagoSeleccionado,
+              onChanged: (id) {
+                setState(() {
+                  _idMedioPagoSeleccionado = id;
+                });
+              },
+              onDefaultSelected: (id) {
+                if (!mounted) return;
+                setState(() {
+                  _idMedioPagoSeleccionado = id;
+                });
+              },
+            ),
             Expanded(
               child: Padding(
                 padding: EdgeInsets.only(bottom: isMobile ? 84 : 0),
                 child: TabBarView(
                   children: [
-                    _tabVentaActual(
-                      context,
-                      cs,
-                      legajo,
-                      deuda,
-                      saldoAFavor,
-                      nombreCliente,
+                    VentaActualTab(
+                      cs: cs,
+                      legajo: legajo,
+                      deuda: deuda,
+                      saldoAFavor: saldoAFavor,
+                      nombreCliente: nombreCliente,
+                      carrito: _carrito,
+                      onPostergar: _postergar,
+                      onNoCompra: () => _noCompra(nombreCliente),
+                      onEditarCantidad: _editarCantidad,
+                      onEliminarItem: _eliminarItem,
                     ),
-                    _tabItems(context),
-                    _tabHistorial(context, cs, historicos),
+
+                    VentaItemsTab(
+                      idListaSeleccionada: _idListaSeleccionada,
+                      futureItems: _futureItems,
+                      comboTienePrecio: _comboTienePrecio,
+                      parsePrecio: _parsePrecio,
+                      onAgregarItem: _agregarItem,
+                    ),
+
+                    VentaHistorialTab(cs: cs, historicos: historicos),
                   ],
                 ),
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _selectorListaPrecios() {
-    return FutureBuilder<List<dynamic>>(
-      future: _futureListasPrecios,
-      builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
-          return const Padding(
-            padding: EdgeInsets.all(12),
-            child: LinearProgressIndicator(),
-          );
-        }
-
-        if (snap.hasError) {
-          return const Padding(
-            padding: EdgeInsets.all(12),
-            child: Text('No se pudieron cargar listas de precios'),
-          );
-        }
-
-        final listas = snap.data ?? const [];
-
-        final activas = listas.where((l) {
-          final estado = (l['estado'] ?? l.estado ?? '')
-              .toString()
-              .toLowerCase()
-              .trim();
-          return estado == 'activo';
-        }).toList();
-
-        if (activas.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.all(12),
-            child: Text('No hay listas de precios activas'),
-          );
-        }
-
-        final existeYActiva =
-            _idListaSeleccionada != null &&
-            activas.any((l) {
-              final id = l is Map<String, dynamic> ? l['id_lista'] : l.idLista;
-              return id == _idListaSeleccionada;
-            });
-
-        if (!existeYActiva) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted) return;
-            setState(() {
-              final primera = activas.first;
-              _idListaSeleccionada = primera is Map<String, dynamic>
-                  ? (primera['id_lista'] as num).toInt()
-                  : primera.idLista as int;
-              _futureItems = _cargarItemsHibrido(_idListaSeleccionada!);
-            });
-          });
-        }
-
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-          child: DropdownButtonFormField<int>(
-            value: _idListaSeleccionada,
-            decoration: const InputDecoration(
-              labelText: 'Lista de precios',
-              border: OutlineInputBorder(),
-              isDense: true,
-            ),
-            items: activas.map((l) {
-              final id = l is Map<String, dynamic>
-                  ? (l['id_lista'] as num).toInt()
-                  : l.idLista as int;
-              final nombre = l is Map<String, dynamic>
-                  ? (l['nombre'] ?? '').toString()
-                  : l.nombre as String;
-
-              return DropdownMenuItem<int>(value: id, child: Text(nombre));
-            }).toList(),
-            onChanged: (v) {
-              if (v != null && v != _idListaSeleccionada) {
-                _seleccionarLista(v);
-              }
-            },
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _tabVentaActual(
-    BuildContext context,
-    ColorScheme cs,
-    String legajo,
-    double deuda,
-    double saldoAFavor,
-    String nombreCliente,
-  ) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        _HeaderInfo(legajo: legajo, deuda: deuda, saldoAFavor: saldoAFavor),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 12,
-          runSpacing: 8,
-          children: [
-            FilledButton.icon(
-              style: FilledButton.styleFrom(backgroundColor: Colors.red),
-              onPressed: () => _noCompra(nombreCliente),
-              icon: const Icon(Icons.close),
-              label: const Text('No compra'),
-            ),
-            OutlinedButton.icon(
-              onPressed: _postergar,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Postergar visita'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Text('Ítems', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
-        if (_carrito.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: cs.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: cs.outlineVariant),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.info_outline, color: cs.primary),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text('No hay productos en la venta actual.'),
-                ),
-              ],
-            ),
-          ),
-        ..._carrito.entries.map((entry) {
-          final key = entry.key;
-          final item = entry.value;
-
-          return Card(
-            margin: const EdgeInsets.symmetric(vertical: 6),
-            child: ListTile(
-              leading: Icon(
-                item.tipo == TipoItemVenta.combo
-                    ? Icons.inventory_2
-                    : Icons.local_drink,
-              ),
-              title: Text(item.nombre),
-              subtitle: Text(
-                '${item.tipo == TipoItemVenta.combo ? "Combo" : "Producto"} · '
-                'Cantidad: ${item.cantidad} · '
-                '\$${item.precioUnitario.toStringAsFixed(0)} c/u',
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    tooltip: 'Editar cantidad',
-                    icon: const Icon(Icons.edit),
-                    onPressed: () => _editarCantidad(key),
-                  ),
-                  IconButton(
-                    tooltip: 'Quitar',
-                    icon: const Icon(Icons.close),
-                    onPressed: () => _eliminarItem(key),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }),
-      ],
-    );
-  }
-
-  Widget _tabItems(BuildContext context) {
-    if (_idListaSeleccionada == null) {
-      return const Center(child: Text('Seleccioná una lista de precios'));
-    }
-
-    return FutureBuilder<List<dynamic>>(
-      future: _futureItems,
-      builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (snap.hasError) {
-          return const Center(child: Text('No se pudieron cargar los ítems'));
-        }
-
-        final items = snap.data ?? const [];
-
-        if (items.isEmpty) {
-          return const Center(
-            child: Text('Esta lista no tiene ítems con precio'),
-          );
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: items.length,
-          itemBuilder: (_, i) {
-            final raw = items[i];
-
-            final Map<String, dynamic> it = raw is Map<String, dynamic>
-                ? raw
-                : {
-                    'tipo': raw.tipo,
-                    'id_item': raw.idItem,
-                    'nombre': raw.nombre,
-                    'precio': raw.precio,
-                    'estado': raw.estado,
-                  };
-
-            final tipo = it['tipo'] == 'combo'
-                ? TipoItemVenta.combo
-                : TipoItemVenta.producto;
-
-            final bool esCombo = tipo == TipoItemVenta.combo;
-            final bool tienePrecio = _comboTienePrecio(it);
-
-            final double precio = _parsePrecio(it['precio']);
-
-            final bool activo = esCombo
-                ? (it['estado'] == true ||
-                      it['estado'] == 'true' ||
-                      it['estado'] == 1 ||
-                      (it['estado']?.toString().toLowerCase() == 'activo'))
-                : true;
-
-            final bool puedeVender = activo && (!esCombo || tienePrecio);
-
-            final icon = esCombo ? Icons.inventory_2 : Icons.local_drink;
-
-            return Card(
-              child: ListTile(
-                enabled: puedeVender,
-                leading: Icon(icon, color: puedeVender ? null : Colors.grey),
-                title: Text(
-                  (it['nombre'] ?? '').toString(),
-                  style: TextStyle(
-                    color: puedeVender ? null : Colors.grey,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                subtitle: !activo && esCombo
-                    ? const Text(
-                        'Combo inactivo',
-                        style: TextStyle(color: Colors.red),
-                      )
-                    : (esCombo && !tienePrecio)
-                    ? const Text(
-                        'Combo sin precio en esta lista',
-                        style: TextStyle(color: Colors.redAccent),
-                      )
-                    : Text('\$${precio.toStringAsFixed(0)}'),
-                trailing: FilledButton(
-                  onPressed: puedeVender
-                      ? () => _agregarItem(
-                          tipo,
-                          (it['id_item'] as num).toInt(),
-                          (it['nombre'] ?? '').toString(),
-                          precio,
-                        )
-                      : null,
-                  child: const Text('Agregar'),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _tabHistorial(
-    BuildContext context,
-    ColorScheme cs,
-    List<dynamic> historicos,
-  ) {
-    if (historicos.isEmpty) {
-      return Center(
-        child: Text(
-          'Sin historial',
-          style: Theme.of(context).textTheme.bodyLarge,
-        ),
-      );
-    }
-
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: historicos.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (_, i) {
-        final h = historicos[i] as Map<String, dynamic>;
-        final fechaStr = (h['fecha'] ?? '').toString();
-        final obs = (h['observacion'] ?? '').toString();
-        final evento = (h['evento'] as Map<String, dynamic>?) ?? {};
-        final nombreEvento = (evento['nombre'] ?? evento['descripcion'] ?? '')
-            .toString();
-
-        return Card(
-          child: ListTile(
-            leading: const Icon(Icons.history),
-            title: Text(nombreEvento.isNotEmpty ? nombreEvento : 'Evento'),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (fechaStr.isNotEmpty) Text(fechaStr),
-                if (obs.isNotEmpty) Text(obs),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _TitleCliente extends StatelessWidget {
-  final String nombre;
-  final String direccion;
-
-  const _TitleCliente({required this.nombre, required this.direccion});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          nombre,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        if (direccion.isNotEmpty)
-          Text(direccion, style: const TextStyle(fontSize: 13)),
-      ],
-    );
-  }
-}
-
-class _HeaderInfo extends StatelessWidget {
-  final String legajo;
-  final double deuda;
-  final double saldoAFavor;
-
-  const _HeaderInfo({
-    required this.legajo,
-    required this.deuda,
-    required this.saldoAFavor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cs.outlineVariant),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Wrap(
-              spacing: 16,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                _InfoItem(label: 'Legajo', value: legajo),
-                _InfoItem(
-                  label: 'Deuda',
-                  value: '\$ ${deuda.toStringAsFixed(0)}',
-                  valueStyle: TextStyle(
-                    color: deuda > 0 ? Colors.red : Colors.green,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                _InfoItem(
-                  label: 'Saldo a favor',
-                  value: '\$ ${saldoAFavor.toStringAsFixed(0)}',
-                  valueStyle: const TextStyle(
-                    color: Colors.teal,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoItem extends StatelessWidget {
-  final String label;
-  final String value;
-  final TextStyle? valueStyle;
-
-  const _InfoItem({required this.label, required this.value, this.valueStyle});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text('$label: ', style: TextStyle(color: cs.onSurfaceVariant)),
-        Text(
-          value,
-          style: valueStyle ?? const TextStyle(fontWeight: FontWeight.w600),
-        ),
-      ],
-    );
-  }
-}
-
-class _CantidadDialog extends StatefulWidget {
-  final int cantidadInicial;
-
-  const _CantidadDialog({required this.cantidadInicial});
-
-  @override
-  State<_CantidadDialog> createState() => _CantidadDialogState();
-}
-
-class _CantidadDialogState extends State<_CantidadDialog> {
-  late int _cant;
-
-  @override
-  void initState() {
-    super.initState();
-    _cant = widget.cantidadInicial;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Editar cantidad'),
-      content: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          IconButton(
-            tooltip: 'Menos',
-            onPressed: () => setState(() => _cant = (_cant - 1).clamp(0, 999)),
-            icon: const Icon(Icons.remove),
-          ),
-          Text(
-            '$_cant',
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-          ),
-          IconButton(
-            tooltip: 'Más',
-            onPressed: () => setState(() => _cant = (_cant + 1).clamp(0, 999)),
-            icon: const Icon(Icons.add),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancelar'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop<int>(context, _cant),
-          child: const Text('Guardar'),
-        ),
-      ],
-    );
-  }
-}
-
-class ConfirmAction extends StatelessWidget {
-  final bool enabled;
-  final double total;
-  final VoidCallback onConfirm;
-
-  const ConfirmAction({
-    super.key,
-    required this.enabled,
-    required this.total,
-    required this.onConfirm,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final w = MediaQuery.of(context).size.width;
-    final isMobile = w < 600;
-
-    if (isMobile) {
-      return SafeArea(
-        top: false,
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            boxShadow: const [BoxShadow(blurRadius: 8, color: Colors.black12)],
-          ),
-          child: SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton.icon(
-              onPressed: enabled ? onConfirm : null,
-              icon: const Icon(Icons.check),
-              label: Text(
-                total > 0
-                    ? 'Confirmar · \$${total.toStringAsFixed(0)}'
-                    : 'Confirmar',
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: enabled ? Colors.green : null,
-                foregroundColor: enabled ? Colors.white : null,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return SafeArea(
-      child: FloatingActionButton.extended(
-        onPressed: enabled ? onConfirm : null,
-        icon: const Icon(Icons.check),
-        label: Text(
-          total > 0 ? 'Confirmar · \$${total.toStringAsFixed(0)}' : 'Confirmar',
-          style: const TextStyle(fontWeight: FontWeight.w700),
-        ),
-        backgroundColor: enabled ? Colors.green : Colors.grey.shade400,
-        foregroundColor: Colors.white,
       ),
     );
   }

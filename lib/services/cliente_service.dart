@@ -208,4 +208,25 @@ class ClienteService {
       );
     }
   }
+
+  Future<Map<String, dynamic>> aplicarInteresCuenta({
+    required int legajo,
+    required int idCuenta,
+    required double porcentaje,
+    String? observacion,
+  }) async {
+    try {
+      final resp = await _dio.post(
+        '/clientes/cuentas/$idCuenta/aplicar-interes',
+        queryParameters: {'legajo': legajo},
+        data: {'porcentaje': porcentaje, 'observacion': observacion},
+      );
+
+      return Map<String, dynamic>.from(resp.data as Map);
+    } on DioException catch (e) {
+      throw Exception(
+        'Error aplicando interés: ${e.response?.data ?? e.message}',
+      );
+    }
+  }
 }

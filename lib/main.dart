@@ -100,10 +100,15 @@ class FrontendSoderiaApp extends StatelessWidget {
         // === Detalle de cliente (blindado) ===
         '/cliente/detail': (ctx) {
           final args = ModalRoute.of(ctx)!.settings.arguments;
+
           if (args is int) {
             return ClienteDetailScreen(legajo: args);
           }
-          // si vino sin legajo, mostramos algo visible y NO rompemos
+
+          if (args is Map && args['legajo'] is int) {
+            return ClienteDetailScreen(legajo: args['legajo'] as int);
+          }
+
           return const Scaffold(
             body: Center(child: Text('Falta el legajo del cliente')),
           );
