@@ -10,6 +10,7 @@ import 'package:frontend_soderia/services/medio_pago_service.dart';
 import 'package:frontend_soderia/widgets/cliente/cliente_servicios_pendientes.dart';
 import 'package:frontend_soderia/widgets/cliente/cliente_servicios_section.dart';
 import 'package:frontend_soderia/widgets/cliente/cliente_cuentas_section.dart';
+import 'package:frontend_soderia/widgets/cliente/cliente_envases_widget.dart';
 import 'package:frontend_soderia/widgets/cliente/cliente_pedidos_section.dart';
 import 'package:frontend_soderia/widgets/cliente/cliente_historico_section.dart';
 import 'package:frontend_soderia/widgets/cliente/cliente_comprobantes_section.dart';
@@ -233,6 +234,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                   ClienteDireccionesSection(direcciones: direcciones),
 
                   // CUENTA
+                  EnvasesSectionCard(legajo: widget.legajo),
                   ClienteCuentasSection(
                     legajo: widget.legajo,
                     nombreCliente: nombre,
@@ -374,7 +376,6 @@ class _SectionCard extends StatelessWidget {
   }
 }
 
-
 // HELPERS
 
 // helper local (ponelo cerca de _toDouble o arriba del build)
@@ -403,6 +404,3 @@ String? _telefonoParaWhatsappFrom(List telefonos) {
   if (d.startsWith('15')) d = d.substring(2);
   return '549$d';
 }
-
-
-

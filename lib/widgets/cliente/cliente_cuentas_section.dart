@@ -3,20 +3,20 @@
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:frontend_soderia/models/cuenta.dart';
+import 'package:frontend_soderia/models/producto_cliente.dart';
 import 'package:frontend_soderia/core/navigation/app_shell_actions.dart';
 import 'package:frontend_soderia/utils/estado_cuenta_pdf.dart';
 import 'package:frontend_soderia/services/cliente_service.dart';
+import 'package:frontend_soderia/widgets/cliente/cliente_envases_widget.dart';
 
-class ClienteCuentasSection extends StatelessWidget {
+class ClienteCuentasSection extends StatefulWidget {
   final int legajo;
   final String nombreCliente;
   final List<Cuenta> cuentas;
   final List<dynamic> pedidos;
   final VoidCallback onChanged;
 
-  final _clienteService = ClienteService();
-
-  ClienteCuentasSection({
+  const ClienteCuentasSection({
     super.key,
     required this.legajo,
     required this.nombreCliente,
@@ -24,6 +24,31 @@ class ClienteCuentasSection extends StatelessWidget {
     required this.pedidos,
     required this.onChanged,
   });
+
+  @override
+  State<ClienteCuentasSection> createState() => _ClienteCuentasSectionState();
+}
+
+class _ClienteCuentasSectionState extends State<ClienteCuentasSection> {
+  final _clienteService = ClienteService();
+  List<ProductoCliente> _productos = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarProductos();
+  }
+
+  Future<void> _cargarProductos() async {
+    try {
+      final raw = await _clienteService.listarProductosCliente(widget.legajo);
+      if (mounted) {
+        setState(() {
+          _productos = raw.map(ProductoCliente.fromJson).toList();
+        });
+      }
+    } catch (_) {}
+  }
 
   Future<void> _aplicarInteres(BuildContext context, Cuenta cuenta) async {
     final porcentajeCtrl = TextEditingController(text: '10');
@@ -95,7 +120,7 @@ class ClienteCuentasSection extends StatelessWidget {
 
     try {
       await _clienteService.aplicarInteresCuenta(
-        legajo: legajo,
+        legajo: widget.legajo,
         idCuenta: cuenta.idCuenta,
         porcentaje: porcentaje,
         observacion: observacionCtrl.text.trim().isEmpty
@@ -109,7 +134,7 @@ class ClienteCuentasSection extends StatelessWidget {
         const SnackBar(content: Text('Interés aplicado correctamente')),
       );
 
-      onChanged();
+      widget.onChanged();
     } catch (e) {
       if (!context.mounted) return;
 
@@ -130,20 +155,20 @@ class ClienteCuentasSection extends StatelessWidget {
           final ok = await AppShellActions.push(
             context,
             '/cliente/cuenta/new',
-            arguments: {'legajo': legajo},
+            arguments: {'legajo': widget.legajo},
           );
 
           if (ok == true && context.mounted) {
-            onChanged();
+            widget.onChanged();
           }
         },
       ),
-      child: cuentas.isEmpty
+      child: widget.cuentas.isEmpty
           ? const Text('Sin cuentas')
           : Wrap(
               spacing: 12,
               runSpacing: 12,
-              children: cuentas.map((c) {
+              children: widget.cuentas.map((c) {
                 final tipo =
                     (c.tipoDeCuenta != null &&
                         c.tipoDeCuenta!.trim().isNotEmpty)
@@ -156,8 +181,11 @@ class ClienteCuentasSection extends StatelessWidget {
                   deuda: c.deuda,
                   bidones: c.numeroBidones,
                   estado: c.estado,
+                  productos: _productos,
                   onPdf: () async {
-                    final ultimos = pedidos.map<Map<String, dynamic>>((p0) {
+                    final ultimos = widget.pedidos.map<Map<String, dynamic>>((
+                      p0,
+                    ) {
                       final p = Map<String, dynamic>.from(p0 as Map);
                       return {
                         'fecha': p['fecha'],
@@ -167,8 +195,8 @@ class ClienteCuentasSection extends StatelessWidget {
                     }).toList();
 
                     final pdfBytes = await generarEstadoCuentaPDF(
-                      nombreCliente: nombreCliente,
-                      legajo: legajo.toString(),
+                      nombreCliente: widget.nombreCliente,
+                      legajo: widget.legajo.toString(),
                       fecha: DateTime.now(),
                       deuda: c.deuda,
                       saldoAFavor: c.saldo,
@@ -191,6 +219,7 @@ class _CuentaMiniCard extends StatelessWidget {
   final double deuda;
   final int? bidones;
   final String? estado;
+  final List<ProductoCliente> productos;
   final VoidCallback onPdf;
   final VoidCallback onAplicarInteres;
 
@@ -200,6 +229,7 @@ class _CuentaMiniCard extends StatelessWidget {
     required this.deuda,
     required this.bidones,
     required this.estado,
+    required this.productos,
     required this.onPdf,
     required this.onAplicarInteres,
   });
@@ -226,9 +256,9 @@ class _CuentaMiniCard extends StatelessWidget {
                 ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 6),
-              Text('Deuda: ${deuda.toStringAsFixed(2)}'),
-              Text('Saldo: ${saldo.toStringAsFixed(2)}'),
-              Text('Bidones: ${bidones ?? 0}'),
+              Text('Deuda: \$${deuda.toStringAsFixed(2)}'),
+              Text('Saldo: \$${saldo.toStringAsFixed(2)}'),
+              Text('Bidones (cuenta): ${bidones ?? 0}'),
               if (estado != null && estado!.trim().isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
@@ -237,6 +267,8 @@ class _CuentaMiniCard extends StatelessWidget {
                     style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
                   ),
                 ),
+              // Envases reales desde ProductoCliente
+              EnvasesInline(productos: productos),
               const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,

@@ -33,6 +33,7 @@ import 'package:frontend_soderia/services/lista_precio_service.dart';
 import 'package:frontend_soderia/services/visita_service.dart';
 
 // Widgets
+import 'package:frontend_soderia/widgets/cliente/cliente_envases_widget.dart';
 import 'package:frontend_soderia/widgets/venta/venta_cantidad_dialog.dart';
 import 'package:frontend_soderia/widgets/venta/venta_confirm_action.dart';
 import 'package:frontend_soderia/widgets/venta/venta_header_info.dart';
@@ -783,6 +784,10 @@ class _VentaScreenState extends State<VentaScreen> {
                   _idMedioPagoSeleccionado = id;
                 });
               },
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              child: EnvasesCompacto(legajo: widget.legajoCliente),
             ),
             Expanded(
               child: Padding(

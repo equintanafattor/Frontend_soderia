@@ -217,8 +217,7 @@ class ClienteService {
   }) async {
     try {
       final resp = await _dio.post(
-        '/clientes/cuentas/$idCuenta/aplicar-interes',
-        queryParameters: {'legajo': legajo},
+        '/clientes/$legajo/cuentas/$idCuenta/aplicar-interes',
         data: {'porcentaje': porcentaje, 'observacion': observacion},
       );
 
@@ -226,6 +225,20 @@ class ClienteService {
     } on DioException catch (e) {
       throw Exception(
         'Error aplicando interés: ${e.response?.data ?? e.message}',
+      );
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> listarProductosCliente(int legajo) async {
+    try {
+      final resp = await _dio.get('/clientes/$legajo/productos');
+      return (resp.data as List)
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    } on DioException catch (e) {
+      throw Exception(
+        'Error listando productos del cliente: ${e.response?.data ?? e.message}',
       );
     }
   }

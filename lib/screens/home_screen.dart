@@ -42,6 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late final CatalogoRepository _catalogoRepository;
   late final SyncQueueDao _syncQueueDao;
   late final SyncService _syncService;
+  bool _cerrandoReparto = false;
 
   @override
   void initState() {
@@ -174,38 +175,105 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _recargarAgendaYMostrarSiguiente(int legajoActual) async {
-    final future = _inicializarPantalla();
-
-    setState(() {
-      _futureAgenda = future;
-    });
-
-    final clientes = await future;
-
+    // Fix 3: cargamos local primero (sin red) para scrollear inmediato
+    final clientesLocales = await _cargarAgendaLocal();
     if (!mounted) return;
 
-    final actualIndex = clientes.indexWhere((c) => c.legajo == legajoActual);
+    // Fix 2: si el cliente ya no aparece en la lista usamos 0 como base
+    final actualIndex = clientesLocales.indexWhere(
+      (c) => c.legajo == legajoActual,
+    );
+    final baseIndex = actualIndex == -1 ? 0 : actualIndex;
 
-    final siguienteIndex = clientes.indexWhere((cliente) {
-      final index = clientes.indexOf(cliente);
+    final siguienteIndex = clientesLocales.indexWhere((cliente) {
+      final index = clientesLocales.indexOf(cliente);
       final estado = mapEstadoVisita(cliente.estadoVisita ?? 'pendiente');
-
-      return index > actualIndex &&
+      return index > baseIndex &&
           (estado == EstadoVisita.pendiente ||
               estado == EstadoVisita.postergado);
     });
 
-    if (siguienteIndex == -1) return;
+    // Fix 4: si no hay siguiente, quedarse en el actual para ver su nuevo estado
+    final indexDestino = siguienteIndex == -1 ? baseIndex : siguienteIndex;
+
+    // Mostrar datos locales ya disponibles
+    setState(() {
+      _futureAgenda = Future.value(clientesLocales);
+    });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollController.hasClients) return;
+      final total = clientesLocales.length;
+      if (total == 0) return;
+
+      // Fix 1: offset proporcional al maxScrollExtent real en lugar de altura fija
+      final maxScroll = _scrollController.position.maxScrollExtent;
+      final targetOffset = (indexDestino / total) * maxScroll;
 
       _scrollController.animateTo(
-        siguienteIndex * 112,
+        targetOffset,
         duration: const Duration(milliseconds: 350),
         curve: Curves.easeOut,
       );
     });
+
+    // Fix 3: bootstrap en background sin bloquear el scroll
+    _inicializarPantalla().then((clientesActualizados) {
+      if (!mounted) return;
+      setState(() {
+        _futureAgenda = Future.value(clientesActualizados);
+      });
+    });
+  }
+
+  Future<void> _cerrarReparto() async {
+    final idReparto = await _repartoRepository.obtenerIdRepartoActualLocal();
+    if (idReparto == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No hay un reparto activo para cerrar')),
+      );
+      return;
+    }
+
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cerrar reparto del día'),
+        content: const Text(
+          '¿Confirmás el cierre del reparto? Esta acción no se puede deshacer.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Cerrar reparto'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar != true) return;
+
+    setState(() => _cerrandoReparto = true);
+    try {
+      await _repartoRepository.api.cerrarReparto(idReparto);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Reparto cerrado correctamente')),
+      );
+      _recargarAgenda();
+    } on Exception catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error al cerrar reparto: $e')));
+    } finally {
+      if (mounted) setState(() => _cerrandoReparto = false);
+    }
   }
 
   Widget _syncBanner() {
@@ -263,13 +331,30 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Hola, ${widget.nombreUsuario}!',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: cs.onBackground,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Hola, ${widget.nombreUsuario}!',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: cs.onBackground,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Cerrar reparto del día',
+                    onPressed: _cerrandoReparto ? null : _cerrarReparto,
+                    icon: _cerrandoReparto
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.lock_outline),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
               _syncBanner(),

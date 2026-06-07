@@ -36,4 +36,8 @@ class RepartoApi {
   Future<Response> obtenerDetalleCliente(int legajo) {
     return dio.get('/clientes/$legajo/detalle');
   }
+
+  Future<Response> cerrarReparto(int idRepartoDia) {
+    return dio.post('/repartos-dia/$idRepartoDia/cerrar');
+  }
 }

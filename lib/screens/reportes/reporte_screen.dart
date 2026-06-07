@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'reporte_resumen_diario_screen.dart';
 import 'reporte_repartos_screen.dart';
 import 'reporte_caja_empresa_screen.dart';
+import 'reporte_excel_cuentas_screen.dart';
 
 class ReportesScreen extends StatefulWidget {
   const ReportesScreen({super.key});
@@ -19,7 +20,7 @@ class _ReportesScreenState extends State<ReportesScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -39,6 +40,7 @@ class _ReportesScreenState extends State<ReportesScreen>
             Tab(text: 'Resumen'),
             Tab(text: 'Repartos'),
             Tab(text: 'Caja'),
+            Tab(text: 'Cuentas'),
           ],
         ),
       ),
@@ -48,9 +50,9 @@ class _ReportesScreenState extends State<ReportesScreen>
           ReporteResumenDiarioScreen(),
           ReporteRepartosScreen(),
           ReporteCajaEmpresaScreen(),
+          ReporteExcelCuentasScreen(),
         ],
       ),
     );
   }
 }
-
