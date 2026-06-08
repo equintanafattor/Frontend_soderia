@@ -499,11 +499,23 @@ class _VentaScreenState extends State<VentaScreen> {
 
     if (!mounted) return;
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Pedido guardado offline')));
+    final result = await Navigator.of(context, rootNavigator: true).push(
+      MaterialPageRoute(
+        builder: (_) => PagoScreen(
+          nombreCliente: nombreCliente,
+          legajo: legajo,
+          fecha: DateTime.now(),
+          deudaActual: deuda,
+          saldoAFavorActual: saldoAFavor,
+          items: items,
+          total: total,
+          idCuenta: idCuenta,
+        ),
+      ),
+    );
 
-    Navigator.of(context).pop(true);
+    if (!mounted) return;
+    Navigator.of(context).pop(result ?? true);
   }
 
   void _noCompra(String nombreCliente) async {
