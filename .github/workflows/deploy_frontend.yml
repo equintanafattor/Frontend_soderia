@@ -22,6 +22,12 @@ jobs:
         run: flutter pub get
 
       - name: Build web
+        run: |
+          flutter clean
+          flutter pub get
+          flutter build web --release
+
+      - name: Build web
         run: flutter build web --release
 
       - name: Copy build to server
