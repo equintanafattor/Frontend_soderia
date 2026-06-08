@@ -1,6 +1,27 @@
 import 'package:dio/dio.dart';
 import 'package:frontend_soderia/core/net/api_client.dart';
 
+class EnvaseMovimiento {
+  final int idProducto;
+  final int entregados;
+  final int devueltos;
+  final String? observacion;
+
+  const EnvaseMovimiento({
+    required this.idProducto,
+    this.entregados = 0,
+    this.devueltos = 0,
+    this.observacion,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'id_producto': idProducto,
+    'entregados': entregados,
+    'devueltos': devueltos,
+    if (observacion != null) 'observacion': observacion,
+  };
+}
+
 class PedidoService {
   final Dio _dio = ApiClient.dio;
 
@@ -43,11 +64,16 @@ class PedidoService {
   Future<Map<String, dynamic>> confirmarPedido({
     required int idPedido,
     required int idRepartoDia,
+    List<EnvaseMovimiento> envases = const [],
   }) async {
     try {
       final res = await _dio.post(
         '/pedidos/$idPedido/confirmar',
-        data: {'id_repartodia': idRepartoDia},
+        data: {
+          'id_repartodia': idRepartoDia,
+          if (envases.isNotEmpty)
+            'envases': envases.map((e) => e.toJson()).toList(),
+        },
       );
       return Map<String, dynamic>.from(res.data as Map);
     } on DioException catch (e) {

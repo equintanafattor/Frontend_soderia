@@ -6,6 +6,7 @@ import 'package:frontend_soderia/services/combo_service.dart';
 import 'package:printing/printing.dart';
 
 import '../utils/pdf_generator.dart';
+import 'package:frontend_soderia/services/cliente_service.dart';
 import 'package:frontend_soderia/services/pedido_service.dart';
 import 'package:frontend_soderia/services/reparto_dia_service.dart';
 
@@ -85,6 +86,10 @@ class _PagoScreenState extends State<PagoScreen> {
   double? _montoElegido;
   MedioPago _medio = MedioPago.efectivo;
   bool _compartirComprobante = false;
+
+  // Envases: Map<idProducto, {nombre, entregados, devueltos}>
+  final List<Map<String, dynamic>> _productosEnvase = [];
+  bool _loadingEnvases = false;
 
   String _money(num v) => '\$${v.toStringAsFixed(0)}';
 
@@ -172,6 +177,39 @@ class _PagoScreenState extends State<PagoScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _cargarProductosEnvase();
+  }
+
+  Future<void> _cargarProductosEnvase() async {
+    setState(() => _loadingEnvases = true);
+    try {
+      final legajoInt = int.tryParse(widget.legajo);
+      if (legajoInt == null) return;
+      final raw = await ClienteService().listarProductosCliente(legajoInt);
+      // Solo productos que son envases (filtramos por nombre o traemos todos)
+      if (mounted) {
+        setState(() {
+          _productosEnvase.clear();
+          for (final p in raw) {
+            _productosEnvase.add({
+              'id_producto': p['id_producto'],
+              'nombre': p['nombre'],
+              'cantidad_actual': p['cantidad'],
+              'entregados': 0,
+              'devueltos': 0,
+            });
+          }
+        });
+      }
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _loadingEnvases = false);
+    }
+  }
+
+  @override
   void dispose() {
     _otroCtrl.dispose();
     super.dispose();
@@ -256,10 +294,24 @@ class _PagoScreenState extends State<PagoScreen> {
 
       final idPedido = pedido['id_pedido'] as int;
 
-      // Confirmar pedido
+      // Confirmar pedido con envases
+      final envasesPayload = _productosEnvase
+          .where(
+            (p) => (p['entregados'] as int) > 0 || (p['devueltos'] as int) > 0,
+          )
+          .map(
+            (p) => EnvaseMovimiento(
+              idProducto: p['id_producto'] as int,
+              entregados: p['entregados'] as int,
+              devueltos: p['devueltos'] as int,
+            ),
+          )
+          .toList();
+
       await _pedidoService.confirmarPedido(
         idPedido: idPedido,
         idRepartoDia: idRepartoDia,
+        envases: envasesPayload,
       );
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -555,6 +607,51 @@ class _PagoScreenState extends State<PagoScreen> {
                 ],
                 onChanged: (v) => setState(() => _medio = v),
               ),
+              const SizedBox(height: 16),
+              if (_loadingEnvases)
+                const Center(child: CircularProgressIndicator())
+              else if (_productosEnvase.isNotEmpty) ...[
+                Text(
+                  'Envases:',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                ..._productosEnvase.asMap().entries.map((entry) {
+                  final i = entry.key;
+                  final p = entry.value;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${p['nombre']} (tiene: ${p['cantidad_actual']})',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _EnvaseCounter(
+                          label: 'Entrega',
+                          value: p['entregados'] as int,
+                          onChanged: (v) => setState(
+                            () => _productosEnvase[i]['entregados'] = v,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _EnvaseCounter(
+                          label: 'Retira',
+                          value: p['devueltos'] as int,
+                          max: p['cantidad_actual'] as int,
+                          onChanged: (v) => setState(
+                            () => _productosEnvase[i]['devueltos'] = v,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+                const SizedBox(height: 8),
+              ],
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -872,6 +969,65 @@ class _ConfirmarButton extends StatelessWidget {
       label: Text(label),
       backgroundColor: enabled ? Colors.green : Colors.grey.shade400,
       foregroundColor: Colors.white,
+    );
+  }
+}
+
+class _EnvaseCounter extends StatelessWidget {
+  final String label;
+  final int value;
+  final int max;
+  final ValueChanged<int> onChanged;
+
+  const _EnvaseCounter({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+    this.max = 999,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      children: [
+        Text(label, style: const TextStyle(fontSize: 11)),
+        const SizedBox(height: 2),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            InkWell(
+              borderRadius: BorderRadius.circular(4),
+              onTap: value > 0 ? () => onChanged(value - 1) : null,
+              child: Icon(
+                Icons.remove_circle_outline,
+                size: 22,
+                color: value > 0 ? cs.primary : cs.outlineVariant,
+              ),
+            ),
+            SizedBox(
+              width: 28,
+              child: Text(
+                '$value',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+            InkWell(
+              borderRadius: BorderRadius.circular(4),
+              onTap: value < max ? () => onChanged(value + 1) : null,
+              child: Icon(
+                Icons.add_circle_outline,
+                size: 22,
+                color: value < max ? cs.primary : cs.outlineVariant,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
