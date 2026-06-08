@@ -41,5 +41,4 @@ jobs:
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_KEY }}
           script: |
-            cd /opt/soderia/app/backend
-            docker compose -f docker-compose.server.yml up -d --build frontend caddy
+            docker restart soderia_frontend
