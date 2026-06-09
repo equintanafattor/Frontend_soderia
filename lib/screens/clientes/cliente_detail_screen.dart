@@ -16,6 +16,7 @@ import 'package:frontend_soderia/widgets/cliente/cliente_comprobantes_section.da
 import 'package:frontend_soderia/widgets/cliente/cliente_header_card.dart';
 import 'package:frontend_soderia/widgets/cliente/cliente_datos_personales_section.dart';
 import 'package:frontend_soderia/widgets/cliente/cliente_direcciones_section.dart';
+import 'package:frontend_soderia/widgets/cliente/cliente_envases_widget.dart';
 
 class ClienteDetailScreen extends StatefulWidget {
   final int legajo;
@@ -96,7 +97,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Cliente eliminado')));
-        Navigator.of(context).pop(true); // para que la lista refresque
+        Navigator.of(context).pop(true);
       }
     } catch (e) {
       if (mounted) {
@@ -114,7 +115,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
     return WillPopScope(
       onWillPop: () async {
         Navigator.pop(context, _changed);
-        return false; // ⛔ evitamos el pop automático
+        return false;
       },
       child: Scaffold(
         appBar: AppBar(
@@ -196,7 +197,6 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
               color: cs.surfaceVariant.withOpacity(0.2),
               child: ListView(
                 padding: const EdgeInsets.all(16),
-
                 children: [
                   ClienteServiciosPendientes(
                     legajo: widget.legajo,
@@ -235,6 +235,9 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                   // DIAS DE REPARTO
                   _DiasRepartoSection(data: data),
 
+                  // ENVASES EN POSESION
+                  EnvasesSectionCard(legajo: widget.legajo),
+
                   // CUENTA
                   ClienteCuentasSection(
                     legajo: widget.legajo,
@@ -244,7 +247,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                     onChanged: _reload,
                   ),
 
-                  // PEDIDOS (desde endpoint aparte)
+                  // PEDIDOS
                   ClientePedidosSection(
                     pedidos: pedidos,
                     phone: phone,
@@ -257,7 +260,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                     telefonos: telefonos.cast<Map>(),
                   ),
 
-                  // HISTÓRICO (desde endpoint aparte)
+                  // HISTORICO
                   ClienteHistoricoSection(historicos: historicos),
 
                   const SizedBox(height: 24),
@@ -287,13 +290,6 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                     label: const Text('Registrar pago'),
                   ),
 
-                  const SizedBox(height: 8),
-
-                  /* OutlinedButton.icon(
-                    onPressed: () => _crearServicioDispenser(),
-                    icon: const Icon(Icons.water_drop),
-                    label: const Text('Crear servicio dispenser'),
-                  ), */
                   const SizedBox(height: 8),
 
                   OutlinedButton.icon(
@@ -344,8 +340,6 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -377,9 +371,6 @@ class _SectionCard extends StatelessWidget {
   }
 }
 
-// HELPERS
-
-// helper local (ponelo cerca de _toDouble o arriba del build)
 String? _telefonoParaWhatsappFrom(List telefonos) {
   if (telefonos.isEmpty) return null;
 
@@ -424,15 +415,15 @@ class _DiasRepartoSection extends StatelessWidget {
   static const Map<String, String> _labelPorCodigo = {
     'lun': 'Lun',
     'mar': 'Mar',
-    'mie': 'Mié',
+    'mie': 'Mie',
     'jue': 'Jue',
     'vie': 'Vie',
-    'sab': 'Sáb',
+    'sab': 'Sab',
     'dom': 'Dom',
   };
 
   static const Map<String, String> _labelTurno = {
-    'manana': 'Mañana',
+    'manana': 'Manana',
     'tarde': 'Tarde',
     'noche': 'Noche',
   };
@@ -510,7 +501,7 @@ class _DiasRepartoSection extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Días de reparto',
+              'Dias de reparto',
               style: Theme.of(
                 context,
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
