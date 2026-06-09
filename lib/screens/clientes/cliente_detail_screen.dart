@@ -10,7 +10,6 @@ import 'package:frontend_soderia/services/medio_pago_service.dart';
 import 'package:frontend_soderia/widgets/cliente/cliente_servicios_pendientes.dart';
 import 'package:frontend_soderia/widgets/cliente/cliente_servicios_section.dart';
 import 'package:frontend_soderia/widgets/cliente/cliente_cuentas_section.dart';
-import 'package:frontend_soderia/widgets/cliente/cliente_envases_widget.dart';
 import 'package:frontend_soderia/widgets/cliente/cliente_pedidos_section.dart';
 import 'package:frontend_soderia/widgets/cliente/cliente_historico_section.dart';
 import 'package:frontend_soderia/widgets/cliente/cliente_comprobantes_section.dart';
@@ -233,8 +232,10 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                   // DIRECCIONES
                   ClienteDireccionesSection(direcciones: direcciones),
 
+                  // DIAS DE REPARTO
+                  _DiasRepartoSection(data: data),
+
                   // CUENTA
-                  EnvasesSectionCard(legajo: widget.legajo),
                   ClienteCuentasSection(
                     legajo: widget.legajo,
                     nombreCliente: nombre,
@@ -403,4 +404,157 @@ String? _telefonoParaWhatsappFrom(List telefonos) {
   if (d.startsWith('0')) d = d.substring(1);
   if (d.startsWith('15')) d = d.substring(2);
   return '549$d';
+}
+
+class _DiasRepartoSection extends StatelessWidget {
+  final Map<String, dynamic> data;
+
+  const _DiasRepartoSection({required this.data});
+
+  static const Map<int, String> _codigoPorId = {
+    1: 'lun',
+    2: 'mar',
+    3: 'mie',
+    4: 'jue',
+    5: 'vie',
+    6: 'sab',
+    7: 'dom',
+  };
+
+  static const Map<String, String> _labelPorCodigo = {
+    'lun': 'Lun',
+    'mar': 'Mar',
+    'mie': 'Mié',
+    'jue': 'Jue',
+    'vie': 'Vie',
+    'sab': 'Sáb',
+    'dom': 'Dom',
+  };
+
+  static const Map<String, String> _labelTurno = {
+    'manana': 'Mañana',
+    'tarde': 'Tarde',
+    'noche': 'Noche',
+  };
+
+  static const List<String> _orden = [
+    'lun',
+    'mar',
+    'mie',
+    'jue',
+    'vie',
+    'sab',
+    'dom',
+  ];
+
+  Set<String> _parseDias() {
+    final dias = <String>{};
+
+    final diasVisita = data['dias_visita'];
+    if (diasVisita is List && diasVisita.isNotEmpty) {
+      for (final d in diasVisita) {
+        if (d is String) dias.add(d.toLowerCase());
+        if (d is Map && d['value'] is String) {
+          dias.add((d['value'] as String).toLowerCase());
+        }
+      }
+    }
+
+    if (dias.isEmpty) {
+      final diasSemanas = data['dias_semanas'];
+      if (diasSemanas is List) {
+        for (final row in diasSemanas) {
+          if (row is! Map) continue;
+          final idDia = row['id_dia'];
+          if (idDia is int) {
+            final code = _codigoPorId[idDia];
+            if (code != null) dias.add(code);
+          }
+        }
+      }
+    }
+
+    return dias;
+  }
+
+  String? _parseTurno() {
+    final turnoRoot = data['turno_visita'];
+    if (turnoRoot is String && turnoRoot.isNotEmpty) return turnoRoot;
+
+    final diasSemanas = data['dias_semanas'];
+    if (diasSemanas is List) {
+      for (final row in diasSemanas) {
+        if (row is! Map) continue;
+        final t = row['turno_visita'];
+        if (t is String && t.isNotEmpty) return t;
+      }
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final dias = _parseDias();
+    final turno = _parseTurno();
+
+    if (dias.isEmpty && turno == null) return const SizedBox.shrink();
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 0.5,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Días de reparto',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: _orden
+                  .where((d) => dias.contains(d))
+                  .map(
+                    (d) => Chip(
+                      label: Text(
+                        _labelPorCodigo[d] ?? d,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: cs.onPrimaryContainer,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      backgroundColor: cs.primaryContainer,
+                      side: BorderSide.none,
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  )
+                  .toList(),
+            ),
+            if (turno != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.schedule, size: 14, color: cs.onSurfaceVariant),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Turno: ${_labelTurno[turno] ?? turno}',
+                    style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
