@@ -1,6 +1,7 @@
 // ignore_for_file: deprecated_member_use
 
 import 'package:flutter/material.dart';
+import 'package:frontend_soderia/core/enums/visita_estado.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 // Core
@@ -21,7 +22,6 @@ import 'package:frontend_soderia/models/venta/venta_carrito_item.dart';
 // Repositories
 import 'package:frontend_soderia/repositories/catalogo_repository.dart';
 import 'package:frontend_soderia/repositories/pedido_repository.dart';
-import 'package:frontend_soderia/core/enums/visita_estado.dart';
 import 'package:frontend_soderia/repositories/visita_repository.dart';
 
 // Screens
@@ -783,25 +783,7 @@ class _VentaScreenState extends State<VentaScreen> {
               },
             ),
 
-            VentaSelectorMedioPago(
-              futureMediosPago: _futureMediosPago,
-              idMedioPagoSeleccionado: _idMedioPagoSeleccionado,
-              onChanged: (id) {
-                setState(() {
-                  _idMedioPagoSeleccionado = id;
-                });
-              },
-              onDefaultSelected: (id) {
-                if (!mounted) return;
-                setState(() {
-                  _idMedioPagoSeleccionado = id;
-                });
-              },
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              child: EnvasesCompacto(legajo: widget.legajoCliente),
-            ),
+            EnvasesCompacto(legajo: widget.legajoCliente),
             Expanded(
               child: Padding(
                 padding: EdgeInsets.only(bottom: isMobile ? 84 : 0),
@@ -818,6 +800,17 @@ class _VentaScreenState extends State<VentaScreen> {
                       onNoCompra: () => _noCompra(nombreCliente),
                       onEditarCantidad: _editarCantidad,
                       onEliminarItem: _eliminarItem,
+                      selectorMedioPago: VentaSelectorMedioPago(
+                        futureMediosPago: _futureMediosPago,
+                        idMedioPagoSeleccionado: _idMedioPagoSeleccionado,
+                        onChanged: (id) {
+                          setState(() => _idMedioPagoSeleccionado = id);
+                        },
+                        onDefaultSelected: (id) {
+                          if (!mounted) return;
+                          setState(() => _idMedioPagoSeleccionado = id);
+                        },
+                      ),
                     ),
 
                     VentaItemsTab(

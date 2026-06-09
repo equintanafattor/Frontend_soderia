@@ -17,6 +17,7 @@ class VentaActualTab extends StatelessWidget {
 
   final Function(String key) onEditarCantidad;
   final Function(String key) onEliminarItem;
+  final Widget? selectorMedioPago;
 
   const VentaActualTab({
     super.key,
@@ -30,6 +31,7 @@ class VentaActualTab extends StatelessWidget {
     required this.onNoCompra,
     required this.onEditarCantidad,
     required this.onEliminarItem,
+    this.selectorMedioPago,
   });
 
   @override
@@ -61,6 +63,10 @@ class VentaActualTab extends StatelessWidget {
 
         const SizedBox(height: 16),
 
+        if (selectorMedioPago != null) ...[
+          selectorMedioPago!,
+          const SizedBox(height: 12),
+        ],
         Text('Ítems', style: Theme.of(context).textTheme.titleMedium),
 
         const SizedBox(height: 8),

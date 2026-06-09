@@ -50,68 +50,60 @@ class _EnvasesCompactoState extends State<EnvasesCompacto> {
         final items = snap.data ?? [];
         if (items.isEmpty) return const SizedBox.shrink();
 
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-          child: Card(
-            color: cs.primaryContainer.withOpacity(0.4),
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: cs.primary.withOpacity(0.25)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
+        return Card(
+          margin: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: cs.outlineVariant),
+          ),
+          elevation: 0,
+          color: cs.surface,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.water_drop_outlined,
+                      size: 15,
+                      color: cs.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Envases en posesion',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: items.map((p) {
+                    return Chip(
+                      avatar: Icon(
                         Icons.water_drop_outlined,
-                        size: 15,
-                        color: cs.primary,
+                        size: 14,
+                        color: cs.onPrimary,
                       ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Envases en posesion',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: cs.onPrimaryContainer,
-                        ),
+                      label: Text(
+                        '${p.nombre}: ${p.cantidad}',
+                        style: TextStyle(fontSize: 12, color: cs.onPrimary),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    children: items.map((p) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: cs.primaryContainer,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: cs.primary.withOpacity(0.4),
-                          ),
-                        ),
-                        child: Text(
-                          '\${p.nombre}  \${p.cantidad}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: cs.onPrimaryContainer,
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ],
-              ),
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      visualDensity: VisualDensity.compact,
+                      backgroundColor: cs.primary,
+                      side: BorderSide.none,
+                    );
+                  }).toList(),
+                ),
+              ],
             ),
           ),
         );
