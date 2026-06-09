@@ -21,6 +21,7 @@ import 'package:frontend_soderia/models/venta/venta_carrito_item.dart';
 // Repositories
 import 'package:frontend_soderia/repositories/catalogo_repository.dart';
 import 'package:frontend_soderia/repositories/pedido_repository.dart';
+import 'package:frontend_soderia/core/enums/visita_estado.dart';
 import 'package:frontend_soderia/repositories/visita_repository.dart';
 
 // Screens

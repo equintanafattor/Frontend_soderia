@@ -1,70 +1,52 @@
+// lib/repositories/visita_repository.dart
+
 import 'dart:convert';
+import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
+
 import '../data/local/app_database.dart';
 import '../data/local/daos/sync_queue_dao.dart';
-import 'package:drift/drift.dart' as drift;
 
 class VisitaRepository {
   final AppDatabase db;
   final SyncQueueDao queueDao;
-  final Uuid _uuid = const Uuid();
 
-  VisitaRepository({
-    required this.db,
-    required this.queueDao,
-  });
+  VisitaRepository({required this.db, required this.queueDao});
 
-  Future<String> registrarVisitaOffline({
+  Future<void> registrarVisitaOffline({
     required int legajo,
     required String estado,
-    int? userId,
-    String? deviceId,
   }) async {
-    final localUuid = _uuid.v4();
-    final now = DateTime.now();
+    final localUuid = const Uuid().v4();
+    final ahora = DateTime.now();
 
-    await db.transaction(() async {
-      await db.into(db.visitasLocales).insert(
-        VisitasLocalesCompanion.insert(
-          localUuid: localUuid,
-          legajo: legajo,
-          fecha: now,
-          estado: estado,
-        ),
-      );
+    // 1. Guardar en tabla local
+    await db
+        .into(db.visitasLocales)
+        .insert(
+          VisitasLocalesCompanion.insert(
+            localUuid: localUuid,
+            legajo: legajo,
+            fecha: ahora,
+            estado: estado,
+            estadoSync: const Value('PENDING'),
+          ),
+        );
 
-      await queueDao.enqueue(
-        localOperationId: _uuid.v4(),
-        entityType: 'visita',
-        entityLocalId: localUuid,
-        action: 'CREATE',
-        payloadJson: jsonEncode({
-          'client_uuid': localUuid,
-          'idempotency_key': localUuid,
-          'legajo': legajo,
-          'fecha': now.toIso8601String(),
-          'estado': estado,
-        }),
-        idempotencyKey: localUuid,
-        userId: userId,
-        deviceId: deviceId,
-      );
-    });
-
-    return localUuid;
-  }
-
-  Future<void> markVisitaSynced({
-    required String localUuid,
-    required int serverId,
-  }) async {
-    await (db.update(db.visitasLocales)
-          ..where((t) => t.localUuid.equals(localUuid)))
-        .write(
-      VisitasLocalesCompanion(
-        serverId: drift.Value(serverId),
-        estadoSync: const drift.Value('SYNCED'),
-      ),
+    // 2. Encolar en SyncQueue para sincronizar con el backend
+    await queueDao.enqueue(
+      localOperationId: localUuid,
+      entityType: 'visita',
+      entityLocalId: localUuid,
+      action: 'CREATE',
+      payloadJson: jsonEncode({
+        'legajo': legajo,
+        'estado': estado,
+        'fecha': ahora.toIso8601String(),
+        'idempotency_key': localUuid,
+        'client_uuid': localUuid,
+      }),
+      idempotencyKey: localUuid,
     );
   }
 }
