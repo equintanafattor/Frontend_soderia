@@ -242,4 +242,52 @@ class ClienteService {
       );
     }
   }
+
+  Future<Map<String, dynamic>> upsertProductoCliente(
+    int legajo,
+    int idProducto, {
+    required int cantidad,
+    String? estado,
+    String? fechaEntrega,
+  }) async {
+    try {
+      final resp = await _dio.put(
+        '/clientes/$legajo/productos/$idProducto',
+        data: {
+          'cantidad': cantidad,
+          if (estado != null) 'estado': estado,
+          if (fechaEntrega != null) 'fecha_entrega': fechaEntrega,
+        },
+      );
+      return Map<String, dynamic>.from(resp.data as Map);
+    } on DioException catch (e) {
+      throw Exception(
+        'Error actualizando producto del cliente: ${e.response?.data ?? e.message}',
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> patchProductoCliente(
+    int legajo,
+    int idProducto, {
+    int? cantidad,
+    String? estado,
+    String? fechaEntrega,
+  }) async {
+    try {
+      final resp = await _dio.patch(
+        '/clientes/$legajo/productos/$idProducto',
+        data: {
+          if (cantidad != null) 'cantidad': cantidad,
+          if (estado != null) 'estado': estado,
+          if (fechaEntrega != null) 'fecha_entrega': fechaEntrega,
+        },
+      );
+      return Map<String, dynamic>.from(resp.data as Map);
+    } on DioException catch (e) {
+      throw Exception(
+        'Error actualizando producto del cliente: ${e.response?.data ?? e.message}',
+      );
+    }
+  }
 }

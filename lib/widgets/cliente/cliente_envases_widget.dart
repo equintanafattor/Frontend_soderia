@@ -1,10 +1,4 @@
 // lib/widgets/cliente/cliente_envases_widget.dart
-//
-// Widget reutilizable que muestra los envases/bidones/sifones
-// que el cliente tiene en posesión. Se usa en:
-//   - VentaScreen  (compacto, una sola línea de chips)
-//   - ClienteDetailScreen  (sección completa con lista)
-//   - ClienteCuentasSection  (dentro de la card de cuenta)
 
 import 'package:flutter/material.dart';
 import 'package:frontend_soderia/models/producto_cliente.dart';
@@ -86,6 +80,7 @@ class _EnvasesCompactoState extends State<EnvasesCompacto> {
 
 // ─────────────────────────────────────────────────────────────
 // Versión SECCIÓN — para ClienteDetailScreen
+// Con botón de edición por fila
 // ─────────────────────────────────────────────────────────────
 class EnvasesSectionCard extends StatefulWidget {
   final int legajo;
@@ -98,17 +93,103 @@ class EnvasesSectionCard extends StatefulWidget {
 
 class _EnvasesSectionCardState extends State<EnvasesSectionCard> {
   final _service = ClienteService();
-  late Future<List<ProductoCliente>> _future;
+  List<ProductoCliente> _productos = [];
+  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _future = _cargar();
+    _cargar();
   }
 
-  Future<List<ProductoCliente>> _cargar() async {
-    final raw = await _service.listarProductosCliente(widget.legajo);
-    return raw.map(ProductoCliente.fromJson).toList();
+  Future<void> _cargar() async {
+    setState(() => _loading = true);
+    try {
+      final raw = await _service.listarProductosCliente(widget.legajo);
+      if (mounted) {
+        setState(() {
+          _productos = raw.map(ProductoCliente.fromJson).toList();
+        });
+      }
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _editarProducto(ProductoCliente producto) async {
+    final cantidadCtrl = TextEditingController(
+      text: producto.cantidad.toString(),
+    );
+    final estadoCtrl = TextEditingController(text: producto.estado ?? '');
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Editar — ${producto.nombre}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: cantidadCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Cantidad',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: estadoCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Estado (opcional)',
+                hintText: 'ej: en uso, roto...',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true || !mounted) return;
+
+    final cantidad = int.tryParse(cantidadCtrl.text.trim());
+    if (cantidad == null || cantidad < 0) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Cantidad invalida')));
+      return;
+    }
+
+    try {
+      await _service.upsertProductoCliente(
+        widget.legajo,
+        producto.idProducto,
+        cantidad: cantidad,
+        estado: estadoCtrl.text.trim().isEmpty ? null : estadoCtrl.text.trim(),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Actualizado correctamente')),
+      );
+      _cargar();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
   }
 
   @override
@@ -118,42 +199,31 @@ class _EnvasesSectionCardState extends State<EnvasesSectionCard> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 0.5,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Envases en posesión',
+              'Envases en posesion',
               style: Theme.of(
                 context,
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
-            FutureBuilder<List<ProductoCliente>>(
-              future: _future,
-              builder: (context, snap) {
-                if (snap.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snap.hasError) {
-                  return Text(
-                    'Error al cargar envases',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  );
-                }
-
-                final items = snap.data ?? [];
-                if (items.isEmpty) {
-                  return const Text('Sin envases registrados');
-                }
-
-                return Column(
-                  children: items.map((p) => _EnvaseRow(p)).toList(),
-                );
-              },
-            ),
+            if (_loading)
+              const Center(child: CircularProgressIndicator())
+            else if (_productos.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Text('Sin envases registrados'),
+              )
+            else
+              ..._productos.map(
+                (p) => _EnvaseEditRow(
+                  producto: p,
+                  onEdit: () => _editarProducto(p),
+                ),
+              ),
           ],
         ),
       ),
@@ -162,8 +232,7 @@ class _EnvasesSectionCardState extends State<EnvasesSectionCard> {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Versión INLINE — para usar dentro de _CuentaMiniCard
-// Recibe la lista ya cargada para no hacer otra llamada HTTP
+// Versión INLINE — para _CuentaMiniCard (datos ya cargados)
 // ─────────────────────────────────────────────────────────────
 class EnvasesInline extends StatelessWidget {
   final List<ProductoCliente> productos;
@@ -202,12 +271,13 @@ class EnvasesInline extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Row interno compartido
+// Row con botón de edición — usado en EnvasesSectionCard
 // ─────────────────────────────────────────────────────────────
-class _EnvaseRow extends StatelessWidget {
+class _EnvaseEditRow extends StatelessWidget {
   final ProductoCliente producto;
+  final VoidCallback onEdit;
 
-  const _EnvaseRow(this.producto);
+  const _EnvaseEditRow({required this.producto, required this.onEdit});
 
   @override
   Widget build(BuildContext context) {
@@ -237,12 +307,18 @@ class _EnvaseRow extends StatelessWidget {
             ),
           ),
           if (producto.estado != null && producto.estado!.isNotEmpty) ...[
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             Text(
               producto.estado!,
               style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
             ),
           ],
+          IconButton(
+            icon: const Icon(Icons.edit_outlined, size: 18),
+            tooltip: 'Editar',
+            visualDensity: VisualDensity.compact,
+            onPressed: onEdit,
+          ),
         ],
       ),
     );
