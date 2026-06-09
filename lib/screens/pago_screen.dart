@@ -619,34 +619,85 @@ class _PagoScreenState extends State<PagoScreen> {
                 ..._productosEnvase.asMap().entries.map((entry) {
                   final i = entry.key;
                   final p = entry.value;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            '${p['nombre']} (tiene: ${p['cantidad_actual']})',
-                            style: const TextStyle(fontSize: 13),
+                  final cs = Theme.of(context).colorScheme;
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: cs.outlineVariant),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.water_drop_outlined,
+                                size: 15,
+                                color: cs.primary,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  p['nombre'] as String,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: cs.primaryContainer,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  'En posesion: ${p['cantidad_actual']}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: cs.onPrimaryContainer,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        _EnvaseCounter(
-                          label: 'Entrega',
-                          value: p['entregados'] as int,
-                          onChanged: (v) => setState(
-                            () => _productosEnvase[i]['entregados'] = v,
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _EnvaseCounter(
+                                  label: 'Entrega',
+                                  value: p['entregados'] as int,
+                                  onChanged: (v) => setState(
+                                    () => _productosEnvase[i]['entregados'] = v,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: _EnvaseCounter(
+                                  label: 'Retira',
+                                  value: p['devueltos'] as int,
+                                  max: p['cantidad_actual'] as int,
+                                  onChanged: (v) => setState(
+                                    () => _productosEnvase[i]['devueltos'] = v,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        _EnvaseCounter(
-                          label: 'Retira',
-                          value: p['devueltos'] as int,
-                          max: p['cantidad_actual'] as int,
-                          onChanged: (v) => setState(
-                            () => _productosEnvase[i]['devueltos'] = v,
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   );
                 }),
