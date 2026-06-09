@@ -1,15 +1,16 @@
 // lib/widgets/cliente/cliente_envases_widget.dart
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:frontend_soderia/core/net/api_client.dart';
 import 'package:frontend_soderia/models/producto_cliente.dart';
 import 'package:frontend_soderia/services/cliente_service.dart';
 
 // ─────────────────────────────────────────────────────────────
-// Versión COMPACTA — para VentaScreen (una fila de chips)
+// Versión COMPACTA — para VentaScreen (chips, solo lectura)
 // ─────────────────────────────────────────────────────────────
 class EnvasesCompacto extends StatefulWidget {
   final int legajo;
-
   const EnvasesCompacto({super.key, required this.legajo});
 
   @override
@@ -37,7 +38,6 @@ class _EnvasesCompactoState extends State<EnvasesCompacto> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-
     return FutureBuilder<List<ProductoCliente>>(
       future: _future,
       builder: (context, snap) {
@@ -48,10 +48,8 @@ class _EnvasesCompactoState extends State<EnvasesCompacto> {
             child: CircularProgressIndicator(strokeWidth: 2),
           );
         }
-
         final items = snap.data ?? [];
         if (items.isEmpty) return const SizedBox.shrink();
-
         return Wrap(
           spacing: 6,
           runSpacing: 4,
@@ -80,11 +78,10 @@ class _EnvasesCompactoState extends State<EnvasesCompacto> {
 
 // ─────────────────────────────────────────────────────────────
 // Versión SECCIÓN — para ClienteDetailScreen
-// Con botón de edición por fila
+// Con botón + para agregar y botón editar por fila
 // ─────────────────────────────────────────────────────────────
 class EnvasesSectionCard extends StatefulWidget {
   final int legajo;
-
   const EnvasesSectionCard({super.key, required this.legajo});
 
   @override
@@ -114,6 +111,140 @@ class _EnvasesSectionCardState extends State<EnvasesSectionCard> {
     } catch (_) {
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _cargarTodosLosProductos() async {
+    try {
+      final resp = await ApiClient.dio.get(
+        '/productos/',
+        queryParameters: {'limit': 200},
+      );
+      return (resp.data as List)
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    } on DioException {
+      return [];
+    }
+  }
+
+  Future<void> _agregarProducto() async {
+    // Cargar lista de productos disponibles
+    final todos = await _cargarTodosLosProductos();
+    if (!mounted) return;
+
+    if (todos.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudieron cargar los productos')),
+      );
+      return;
+    }
+
+    // Filtrar los que el cliente ya tiene
+    final idsExistentes = _productos.map((p) => p.idProducto).toSet();
+    final disponibles = todos
+        .where((p) => !idsExistentes.contains(p['id_producto'] as int))
+        .toList();
+
+    if (disponibles.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('El cliente ya tiene todos los productos asignados'),
+        ),
+      );
+      return;
+    }
+
+    Map<String, dynamic>? productoSeleccionado;
+    final cantidadCtrl = TextEditingController(text: '1');
+    final estadoCtrl = TextEditingController();
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx2, setInner) {
+            return AlertDialog(
+              title: const Text('Agregar envase'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  DropdownButtonFormField<Map<String, dynamic>>(
+                    value: productoSeleccionado,
+                    decoration: const InputDecoration(
+                      labelText: 'Producto',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: disponibles.map((p) {
+                      return DropdownMenuItem(
+                        value: p,
+                        child: Text(p['nombre']?.toString() ?? ''),
+                      );
+                    }).toList(),
+                    onChanged: (v) => setInner(() => productoSeleccionado = v),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: cantidadCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Cantidad',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: estadoCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Estado (opcional)',
+                      hintText: 'ej: en uso, roto...',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton(
+                  onPressed: productoSeleccionado == null
+                      ? null
+                      : () => Navigator.pop(ctx, true),
+                  child: const Text('Agregar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (ok != true || productoSeleccionado == null || !mounted) return;
+
+    final cantidad = int.tryParse(cantidadCtrl.text.trim()) ?? 1;
+    if (cantidad < 0) return;
+
+    try {
+      await _service.upsertProductoCliente(
+        widget.legajo,
+        productoSeleccionado!['id_producto'] as int,
+        cantidad: cantidad,
+        estado: estadoCtrl.text.trim().isEmpty ? null : estadoCtrl.text.trim(),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Producto agregado correctamente')),
+      );
+      _cargar();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
@@ -203,11 +334,22 @@ class _EnvasesSectionCardState extends State<EnvasesSectionCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Envases en posesion',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Envases en posesion',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  tooltip: 'Agregar envase',
+                  onPressed: _loading ? null : _agregarProducto,
+                ),
+              ],
             ),
             const SizedBox(height: 8),
             if (_loading)
@@ -236,14 +378,12 @@ class _EnvasesSectionCardState extends State<EnvasesSectionCard> {
 // ─────────────────────────────────────────────────────────────
 class EnvasesInline extends StatelessWidget {
   final List<ProductoCliente> productos;
-
   const EnvasesInline({super.key, required this.productos});
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final conCantidad = productos.where((p) => p.cantidad > 0).toList();
-
     if (conCantidad.isEmpty) return const SizedBox.shrink();
 
     return Column(
@@ -271,7 +411,7 @@ class EnvasesInline extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Row con botón de edición — usado en EnvasesSectionCard
+// Row con botón de edición
 // ─────────────────────────────────────────────────────────────
 class _EnvaseEditRow extends StatelessWidget {
   final ProductoCliente producto;
@@ -282,7 +422,6 @@ class _EnvaseEditRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
