@@ -42,34 +42,78 @@ class _EnvasesCompactoState extends State<EnvasesCompacto> {
       future: _future,
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
-          return const SizedBox(
-            height: 20,
-            width: 20,
-            child: CircularProgressIndicator(strokeWidth: 2),
+          return const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: LinearProgressIndicator(),
           );
         }
         final items = snap.data ?? [];
         if (items.isEmpty) return const SizedBox.shrink();
-        return Wrap(
-          spacing: 6,
-          runSpacing: 4,
-          children: items.map((p) {
-            return Chip(
-              avatar: Icon(
-                Icons.water_drop_outlined,
-                size: 14,
-                color: cs.primary,
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+          child: Card(
+            color: cs.primaryContainer.withOpacity(0.4),
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: cs.primary.withOpacity(0.25)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.water_drop_outlined,
+                        size: 15,
+                        color: cs.primary,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Envases en posesion',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: cs.onPrimaryContainer,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: items.map((p) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: cs.primaryContainer,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: cs.primary.withOpacity(0.4),
+                          ),
+                        ),
+                        child: Text(
+                          '\${p.nombre}  \${p.cantidad}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: cs.onPrimaryContainer,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
               ),
-              label: Text(
-                '${p.nombre}: ${p.cantidad}',
-                style: const TextStyle(fontSize: 12),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              visualDensity: VisualDensity.compact,
-              backgroundColor: cs.primaryContainer,
-              side: BorderSide.none,
-            );
-          }).toList(),
+            ),
+          ),
         );
       },
     );

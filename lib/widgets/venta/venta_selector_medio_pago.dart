@@ -42,7 +42,6 @@ class VentaSelectorMedioPago extends StatelessWidget {
         if (selected == null) {
           final primero = medios.first;
           selected = primero.idMedioPago as int;
-
           WidgetsBinding.instance.addPostFrameCallback((_) {
             onDefaultSelected(selected!);
           });
@@ -50,23 +49,45 @@ class VentaSelectorMedioPago extends StatelessWidget {
 
         return Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-          child: DropdownButtonFormField<int>(
-            value: selected,
-            decoration: const InputDecoration(
-              labelText: 'Medio de pago',
-              border: OutlineInputBorder(),
-              isDense: true,
-            ),
-            items: medios.map((m) {
-              return DropdownMenuItem<int>(
-                value: m.idMedioPago as int,
-                child: Text(m.nombre as String),
-              );
-            }).toList(),
-            onChanged: (v) {
-              if (v == null) return;
-              onChanged(v);
-            },
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Medio de pago',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: medios.map((m) {
+                  final id = m.idMedioPago as int;
+                  final nombre = m.nombre as String;
+                  final isSelected = selected == id;
+                  final cs = Theme.of(context).colorScheme;
+
+                  return ChoiceChip(
+                    label: Text(nombre),
+                    selected: isSelected,
+                    onSelected: (_) => onChanged(id),
+                    selectedColor: cs.primaryContainer,
+                    labelStyle: TextStyle(
+                      color: isSelected ? cs.onPrimaryContainer : cs.onSurface,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.normal,
+                    ),
+                    side: BorderSide(
+                      color: isSelected ? cs.primary : cs.outlineVariant,
+                    ),
+                    backgroundColor: cs.surface,
+                  );
+                }).toList(),
+              ),
+            ],
           ),
         );
       },
