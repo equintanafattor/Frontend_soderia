@@ -1,10 +1,13 @@
-import 'dart:io';
+// ignore: avoid_web_libraries_in_flutter
+// ignore_for_file: deprecated_member_use
+
+import 'dart:html' as html;
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 
 import 'package:frontend_soderia/core/net/api_client.dart';
 
@@ -27,13 +30,12 @@ class ReporteExcelCuentasScreen extends StatefulWidget {
       _ReporteExcelCuentasScreenState();
 }
 
-class _ReporteExcelCuentasScreenState
-    extends State<ReporteExcelCuentasScreen> {
+class _ReporteExcelCuentasScreenState extends State<ReporteExcelCuentasScreen> {
   final _now = DateTime.now();
 
   late int _mes;
   late int _anio;
-  String? _dia; // null = todos
+  String? _dia;
   bool _descargando = false;
 
   @override
@@ -62,18 +64,21 @@ class _ReporteExcelCuentasScreenState
         options: Options(responseType: ResponseType.bytes),
       );
 
-      // Guardar en directorio temporal y compartir
-      final dir = await getTemporaryDirectory();
       final sufijo = _dia != null ? '_$_dia' : '';
       final fileName =
           'cuentas_${_anio}_${_mes.toString().padLeft(2, '0')}$sufijo.xlsx';
-      final file = File('${dir.path}/$fileName');
-      await file.writeAsBytes(response.data as List<int>);
 
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        subject: 'Planilla de cuentas — $_nombreMes $_anio',
-      );
+      final bytes = response.data as List<int>;
+
+      // Descarga directa en el navegador via dart:html
+      final blob = html.Blob([
+        Uint8List.fromList(bytes),
+      ], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final anchor = html.AnchorElement(href: url)
+        ..setAttribute('download', fileName)
+        ..click();
+      html.Url.revokeObjectUrl(url);
     } on DioException catch (e) {
       if (!mounted) return;
       _mostrarError('Error al descargar: ${e.response?.data ?? e.message}');
@@ -86,13 +91,10 @@ class _ReporteExcelCuentasScreenState
   }
 
   void _mostrarError(String msg) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   Future<void> _seleccionarMes() async {
-    // Picker simple: año y mes con dos ListWheelScrollView
     int tempMes = _mes;
     int tempAnio = _anio;
 
@@ -107,7 +109,6 @@ class _ReporteExcelCuentasScreenState
               builder: (ctx2, setInner) {
                 return Row(
                   children: [
-                    // Mes
                     Expanded(
                       flex: 3,
                       child: ListWheelScrollView.useDelegate(
@@ -122,8 +123,10 @@ class _ReporteExcelCuentasScreenState
                           childCount: 12,
                           builder: (_, i) => Center(
                             child: Text(
-                              DateFormat('MMMM', 'es_AR')
-                                  .format(DateTime(2000, i + 1)),
+                              DateFormat(
+                                'MMMM',
+                                'es_AR',
+                              ).format(DateTime(2000, i + 1)),
                               style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: tempMes == i + 1
@@ -135,7 +138,6 @@ class _ReporteExcelCuentasScreenState
                         ),
                       ),
                     ),
-                    // Año
                     Expanded(
                       flex: 2,
                       child: ListWheelScrollView.useDelegate(
@@ -197,9 +199,7 @@ class _ReporteExcelCuentasScreenState
     final cs = Theme.of(context).colorScheme;
     final diaLabel = _dia == null
         ? 'Todos'
-        : _diasSemana
-              .firstWhere((d) => d['value'] == _dia)['label']
-              .toString();
+        : _diasSemana.firstWhere((d) => d['value'] == _dia)['label'].toString();
 
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -208,10 +208,9 @@ class _ReporteExcelCuentasScreenState
         children: [
           Text(
             'Planilla de cuentas',
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(fontWeight: FontWeight.w600),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 4),
           Text(
@@ -219,16 +218,16 @@ class _ReporteExcelCuentasScreenState
             style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
           ),
           const SizedBox(height: 24),
-
-          // Selector de mes
           _FilterRow(
             label: 'Período',
             child: InkWell(
               borderRadius: BorderRadius.circular(8),
               onTap: _seleccionarMes,
               child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -245,10 +244,7 @@ class _ReporteExcelCuentasScreenState
               ),
             ),
           ),
-
           const SizedBox(height: 16),
-
-          // Filtro de día
           _FilterRow(
             label: 'Día de visita',
             child: DropdownButton<String?>(
@@ -266,9 +262,7 @@ class _ReporteExcelCuentasScreenState
               onChanged: (v) => setState(() => _dia = v),
             ),
           ),
-
           const Spacer(),
-
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
@@ -284,9 +278,7 @@ class _ReporteExcelCuentasScreenState
                     )
                   : const Icon(Icons.download_outlined),
               label: Text(
-                _descargando
-                    ? 'Generando...'
-                    : 'Descargar Excel — $diaLabel',
+                _descargando ? 'Generando...' : 'Descargar Excel — $diaLabel',
               ),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
