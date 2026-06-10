@@ -5,6 +5,7 @@ import 'package:frontend_soderia/core/net/api_client.dart';
 import 'package:frontend_soderia/services/documento_service.dart';
 import 'package:frontend_soderia/utils/open_pdf.dart';
 import 'package:frontend_soderia/utils/share_whatsapp.dart';
+import 'package:intl/intl.dart';
 
 class ClientePedidosSection extends StatelessWidget {
   final List<dynamic> pedidos;
@@ -28,7 +29,14 @@ class ClientePedidosSection extends StatelessWidget {
               children: pedidos.map((p0) {
                 final p = p0 as Map;
                 final id = (p['id_pedido'] as num?)?.toInt();
-                final fecha = (p['fecha'] ?? '').toString();
+                // en cliente_pedidos_section.dart línea 31
+                final fechaRaw = (p['fecha'] ?? '').toString();
+                final fecha = fechaRaw.isNotEmpty
+                    ? DateFormat(
+                        'dd/MM/yyyy HH:mm',
+                        'es_AR',
+                      ).format(DateTime.parse(fechaRaw).toLocal())
+                    : '';
 
                 return ListTile(
                   contentPadding: EdgeInsets.zero,

@@ -1,6 +1,7 @@
 // lib/widgets/cliente/cliente_historico_section.dart
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:frontend_soderia/utils/historico_cliente_formatter.dart';
 
 class ClienteHistoricoSection extends StatelessWidget {
@@ -24,6 +25,14 @@ class ClienteHistoricoSection extends StatelessWidget {
 
                 final subtitleText = buildHistoricoSubtitle(h);
 
+                final fechaRaw = (h['fecha'] ?? '').toString();
+                final fechaFmt = fechaRaw.isNotEmpty
+                    ? DateFormat(
+                        'dd/MM/yyyy HH:mm',
+                        'es_AR',
+                      ).format(DateTime.parse(fechaRaw).toLocal())
+                    : '';
+
                 return ListTile(
                   dense: true,
                   contentPadding: EdgeInsets.zero,
@@ -36,7 +45,7 @@ class ClienteHistoricoSection extends StatelessWidget {
                           maxLines: 6,
                           overflow: TextOverflow.ellipsis,
                         ),
-                  trailing: Text('${h['fecha'] ?? ''}'),
+                  trailing: Text(fechaFmt),
                 );
               }).toList(),
             ),
