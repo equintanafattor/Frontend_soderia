@@ -2,7 +2,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:frontend_soderia/utils/historico_cliente_formatter.dart';
 
 class ClienteHistoricoSection extends StatelessWidget {
   final List<dynamic> historicos;
@@ -23,7 +22,13 @@ class ClienteHistoricoSection extends StatelessWidget {
                     ? (ev['nombre'] ?? 'Evento')
                     : (ev?.toString() ?? 'Evento');
 
-                final subtitleText = buildHistoricoSubtitle(h);
+                // El backend ahora arma `detalle` a partir de `datos`.
+                // Si por algun motivo viene vacio, caemos a `observacion`.
+                final detalle = (h['detalle'] ?? '').toString();
+                final observacion = (h['observacion'] ?? '').toString();
+                final subtitleText = detalle.isNotEmpty ? detalle : observacion;
+
+                final monto = h['monto'];
 
                 final fechaRaw = (h['fecha'] ?? '').toString();
                 final fechaFmt = fechaRaw.isNotEmpty
@@ -45,7 +50,24 @@ class ClienteHistoricoSection extends StatelessWidget {
                           maxLines: 6,
                           overflow: TextOverflow.ellipsis,
                         ),
-                  trailing: Text(fechaFmt),
+                  trailing: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(fechaFmt),
+                      if (monto != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            '\$${(monto as num).toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 );
               }).toList(),
             ),

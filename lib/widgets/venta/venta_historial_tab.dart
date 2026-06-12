@@ -29,20 +29,25 @@ class VentaHistorialTab extends StatelessWidget {
       itemBuilder: (_, i) {
         final h = historicos[i] as Map<String, dynamic>;
 
-        // en venta_historial_tab.dart línea 31
         final fechaRaw = (h['fecha'] ?? '').toString();
-        final fechaStr = fechaRaw.isNotEmpty
+        final fechaFmt = fechaRaw.isNotEmpty
             ? DateFormat(
                 'dd/MM/yyyy HH:mm',
                 'es_AR',
               ).format(DateTime.parse(fechaRaw).toLocal())
             : '';
+
         final obs = (h['observacion'] ?? '').toString();
+        final detalle = (h['detalle'] ?? '').toString();
+        final monto = h['monto'];
 
         final evento = (h['evento'] as Map<String, dynamic>?) ?? {};
-
         final nombreEvento = (evento['nombre'] ?? evento['descripcion'] ?? '')
             .toString();
+
+        // El detalle ya incluye la información relevante armada por el
+        // backend; si viene vacío, caemos a la observación como antes.
+        final cuerpo = detalle.isNotEmpty ? detalle : obs;
 
         return Card(
           child: ListTile(
@@ -51,10 +56,33 @@ class VentaHistorialTab extends StatelessWidget {
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (fechaStr.isNotEmpty) Text(fechaStr),
-                if (obs.isNotEmpty) Text(obs),
+                if (cuerpo.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(cuerpo),
+                  ),
+                if (fechaFmt.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      fechaFmt,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
               ],
             ),
+            trailing: monto != null
+                ? Text(
+                    '\$${(monto as num).toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  )
+                : null,
           ),
         );
       },
