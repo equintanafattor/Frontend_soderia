@@ -35,6 +35,7 @@ import 'package:frontend_soderia/services/visita_service.dart';
 
 // Widgets
 import 'package:frontend_soderia/widgets/cliente/cliente_envases_widget.dart';
+import 'package:frontend_soderia/widgets/venta/envases_visita_dialog.dart';
 import 'package:frontend_soderia/widgets/venta/venta_cantidad_dialog.dart';
 import 'package:frontend_soderia/widgets/venta/venta_confirm_action.dart';
 import 'package:frontend_soderia/widgets/venta/venta_header_info.dart';
@@ -325,11 +326,21 @@ class _VentaScreenState extends State<VentaScreen> {
     return precio != null && precio > 0;
   }
 
-  Future<void> _registrarVisita(String estado) async {
+  Future<void> _registrarVisita(
+    String estado, {
+    List<EnvaseMovimientoVisita> envases = const [],
+  }) async {
     try {
+      int? idRepartoDia;
+      if (envases.isNotEmpty) {
+        idRepartoDia = await _obtenerIdRepartoDiaActual();
+      }
+
       await _visitaRepository.registrarVisitaOffline(
         legajo: widget.legajoCliente,
         estado: estado,
+        idRepartoDia: idRepartoDia,
+        envases: envases,
       );
 
       if (!mounted) return;
@@ -540,18 +551,36 @@ class _VentaScreenState extends State<VentaScreen> {
         ],
       ),
     );
-    if (ok == true && mounted) {
-      await _registrarVisita(VisitaEstado.noCompra);
+    if (ok != true || !mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Visita marcada como "No compra"')),
-      );
-      Navigator.of(context).pop(true);
-    }
+    final envases = await showDialog<List<EnvaseMovimientoVisita>>(
+      context: context,
+      builder: (_) => EnvasesVisitaDialog(legajo: widget.legajoCliente),
+    );
+
+    if (!mounted) return;
+
+    await _registrarVisita(VisitaEstado.noCompra, envases: envases ?? const []);
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Visita marcada como "No compra"')),
+    );
+    Navigator.of(context).pop(true);
   }
 
   void _postergar() async {
-    await _registrarVisita(VisitaEstado.postergada);
+    final envases = await showDialog<List<EnvaseMovimientoVisita>>(
+      context: context,
+      builder: (_) => EnvasesVisitaDialog(legajo: widget.legajoCliente),
+    );
+
+    if (!mounted) return;
+
+    await _registrarVisita(
+      VisitaEstado.postergada,
+      envases: envases ?? const [],
+    );
 
     if (!mounted) return;
 
@@ -783,7 +812,25 @@ class _VentaScreenState extends State<VentaScreen> {
               },
             ),
 
-            EnvasesCompacto(legajo: widget.legajoCliente),
+            VentaSelectorMedioPago(
+              futureMediosPago: _futureMediosPago,
+              idMedioPagoSeleccionado: _idMedioPagoSeleccionado,
+              onChanged: (id) {
+                setState(() {
+                  _idMedioPagoSeleccionado = id;
+                });
+              },
+              onDefaultSelected: (id) {
+                if (!mounted) return;
+                setState(() {
+                  _idMedioPagoSeleccionado = id;
+                });
+              },
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              child: EnvasesCompacto(legajo: widget.legajoCliente),
+            ),
             Expanded(
               child: Padding(
                 padding: EdgeInsets.only(bottom: isMobile ? 84 : 0),
@@ -800,17 +847,6 @@ class _VentaScreenState extends State<VentaScreen> {
                       onNoCompra: () => _noCompra(nombreCliente),
                       onEditarCantidad: _editarCantidad,
                       onEliminarItem: _eliminarItem,
-                      selectorMedioPago: VentaSelectorMedioPago(
-                        futureMediosPago: _futureMediosPago,
-                        idMedioPagoSeleccionado: _idMedioPagoSeleccionado,
-                        onChanged: (id) {
-                          setState(() => _idMedioPagoSeleccionado = id);
-                        },
-                        onDefaultSelected: (id) {
-                          if (!mounted) return;
-                          setState(() => _idMedioPagoSeleccionado = id);
-                        },
-                      ),
                     ),
 
                     VentaItemsTab(
