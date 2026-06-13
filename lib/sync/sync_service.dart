@@ -90,8 +90,9 @@ class SyncService {
     SyncQueueData op,
     Map<String, dynamic> payload,
   ) async {
+    final legajo = payload['legajo'];
     final resp = await _dio.post(
-      '/visitas',
+      '/visitas/$legajo',
       data: payload,
       options: Options(
         headers: {'Idempotency-Key': payload['idempotency_key']},
@@ -118,7 +119,7 @@ class SyncService {
     Map<String, dynamic> payload,
   ) async {
     final resp = await _dio.post(
-      '/pedidos',
+      '/pedidos/',
       data: payload,
       options: Options(
         headers: {'Idempotency-Key': payload['idempotency_key']},

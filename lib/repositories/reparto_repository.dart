@@ -34,6 +34,17 @@ class RepartoRepository {
       agenda['clientes'] ?? const [],
     );
 
+    // Descargar el detalle de cada cliente de la agenda EN PARALELO
+    // (antes era un await secuencial por cliente, lo que multiplicaba
+    // el tiempo de carga por la cantidad de clientes de la agenda).
+    final detalles = await Future.wait(
+      clientesAgenda.map((item) async {
+        final legajo = (item['legajo'] as num).toInt();
+        final detalleResp = await api.obtenerDetalleCliente(legajo);
+        return Map<String, dynamic>.from(detalleResp.data);
+      }),
+    );
+
     await db.transaction(() async {
       await db.delete(db.repartoActualLocal).go();
       await db.delete(db.repartoClientesLocal).go();
@@ -63,11 +74,10 @@ class RepartoRepository {
         )..where((t) => t.legajo.isIn(legajos))).go();
       }
 
-      for (final item in clientesAgenda) {
+      for (var i = 0; i < clientesAgenda.length; i++) {
+        final item = clientesAgenda[i];
         final legajo = (item['legajo'] as num).toInt();
-
-        final detalleResp = await api.obtenerDetalleCliente(legajo);
-        final detalle = Map<String, dynamic>.from(detalleResp.data);
+        final detalle = detalles[i];
 
         final persona = detalle['persona'] as Map<String, dynamic>?;
         final direcciones = List<Map<String, dynamic>>.from(

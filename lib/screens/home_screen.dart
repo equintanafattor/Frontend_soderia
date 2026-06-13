@@ -112,6 +112,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<List<RepartoClienteConDatos>> _inicializarPantalla() async {
+    // IMPORTANTE: sincronizamos primero los cambios offline pendientes
+    // (visitas, pedidos, etc.) para que el backend ya los tenga antes de
+    // que el bootstrap descargue la agenda fresca y sobreescriba
+    // RepartoClientesLocal. Si el orden fuera al revés, el bootstrap
+    // pisaría el estado_visita local con el valor viejo del servidor,
+    // y recién se vería actualizado en la siguiente recarga.
+    try {
+      await _syncService.syncPendientes();
+    } catch (_) {}
+
     try {
       await _repartoRepository.bootstrapDelDia(
         fecha: _fechaObjetivo,
@@ -121,10 +131,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       await _catalogoRepository.bootstrapCatalogo();
-    } catch (_) {}
-
-    try {
-      await _syncService.syncPendientes();
     } catch (_) {}
 
     return _cargarAgendaLocal();
@@ -220,9 +226,25 @@ class _HomeScreenState extends State<HomeScreen> {
     // Fix 3: bootstrap en background sin bloquear el scroll
     _inicializarPantalla().then((clientesActualizados) {
       if (!mounted) return;
+
+      // Guardamos el offset actual para restaurarlo después del setState,
+      // ya que reemplazar _futureAgenda reconstruye el ListView y por
+      // defecto vuelve el scroll al inicio.
+      final offsetPrevio = _scrollController.hasClients
+          ? _scrollController.offset
+          : null;
+
       setState(() {
         _futureAgenda = Future.value(clientesActualizados);
       });
+
+      if (offsetPrevio != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!_scrollController.hasClients) return;
+          final maxScroll = _scrollController.position.maxScrollExtent;
+          _scrollController.jumpTo(offsetPrevio.clamp(0, maxScroll));
+        });
+      }
     });
   }
 
@@ -306,6 +328,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 onPressed: () async {
                   await _syncService.syncPendientes();
                   if (!mounted) return;
+                  _recargarAgenda();
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Sincronización ejecutada')),
                   );

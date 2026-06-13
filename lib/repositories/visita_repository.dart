@@ -56,6 +56,25 @@ class VisitaRepository {
             ),
           );
 
+      // Reflejar el nuevo estado en RepartoClientesLocal para que la
+      // agenda (HomeScreen) lo muestre sin necesitar un bootstrap completo.
+      final idRepartoActual = await db
+          .select(db.repartoActualLocal)
+          .getSingleOrNull();
+      if (idRepartoActual != null) {
+        await (db.update(db.repartoClientesLocal)..where(
+              (t) =>
+                  t.idReparto.equals(idRepartoActual.idReparto) &
+                  t.legajo.equals(legajo),
+            ))
+            .write(
+              RepartoClientesLocalCompanion(
+                estadoVisita: drift.Value(estado),
+                updatedAt: drift.Value(now),
+              ),
+            );
+      }
+
       await queueDao.enqueue(
         localOperationId: _uuid.v4(),
         entityType: 'visita',
