@@ -96,7 +96,7 @@ class _TodosScreenState extends State<TodosScreen> {
 
   // ===== Carga de datos reales =====
 
-  Future<Map<DateTime, List<ClientePorDiaItem>>> _cargarAgendaMes(
+  /*Future<Map<DateTime, List<ClientePorDiaItem>>> _cargarAgendaMes(
     DateTime mes,
   ) async {
     final dias = _todosLosDiasDelMes(mes);
@@ -119,7 +119,23 @@ class _TodosScreenState extends State<TodosScreen> {
       map[entry.key] = entry.value;
     }
     return map;
-  }
+  }*/
+  Future<Map<DateTime, List<ClientePorDiaItem>>> _cargarAgendaMes(
+      DateTime mes,
+    ) async {
+      final desde = DateTime(mes.year, mes.month, 1);
+      final hasta = DateTime(mes.year, mes.month, _diasEnMes(mes));
+
+      try {
+        return await _agendaService.obtenerAgendaPorRango(desde, hasta);
+      } catch (_) {
+        final map = <DateTime, List<ClientePorDiaItem>>{};
+        for (final fecha in _todosLosDiasDelMes(mes)) {
+          map[_soloFecha(fecha)] = <ClientePorDiaItem>[];
+        }
+        return map;
+      }
+    }
 
   void _cambiarMes(int delta) {
     setState(() {
