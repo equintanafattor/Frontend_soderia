@@ -32,6 +32,18 @@ class RepartoApi {
       },
     );
   }
+  Future<Response> obtenerAgendaConDatosPorFecha({
+    required String fechaIso,
+    String? turno,
+  }) {
+    return dio.get(
+      '/clientes/agenda/visitas/con-datos',
+      queryParameters: {
+        'fecha': fechaIso,
+        if (turno != null && turno.isNotEmpty) 'turno': turno,
+      },
+    );
+  }
 
   Future<Response> obtenerDetalleCliente(int legajo) {
     return dio.get('/clientes/$legajo/detalle');
