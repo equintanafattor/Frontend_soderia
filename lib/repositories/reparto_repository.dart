@@ -23,7 +23,9 @@ class RepartoRepository {
       idUsuario: idUsuario,
     );
 
-    final agendaResp = await api.obtenerAgendaPorFecha(
+    // ⬇️ Agenda ENRIQUECIDA: trae dirección/teléfono/cuenta de cada cliente
+    // en la misma respuesta. Antes hacíamos 1 request /detalle por cliente.
+    final agendaResp = await api.obtenerAgendaConDatosPorFecha(
       fechaIso: fechaIso,
       turno: turno,
     );
@@ -34,16 +36,7 @@ class RepartoRepository {
       agenda['clientes'] ?? const [],
     );
 
-    // Descargar el detalle de cada cliente de la agenda EN PARALELO
-    // (antes era un await secuencial por cliente, lo que multiplicaba
-    // el tiempo de carga por la cantidad de clientes de la agenda).
-    final detalles = await Future.wait(
-      clientesAgenda.map((item) async {
-        final legajo = (item['legajo'] as num).toInt();
-        final detalleResp = await api.obtenerDetalleCliente(legajo);
-        return Map<String, dynamic>.from(detalleResp.data);
-      }),
-    );
+    // (Ya no hace falta el Future.wait de detalles: los datos vienen en la agenda)
 
     await db.transaction(() async {
       await db.delete(db.repartoActualLocal).go();
@@ -74,39 +67,20 @@ class RepartoRepository {
         )..where((t) => t.legajo.isIn(legajos))).go();
       }
 
-      for (var i = 0; i < clientesAgenda.length; i++) {
-        final item = clientesAgenda[i];
+      for (final item in clientesAgenda) {
         final legajo = (item['legajo'] as num).toInt();
-        final detalle = detalles[i];
 
-        final persona = detalle['persona'] as Map<String, dynamic>?;
-        final direcciones = List<Map<String, dynamic>>.from(
-          detalle['direcciones'] ?? const [],
-        );
-        final telefonos = List<Map<String, dynamic>>.from(
-          detalle['telefonos'] ?? const [],
-        );
-        final cuentas = List<Map<String, dynamic>>.from(
-          detalle['cuentas'] ?? const [],
-        );
-
-        final direccion = direcciones.isNotEmpty
-            ? direcciones.first['direccion'] as String?
-            : null;
-
-        final telefono = telefonos.isNotEmpty
-            ? telefonos.first['nro_telefono'] as String?
-            : null;
-
-        final cuenta = cuentas.isNotEmpty ? cuentas.first : null;
-        final idCuenta = (cuenta?['id_cuenta'] as num?)?.toInt();
-        final saldo = _toDouble(cuenta?['saldo']);
-        final deuda = _toDouble(cuenta?['deuda']);
+        // ⬇️ Ahora sale todo del item de la agenda (antes salía del /detalle)
+        final direccion = item['direccion'] as String?;
+        final telefono = item['telefono'] as String?;
+        final idCuenta = (item['id_cuenta'] as num?)?.toInt();
+        final saldo = _toDouble(item['saldo']);
+        final deuda = _toDouble(item['deuda']);
 
         final nombre = [
-          persona?['apellido']?.toString().trim(),
-          persona?['nombre']?.toString().trim(),
-        ].where((e) => e != null && e!.isNotEmpty).join(', ');
+          item['apellido']?.toString().trim(),
+          item['nombre']?.toString().trim(),
+          ].where((e) => e != null && e!.isNotEmpty).join(', ');
 
         await db
             .into(db.clientesLocal)
@@ -132,7 +106,7 @@ class RepartoRepository {
                 turno: Value(item['turno_visita'] as String?),
                 posicion: const Value.absent(),
                 estadoVisita: Value(item['estado_visita'] as String?),
-                observacion: Value(detalle['observacion'] as String?),
+                observacion: Value(item['observacion'] as String?),
                 dirty: const Value(false),
                 updatedAt: Value(DateTime.now()),
               ),
