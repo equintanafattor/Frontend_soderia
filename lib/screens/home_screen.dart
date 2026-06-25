@@ -18,6 +18,7 @@ import 'package:frontend_soderia/data/remote/reparto_api.dart';
 import 'package:frontend_soderia/repositories/reparto_repository.dart';
 import 'package:frontend_soderia/data/local/daos/sync_queue_dao.dart';
 import 'package:frontend_soderia/sync/sync_service.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 class HomeScreen extends StatefulWidget {
   final String nombreUsuario;
@@ -36,7 +37,9 @@ class _HomeScreenState extends State<HomeScreen> {
   late Future<List<RepartoClienteConDatos>> _futureAgenda;
   late final VoidCallback _homeDayFilterListener;
   late final VoidCallback _shellListener;
-  final ScrollController _scrollController = ScrollController();
+  /*final ScrollController _scrollController = ScrollController();*/
+  final ItemScrollController _itemScrollController = ItemScrollController();
+  int? _scrollTargetIndex;
 
   late final RepartoRepository _repartoRepository;
   late final CatalogoRepository _catalogoRepository;
@@ -106,8 +109,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     homeDayFilter.removeListener(_homeDayFilterListener);
-    shellState.removeListener(_shellListener);
-    _scrollController.dispose();
+    shellState.removeListener(_shellListener);    
     super.dispose();
   }
 
@@ -180,71 +182,45 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+    /// Devuelve el índice del próximo cliente pendiente/postergado después
+  /// del actual. Si no hay siguiente, devuelve el índice del actual
+  /// (para que quede visible con su nuevo estado).
+  int _indexSiguientePendiente(
+    List<RepartoClienteConDatos> clientes,
+    int legajoActual,
+  ) {
+    final actualIndex = clientes.indexWhere((c) => c.legajo == legajoActual);
+
+    for (int i = actualIndex + 1; i < clientes.length; i++) {
+      final estado = mapEstadoVisita(clientes[i].estadoVisita ?? 'pendiente');
+      if (estado == EstadoVisita.pendiente ||
+          estado == EstadoVisita.postergado) {
+        return i;
+      }
+    }
+    return actualIndex == -1 ? 0 : actualIndex;
+  }
+
   Future<void> _recargarAgendaYMostrarSiguiente(int legajoActual) async {
-    // Fix 3: cargamos local primero (sin red) para scrollear inmediato
+    // 1) Datos locales primero (sin red): reaccionamos al instante.
     final clientesLocales = await _cargarAgendaLocal();
     if (!mounted) return;
 
-    // Fix 2: si el cliente ya no aparece en la lista usamos 0 como base
-    final actualIndex = clientesLocales.indexWhere(
-      (c) => c.legajo == legajoActual,
-    );
-    final baseIndex = actualIndex == -1 ? 0 : actualIndex;
-
-    final siguienteIndex = clientesLocales.indexWhere((cliente) {
-      final index = clientesLocales.indexOf(cliente);
-      final estado = mapEstadoVisita(cliente.estadoVisita ?? 'pendiente');
-      return index > baseIndex &&
-          (estado == EstadoVisita.pendiente ||
-              estado == EstadoVisita.postergado);
-    });
-
-    // Fix 4: si no hay siguiente, quedarse en el actual para ver su nuevo estado
-    final indexDestino = siguienteIndex == -1 ? baseIndex : siguienteIndex;
-
-    // Mostrar datos locales ya disponibles
     setState(() {
       _futureAgenda = Future.value(clientesLocales);
+      _scrollTargetIndex =
+          _indexSiguientePendiente(clientesLocales, legajoActual);
     });
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scrollController.hasClients) return;
-      final total = clientesLocales.length;
-      if (total == 0) return;
-
-      // Fix 1: offset proporcional al maxScrollExtent real en lugar de altura fija
-      final maxScroll = _scrollController.position.maxScrollExtent;
-      final targetOffset = (indexDestino / total) * maxScroll;
-
-      _scrollController.animateTo(
-        targetOffset,
-        duration: const Duration(milliseconds: 350),
-        curve: Curves.easeOut,
-      );
-    });
-
-    // Fix 3: bootstrap en background sin bloquear el scroll
+    // 2) Refresco en background (sync + bootstrap). Al terminar,
+    //    recalculamos el índice y reafirmamos la posición.
     _inicializarPantalla().then((clientesActualizados) {
       if (!mounted) return;
-
-      // Guardamos el offset actual para restaurarlo después del setState,
-      // ya que reemplazar _futureAgenda reconstruye el ListView y por
-      // defecto vuelve el scroll al inicio.
-      final offsetPrevio = _scrollController.hasClients
-          ? _scrollController.offset
-          : null;
-
       setState(() {
         _futureAgenda = Future.value(clientesActualizados);
+        _scrollTargetIndex =
+            _indexSiguientePendiente(clientesActualizados, legajoActual);
       });
-
-      if (offsetPrevio != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!_scrollController.hasClients) return;
-          final maxScroll = _scrollController.position.maxScrollExtent;
-          _scrollController.jumpTo(offsetPrevio.clamp(0, maxScroll));
-        });
-      }
     });
   }
 
@@ -414,44 +390,52 @@ class _HomeScreenState extends State<HomeScreen> {
                       );
                     }
 
-                    return ListView.builder(
-                      controller: _scrollController,
-                      itemCount: clientes.length,
-                      itemBuilder: (context, index) {
-                        final c = clientes[index];
-                        final estado = mapEstadoVisita(
-                          c.estadoVisita ?? 'pendiente',
-                        );
+                    // Disparamos el scroll recién cuando la lista está montada con datos.
+                      final targetIndex = _scrollTargetIndex;
+                      if (targetIndex != null) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (!mounted || _scrollTargetIndex != targetIndex) return;
+                          if (!_itemScrollController.isAttached) return;
+                          _itemScrollController.scrollTo(
+                            index: targetIndex.clamp(0, clientes.length - 1),
+                            duration: const Duration(milliseconds: 350),
+                            curve: Curves.easeOut,
+                            alignment: 0.0, // 0.0 = el ítem queda arriba de todo
+                          );
+                          _scrollTargetIndex = null;
+                        });
+                      }
 
-                        final bool puedeEntrar =
-                            estado == EstadoVisita.pendiente ||
-                            estado == EstadoVisita.postergado;
+                      return ScrollablePositionedList.builder(
+                        itemScrollController: _itemScrollController,
+                        itemCount: clientes.length,
+                        itemBuilder: (context, index) {
+                          final c = clientes[index];
+                          final estado = mapEstadoVisita(c.estadoVisita ?? 'pendiente');
 
-                        return VisitCard(
-                          nombre: c.nombre,
-                          direccion: c.direccion ?? 'Sin dirección',
-                          estado: estado,
-                          turnoVisita: c.turno,
-                          onTap: puedeEntrar
-                              ? () async {
-                                  final res =
-                                      await Navigator.of(
-                                        context,
-                                        rootNavigator: true,
-                                      ).pushNamed(
-                                        '/venta',
-                                        arguments: {'legajo': c.legajo},
-                                      );
-                                  if (res == true) {
-                                    await _recargarAgendaYMostrarSiguiente(
-                                      c.legajo,
-                                    );
+                          final bool puedeEntrar = estado == EstadoVisita.pendiente ||
+                              estado == EstadoVisita.postergado ||
+                              estado == EstadoVisita.visitado;
+
+                          return VisitCard(
+                            nombre: c.nombre,
+                            direccion: c.direccion ?? 'Sin dirección',
+                            estado: estado,
+                            turnoVisita: c.turno,
+                            onTap: puedeEntrar
+                                ? () async {
+                                    final res = await Navigator.of(
+                                      context,
+                                      rootNavigator: true,
+                                    ).pushNamed('/venta', arguments: {'legajo': c.legajo});
+                                    if (res == true) {
+                                      await _recargarAgendaYMostrarSiguiente(c.legajo);
+                                    }
                                   }
-                                }
-                              : null,
-                        );
-                      },
-                    );
+                                : null,
+                          );
+                        },
+                      );
                   },
                 ),
               ),
