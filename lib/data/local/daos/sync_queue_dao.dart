@@ -34,7 +34,7 @@ class SyncQueueDao {
 
   Future<List<SyncQueueData>> getPending() {
     return (db.select(db.syncQueue)
-          ..where((t) => t.status.isIn(['PENDING', 'ERROR']))
+          ..where((t) => t.status.isIn(['PENDING', 'ERROR', 'CONFLICT', 'SYNCING']))
           ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
         .get();
   }
