@@ -20,7 +20,7 @@ class SyncService {
     _isSyncing = true;
 
     try {
-      final pendientes = await queueDao.getPendientes();
+      final pendientes = await queueDao.getPending();
 
       for (final op in pendientes) {
         await _procesarOperacion(op);
