@@ -86,6 +86,7 @@ class PedidoRepository {
         payloadJson: jsonEncode({
           'client_uuid': localUuid,
           'idempotency_key': localUuid,
+          'id_empresa': 1,
           'legajo': legajo,
           'id_cuenta': idCuenta,
           'id_repartodia': idRepartoDia,
