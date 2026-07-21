@@ -301,24 +301,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               TextButton(
-  onPressed: () async {
-    final ops = await _syncQueueDao.getPending();
-    if (!mounted) return;
-    
-    final detalle = ops.map((o) => '${o.id}:${o.entityType}:${o.status}').join('\n');
-    
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Debug sync: ${ops.length} ops'),
-        content: Text(detalle.isEmpty ? 'No encontró operaciones' : detalle),
-        actions: [
-          TextButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          child: const Text('OK'),
-                        ),
-                      ],
-                    ),
+                onPressed: () async {
+                  await _syncService.syncPendientes();
+                  if (!mounted) return;
+                  _recargarAgenda();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Sincronización ejecutada')),
                   );
                 },
                 child: const Text('Sincronizar ahora'),

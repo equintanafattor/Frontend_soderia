@@ -34,7 +34,7 @@ class SyncQueueDao {
 
   Future<List<SyncQueueData>> getPending() {
     return (db.select(db.syncQueue)
-          ..where((t) => t.status.isIn(['PENDING', 'ERROR', 'CONFLICT', 'SYNCING']))
+          ..where((t) => t.status.isIn(['PENDING', 'ERROR']))
           ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
         .get();
   }
@@ -109,8 +109,17 @@ class SyncQueueDao {
 
     final query = db.selectOnly(db.syncQueue)
       ..addColumns([countExpression])
-      ..where(db.syncQueue.status.isIn(['PENDING', 'ERROR', 'CONFLICT']));
+      ..where(db.syncQueue.status.isIn(['PENDING', 'ERROR']));
 
     return query.watchSingle().map((row) => row.read(countExpression) ?? 0);
+  }
+
+  Future<void> resetHuerfanas() async {
+    await (db.update(db.syncQueue)
+          ..where((t) => t.status.equals('SYNCING')))
+        .write(SyncQueueCompanion(
+          status: const Value('PENDING'),
+          updatedAt: Value(DateTime.now()),
+        ));
   }
 }
